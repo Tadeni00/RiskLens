@@ -1,0 +1,195 @@
+# FraudTrap Rules Configuration
+# This file defines all rules for the Tier 1 Rules Engine
+# Supports hot-reload: changes take effect within 60 seconds (configurable)
+
+rules:
+  # ─── Blocklist Rules (Hard Block) ──────────────────────────────────────────
+  - id: "BLOCKLIST_ACCOUNT"
+    description: "Account on fraud blocklist"
+    type: "blocklist"
+    action: "hard_block"
+    severity: "critical"
+    blocklist:
+      entity: "account"
+      list_name: "fraud_accounts"
+
+  - id: "BLOCKLIST_DEVICE"
+    description: "Device on fraud blocklist"
+    type: "blocklist"
+    action: "hard_block"
+    severity: "critical"
+    blocklist:
+      entity: "device"
+      list_name: "fraud_devices"
+
+  - id: "BLOCKLIST_IP"
+    description: "IP hash on fraud blocklist"
+    type: "blocklist"
+    action: "hard_block"
+    severity: "critical"
+    blocklist:
+      entity: "ip"
+      list_name: "fraud_ips"
+
+  - id: "BLOCKLIST_MERCHANT"
+    description: "Merchant on fraud blocklist"
+    type: "blocklist"
+    action: "hard_block"
+    severity: "critical"
+    blocklist:
+      entity: "merchant"
+      list_name: "fraud_merchants"
+
+  - id: "SANCTIONED_COUNTRY"
+    description: "Transaction country on sanctions list"
+    type: "blocklist"
+    action: "hard_block"
+    severity: "critical"
+    blocklist:
+      entity: "country"
+      list_name: "sanctioned_countries"
+
+  # ─── Geo Rules ──────────────────────────────────────────────────────────────
+  - id: "IMPOSSIBLE_TRAVEL"
+    description: "Geo velocity > 900 km/h (impossible travel)"
+    type: "geo"
+    action: "hard_block"
+    severity: "critical"
+    geo:
+      rule_type: "impossible_travel"
+      threshold_kmh: 900.0
+
+  - id: "CROSS_BORDER_HIGH_VALUE"
+    description: "Cross-border transaction > 50x account mean"
+    type: "expression"
+    action: "soft_boost"
+    severity: "high"
+    boost: 0.20
+    expression:
+      expression: "cross_country_flag == 1 and amount_vs_mean_ratio > 50"
+
+  # ─── Velocity Rules ─────────────────────────────────────────────────────────
+  - id: "VELOCITY_SPIKE_1M"
+    description: "Velocity spike: > 10 transactions in 1 minute"
+    type: "velocity"
+    action: "hard_block"
+    severity: "high"
+    velocity:
+      entity_type: "account"
+      window_seconds: 60
+      threshold: 10
+      operator: ">"
+
+  - id: "VELOCITY_SPIKE_5M"
+    description: "Velocity spike: > 20 transactions in 5 minutes"
+    type: "velocity"
+    action: "soft_boost"
+    severity: "medium"
+    boost: 0.10
+    velocity:
+      entity_type: "account"
+      window_seconds: 300
+      threshold: 20
+      operator: ">"
+
+  # ─── Expression Rules (Soft Boost) ──────────────────────────────────────────
+  - id: "NEW_ACCT_HIGH_VALUE"
+    description: "New account (< 5 txns/24h) with amount > 10x mean"
+    type: "expression"
+    action: "hard_block"
+    severity: "high"
+    expression:
+      expression: "acct_v_24h_count < 5 and amount_vs_mean_ratio > 10"
+
+  - id: "ROUND_AMT_BURST"
+    description: "Round-amount burst (card testing): 5+ round amounts in 5 min"
+    type: "expression"
+    action: "soft_boost"
+    severity: "medium"
+    boost: 0.15
+    expression:
+      expression: "is_round_amount == 1 and acct_v_5m_count >= 5"
+
+  - id: "HIGH_RISK_CHANNEL"
+    description: "High-risk channel (API, USSD) with large amount"
+    type: "expression"
+    action: "soft_boost"
+    severity: "medium"
+    boost: 0.10
+    expression:
+      expression: "channel_enc in [2, 5] and amount > 100000"
+
+  - id: "NEW_DEVICE_HIGH_VALUE"
+    description: "New device with amount > 5x account mean"
+    type: "expression"
+    action: "soft_boost"
+    severity: "medium"
+    boost: 0.12
+    expression:
+      expression: "is_new_device == 1 and amount_vs_mean_ratio > 5"
+
+  - id: "CROSS_BORDER_NEW_MERCHANT"
+    description: "Cross-border transaction with new merchant"
+    type: "expression"
+    action: "soft_boost"
+    severity: "medium"
+    boost: 0.08
+    expression:
+      expression: "cross_country_flag == 1 and is_new_merchant == 1"
+
+  - id: "NEW_DEVICE_NEW_MERCHANT"
+    description: "New device AND new merchant (account takeover pattern)"
+    type: "expression"
+    action: "soft_boost"
+    severity: "medium"
+    boost: 0.10
+    expression:
+      expression: "is_new_device == 1 and is_new_merchant == 1"
+
+  - id: "NIGHT_HIGH_VELOCITY"
+    description: "Night transactions with high velocity"
+    type: "expression"
+    action: "soft_boost"
+    severity: "medium"
+    boost: 0.08
+    expression:
+      expression: "is_night == 1 and acct_v_1h_count > 30"
+
+  # ─── Threshold Rules ────────────────────────────────────────────────────────
+  - id: "AMOUNT_HARD_CAP"
+    description: "Amount exceeds hard cap for account tier"
+    type: "threshold"
+    action: "hard_block"
+    severity: "critical"
+    threshold:
+      feature: "amount"
+      operator: ">"
+      threshold: 1000000.0
+
+  - id: "DEVICE_SHARED_HIGH"
+    description: "Device shared by too many accounts (> 10)"
+    type: "threshold"
+    action: "soft_boost"
+    severity: "high"
+    boost: 0.15
+    threshold:
+      feature: "device_account_count"
+      operator: ">"
+      threshold: 10.0
+
+  - id: "TYPING_ANOMALY"
+    description: "Typing cadence anomaly (z-score > 3)"
+    type: "threshold"
+    action: "soft_boost"
+    severity: "medium"
+    boost: 0.12
+    threshold:
+      feature: "typing_zscore"
+      operator: ">"
+      threshold: 3.0
+
+# ─── Global Settings ─────────────────────────────────────────────────────────
+global:
+  default_boost: 0.05
+  max_boost: 0.30
+  enabled: true

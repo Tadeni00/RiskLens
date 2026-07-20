@@ -1,0 +1,110 @@
+name: Automated Retraining Scheduler
+on:
+  schedule:
+    # Run daily at 02:00 UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      tenant_id:
+        description: 'Tenant to retrain (or "all")'
+        required: true
+        default: 'all'
+      force:
+        description: 'Force retrain regardless of triggers'
+        type: boolean
+        default: false
+
+jobs:
+  check-retrain-needed:
+    runs-on: ubuntu-latest
+    outputs:
+      tenants: ${{ steps.filter.outputs.tenants }}
+      should_retrain: ${{ steps.check.outputs.should_retrain }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements.gpu.txt
+      
+      - name: Check retrain triggers
+        id: check
+        run: |
+          python scripts/retrain_scheduler.py \
+            --tenant "${{ github.event.inputs.tenant_id }}" \
+            --force "${{ github.event.inputs.force }}" \
+            --output-github-actions
+
+  retrain:
+    needs: check-retrain-needed
+    if: needs.check-retrain-needed.outputs.should_retrain == 'true'
+    runs-on: gpu-runner
+    strategy:
+      matrix:
+        tenant: ${{ fromJson(needs.check-retrain-needed.outputs.tenants) }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements.gpu.txt
+      
+      - name: Train model
+        run: |
+          python -m training.pipeline \
+            --tenant ${{ matrix.tenant }} \
+            --phase 3 \
+            --optimize-hyperparams \
+            --n-trials 50
+      
+      - name: Evaluate model
+        run: |
+          python -m training.evaluate \
+            --tenant ${{ matrix.tenant }} \
+            --model-path artifacts/models/${{ matrix.tenant }}/phase3 \
+            --output evaluation_${{ matrix.tenant }}.json
+      
+      - name: Register model
+        run: |
+          python scripts/register_model.py \
+            --tenant ${{ matrix.tenant }} \
+            --model-path artifacts/models/${{ matrix.tenant }}/phase3 \
+            --evaluation evaluation_${{ matrix.tenant }}.json
+        env:
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+      
+      - name: Trigger canary deploy
+        if: always()
+        run: |
+          python scripts/deploy_model.py \
+            --tenant ${{ matrix.tenant }} \
+            --mode canary \
+            --traffic-pct 10
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          python scripts/notify_slack.py \
+            --message "❌ Retrain failed for ${{ matrix.tenant }}" \
+            --channel "#fraud-alerts" \
+            --severity critical
+
+      - name: Notify Slack on success
+        if: success()
+        run: |
+          python scripts/notify_slack.py \
+            --message "✅ Retrain completed for ${{ matrix.tenant }} - Canary deployed at 10%" \
+            --channel "#fraud-deployments"

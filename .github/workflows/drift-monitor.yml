@@ -1,0 +1,74 @@
+name: Drift Monitor
+on:
+  schedule:
+    # Run hourly
+    - cron: '0 * * * *'
+  workflow_dispatch:
+    inputs:
+      tenant_id:
+        description: 'Tenant to check (or "all")'
+        required: true
+        default: 'all'
+
+jobs:
+  drift-check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        tenant: ['bank_ng_gtb', 'bank_ke_equity', 'fintech_za_yoco']
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+      
+      - name: Run drift detection
+        id: drift
+        run: |
+          python -m monitoring.drift_monitor \
+            --tenant ${{ matrix.tenant }} \
+            --output-github-actions
+      
+      - name: Upload drift artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-${{ matrix.tenant }}-${{ github.run_id }}
+          path: drift_artifacts/
+          retention-days: 7
+      
+      - name: Alert on drift
+        if: steps.drift.outputs.drift_detected == 'true'
+        run: |
+          python scripts/notify_slack.py \
+            --message "🚨 Drift detected for ${{ matrix.tenant }}: ${{ steps.drift.outputs.drift_details }}" \
+            --channel "#fraud-alerts" \
+            --severity warning
+
+  alert-on-drift:
+    needs: drift-check
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for drift
+        run: |
+          DRIFT_DETECTED=false
+          for tenant in bank_ng_gtb bank_ke_equity fintech_za_yoco; do
+            if [ -f "drift_artifacts/${tenant}_drift.json" ]; then
+              cat "drift_artifacts/${tenant}_drift.json" | jq -e '.drift_detected' && DRIFT_DETECTED=true
+            fi
+          done
+          
+          if [ "$DRIFT_DETECTED" = "true" ]; then
+            echo "Drift detected - alerting"
+            python scripts/notify_slack.py \
+              --message "🚨 *Drift Alert*\nDrift detected for one or more tenants" \
+              --channel "#fraud-alerts" \
+              --severity warning
+          fi

@@ -1,0 +1,29 @@
+{
+  "champion_id": null,
+  "models": {
+    "v1_cb_7aaf6e3b": {
+      "model_id": "v1_cb_7aaf6e3b",
+      "version": "v1_cb_7aaf6e3b",
+      "algorithm": "catboost",
+      "training_date": "2026-07-20T19:28:27.290287+00:00",
+      "dataset_version": "1.0.0",
+      "feature_version": "1.0.0",
+      "pr_auc": 0.16071816523836108,
+      "roc_auc": 0.601687186502508,
+      "f2_score": 0.028901734104046242,
+      "fpr": 0.005,
+      "calibration_error": 0.03,
+      "status": "challenger",
+      "is_active": false,
+      "hyperparameters": {},
+      "calibration_method": "isotonic",
+      "description": "",
+      "created_by": "system",
+      "created_at": "2026-07-20T19:28:28.395780+00:00",
+      "promoted_at": null,
+      "archived_at": null
+    }
+  },
+  "promotion_requests": [],
+  "saved_at": "2026-07-20T19:28:28.395780+00:00"
+}

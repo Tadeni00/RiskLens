@@ -1,0 +1,515 @@
+{
+  "info": {
+    "name": "FraudTrap API",
+    "description": "Production-grade fraud detection API for banks and fintechs",
+    "_postman_id": "fraudtrap-api-collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "X-API-Key",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "{{api_key}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "api_key",
+      "value": "your-api-key-here",
+      "type": "string"
+    },
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Scoring",
+      "item": [
+        {
+          "name": "POST /v1/score — Score Transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"bank_ng_gtb\",\n  \"account_id\": \"tok_acct_123\",\n  \"amount\": 45000,\n  \"currency\": \"NGN\",\n  \"timestamp\": \"2026-07-20T14:30:00Z\",\n  \"transaction_type\": \"PAYMENT\",\n  \"channel\": \"MOBILE\",\n  \"counterparty\": {\n    \"name\": \"QuickStore Ltd\",\n    \"country\": \"NG\"\n  },\n  \"metadata\": {\n    \"device_id\": \"dev_abc123\",\n    \"ip_address\": \"105.112.33.44\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/score",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "score"]
+            },
+            "description": "Score a single transaction for fraud risk"
+          }
+        },
+        {
+          "name": "POST /v1/score/batch — Batch Score",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"tenant_id\": \"bank_ng_gtb\",\n    \"account_id\": \"tok_acct_123\",\n    \"amount\": 45000,\n    \"currency\": \"NGN\",\n    \"timestamp\": \"2026-07-20T14:30:00Z\",\n    \"transaction_type\": \"PAYMENT\",\n    \"channel\": \"MOBILE\"\n  },\n  {\n    \"tenant_id\": \"bank_ng_gtb\",\n    \"account_id\": \"tok_acct_456\",\n    \"amount\": 120000,\n    \"currency\": \"NGN\",\n    \"timestamp\": \"2026-07-20T14:31:00Z\",\n    \"transaction_type\": \"TRANSFER\",\n    \"channel\": \"USSD\"\n  },\n  {\n    \"tenant_id\": \"bank_ng_gtb\",\n    \"account_id\": \"tok_acct_789\",\n    \"amount\": 5000,\n    \"currency\": \"NGN\",\n    \"timestamp\": \"2026-07-20T14:32:00Z\",\n    \"transaction_type\": \"WITHDRAWAL\",\n    \"channel\": \"ATM\"\n  }\n]"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/score/batch",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "score", "batch"]
+            },
+            "description": "Score multiple transactions in a single request"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Labels",
+      "item": [
+        {
+          "name": "POST /v1/labels — Ingest Ground-Truth Label",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction_id\": \"txn_a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n  \"tenant_id\": \"bank_ng_gtb\",\n  \"label\": 1,\n  \"label_source\": \"CHARGEBACK\",\n  \"labelled_at\": \"2026-07-20T15:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/labels",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "labels"]
+            },
+            "description": "Ingest ground-truth label for model training and evaluation"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Operations",
+      "item": [
+        {
+          "name": "GET /health — Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Check API health status"
+          }
+        },
+        {
+          "name": "GET /metrics — Prometheus Metrics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/metrics",
+              "host": ["{{base_url}}"],
+              "path": ["metrics"]
+            },
+            "description": "Get Prometheus-format metrics for monitoring"
+          }
+        },
+        {
+          "name": "GET /v1/recent — Recent Scored Transactions",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/v1/recent?limit=500&tenant_id=bank_ng_gtb",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "recent"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "500",
+                  "description": "Maximum number of transactions to return"
+                },
+                {
+                  "key": "tenant_id",
+                  "value": "bank_ng_gtb",
+                  "description": "Filter by tenant ID (optional)"
+                }
+              ]
+            },
+            "description": "Get recent scored transactions"
+          }
+        },
+        {
+          "name": "GET /v1/phase/{tenant_id} — Phase Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/v1/phase/bank_ng_gtb",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "phase", ":tenant_id"],
+              "variable": [
+                {
+                  "key": "tenant_id",
+                  "value": "bank_ng_gtb",
+                  "description": "Tenant identifier"
+                }
+              ]
+            },
+            "description": "Get phase status for a specific tenant"
+          }
+        },
+        {
+          "name": "GET /v1/drift/{tenant_id} — Drift Metrics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/v1/drift/bank_ng_gtb",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "drift", ":tenant_id"],
+              "variable": [
+                {
+                  "key": "tenant_id",
+                  "value": "bank_ng_gtb",
+                  "description": "Tenant identifier"
+                }
+              ]
+            },
+            "description": "Get drift metrics for a specific tenant"
+          }
+        },
+        {
+          "name": "GET /v1/lifecycle/{tenant_id} — Lifecycle Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/v1/lifecycle/bank_ng_gtb",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "lifecycle", ":tenant_id"],
+              "variable": [
+                {
+                  "key": "tenant_id",
+                  "value": "bank_ng_gtb",
+                  "description": "Tenant identifier"
+                }
+              ]
+            },
+            "description": "Get lifecycle status for a specific tenant"
+          }
+        },
+        {
+          "name": "GET /v1/explain/{trace_id} — Get Explanation",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/v1/explain/txn_a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "explain", ":trace_id"],
+              "variable": [
+                {
+                  "key": "trace_id",
+                  "value": "txn_a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                  "description": "Transaction trace ID"
+                }
+              ]
+            },
+            "description": "Get detailed explanation for a scored transaction"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Rules",
+          "item": [
+            {
+              "name": "GET /v1/admin/rules — List Rules",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/v1/admin/rules",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "admin", "rules"]
+                },
+                "description": "List all fraud detection rules"
+              }
+            },
+            {
+              "name": "POST /v1/admin/rules — Create Rule",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"id\": \"velocity_high_amount\",\n  \"description\": \"High amount velocity\",\n  \"type\": \"velocity\",\n  \"action\": \"REVIEW\",\n  \"severity\": \"high\",\n  \"conditions\": {\n    \"field\": \"amount\",\n    \"operator\": \"gt\",\n    \"value\": 100000,\n    \"window_minutes\": 60,\n    \"threshold\": 3\n  },\n  \"enabled\": true,\n  \"tenant_id\": \"bank_ng_gtb\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/v1/admin/rules",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "admin", "rules"]
+                },
+                "description": "Create a new fraud detection rule"
+              }
+            },
+            {
+              "name": "DELETE /v1/admin/rules/{rule_id} — Delete Rule",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{base_url}}/v1/admin/rules/velocity_high_amount",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "admin", "rules", ":rule_id"],
+                  "variable": [
+                    {
+                      "key": "rule_id",
+                      "value": "velocity_high_amount",
+                      "description": "Rule identifier"
+                    }
+                  ]
+                },
+                "description": "Delete a fraud detection rule"
+              }
+            },
+            {
+              "name": "POST /v1/admin/rules/reload — Reload Rules",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/v1/admin/rules/reload",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "admin", "rules", "reload"]
+                },
+                "description": "Reload all rules from configuration"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Blocklist",
+          "item": [
+            {
+              "name": "POST /v1/admin/blocklist — Add Blocklist Entry",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"list_name\": \"blocked_accounts\",\n  \"value\": \"acct_suspicious_001\",\n  \"reason\": \"Confirmed fraud account\",\n  \"tenant_id\": \"bank_ng_gtb\",\n  \"expires_at\": \"2026-08-20T00:00:00Z\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/v1/admin/blocklist",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "admin", "blocklist"]
+                },
+                "description": "Add an entry to a blocklist"
+              }
+            },
+            {
+              "name": "GET /v1/admin/blocklist/{list_name} — List Blocklist Entries",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/v1/admin/blocklist/blocked_accounts?tenant_id=bank_ng_gtb",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "admin", "blocklist", ":list_name"],
+                  "query": [
+                    {
+                      "key": "tenant_id",
+                      "value": "bank_ng_gtb",
+                      "description": "Filter by tenant ID"
+                    }
+                  ],
+                  "variable": [
+                    {
+                      "key": "list_name",
+                      "value": "blocked_accounts",
+                      "description": "Blocklist name"
+                    }
+                  ]
+                },
+                "description": "List entries in a blocklist"
+              }
+            },
+            {
+              "name": "DELETE /v1/admin/blocklist/{list_name}/{value} — Remove Blocklist Entry",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{base_url}}/v1/admin/blocklist/blocked_accounts/acct_suspicious_001",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "admin", "blocklist", ":list_name", ":value"],
+                  "variable": [
+                    {
+                      "key": "list_name",
+                      "value": "blocked_accounts",
+                      "description": "Blocklist name"
+                    },
+                    {
+                      "key": "value",
+                      "value": "acct_suspicious_001",
+                      "description": "Value to remove from blocklist"
+                    }
+                  ]
+                },
+                "description": "Remove an entry from a blocklist"
+              }
+            },
+            {
+              "name": "GET /v1/admin/blocklist/audit/{tenant_id} — Get Audit Log",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/v1/admin/blocklist/audit/bank_ng_gtb",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "admin", "blocklist", "audit", ":tenant_id"],
+                  "variable": [
+                    {
+                      "key": "tenant_id",
+                      "value": "bank_ng_gtb",
+                      "description": "Tenant identifier"
+                    }
+                  ]
+                },
+                "description": "Get audit log for blocklist changes"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Heuristics",
+          "item": [
+            {
+              "name": "GET /v1/admin/heuristic — Get Heuristic Config",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/v1/admin/heuristic",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "admin", "heuristic"]
+                },
+                "description": "Get current heuristic configuration"
+              }
+            },
+            {
+              "name": "POST /v1/admin/heuristic — Update Heuristic Config",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"velocity_threshold\": 5,\n  \"amount_threshold\": 100000,\n  \"time_window_minutes\": 60,\n  \"geo_distance_km\": 500,\n  \"new_account_days\": 30,\n  \"enabled\": true,\n  \"tenant_id\": \"bank_ng_gtb\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/v1/admin/heuristic",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "admin", "heuristic"]
+                },
+                "description": "Update heuristic configuration"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Models",
+          "item": [
+            {
+              "name": "POST /v1/admin/models/reload — Reload Models",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/v1/admin/models/reload",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "admin", "models", "reload"]
+                },
+                "description": "Reload ML models from storage"
+              }
+            },
+            {
+              "name": "GET /v1/admin/models/status — Model Status",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/v1/admin/models/status",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "admin", "models", "status"]
+                },
+                "description": "Get status of loaded ML models"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Health & Stats",
+          "item": [
+            {
+              "name": "GET /v1/admin/health — Admin Health Check",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/v1/admin/health",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "admin", "health"]
+                },
+                "description": "Check admin service health status"
+              }
+            },
+            {
+              "name": "GET /v1/admin/stats — Admin Statistics",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/v1/admin/stats",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "admin", "stats"]
+                },
+                "description": "Get admin statistics and usage metrics"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

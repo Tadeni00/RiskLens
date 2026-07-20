@@ -1,0 +1,259 @@
+# FraudTrap — Supervised Learning Configuration
+# Champion-Challenger Architecture Settings
+
+# Champion Configuration
+champion:
+  # Algorithm (only catboost for champion)
+  algorithm: catboost
+  
+  # CatBoost hyperparameters
+  params:
+    iterations: 1000
+    depth: 6
+    learning_rate: 0.05
+    loss_function: Logloss
+    eval_metric: AUC
+    auto_class_weights: Balanced
+    bootstrap_type: Bernoulli
+    subsample: 0.8
+    random_seed: 42
+    early_stopping_rounds: 50
+  
+  # Calibration
+  calibration:
+    method: isotonic  # isotonic or platt
+    enabled: true
+  
+  # Version pinning
+  versioning:
+    enabled: true
+    auto_increment: true
+
+# Challengers Configuration
+challengers:
+  # List of challenger algorithms to train
+  algorithms:
+    - xgboost
+    - lightgbm
+    - ft_transformer
+    - tabnet
+  
+  # XGBoost hyperparameters
+  xgboost:
+    n_estimators: 500
+    max_depth: 6
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    min_child_weight: 3
+    reg_alpha: 0.1
+    reg_lambda: 1.0
+    eval_metric: aucpr
+    random_state: 42
+  
+  # LightGBM hyperparameters
+  lightgbm:
+    n_estimators: 500
+    max_depth: 6
+    learning_rate: 0.05
+    num_leaves: 63
+    subsample: 0.8
+    colsample_bytree: 0.8
+    is_unbalance: true
+    random_state: 42
+  
+  # FT-Transformer hyperparameters
+  ft_transformer:
+    n_epochs: 100
+    batch_size: 256
+    learning_rate: 0.001
+    d_token: 64
+    n_heads: 4
+    n_layers: 2
+    dropout: 0.1
+    device: cpu
+  
+  # TabNet hyperparameters
+  tabnet:
+    n_d: 64
+    n_a: 64
+    n_steps: 3
+    gamma: 1.3
+    n_independent: 2
+    n_shared: 2
+    max_epochs: 100
+    patience: 10
+    batch_size: 256
+    virtual_batch_size: 128
+  
+  # Training settings
+  training:
+    train_ratio: 0.7
+    val_ratio: 0.15
+    test_ratio: 0.15
+    random_seed: 42
+
+# Evaluation Configuration
+evaluation:
+  # Metrics to compute
+  metrics:
+    - pr_auc
+    - roc_auc
+    - f2_score
+    - precision
+    - recall
+    - f1
+    - accuracy
+    - fpr
+    - calibration_error
+    - brier_score
+  
+  # Threshold analysis
+  threshold_analysis:
+    enabled: true
+    n_thresholds: 9
+    threshold_range: [0.1, 0.9]
+  
+  # Latency measurement
+  latency:
+    enabled: true
+    n_samples: 1000
+    warmup_samples: 10
+  
+  # Output
+  output:
+    save_reports: true
+    report_format: json
+    include_confusion_matrix: true
+
+# Promotion Configuration
+promotion:
+  # Criteria for champion promotion
+  criteria:
+    # Minimum PR-AUC improvement over champion
+    min_pr_auc_improvement: 0.01
+    
+    # Maximum allowed FPR (False Positive Rate)
+    max_fpr: 0.01
+    
+    # Maximum allowed calibration error
+    max_calibration_error: 0.05
+    
+    # Maximum allowed latency ratio (challenger/champion)
+    max_latency_ratio: 2.0
+    
+    # Minimum number of validation samples required
+    min_validation_samples: 1000
+  
+  # Approval settings
+  approval:
+    require_manual_approval: false
+    auto_approve: true
+  
+  # Rollback settings
+  rollback:
+    enabled: true
+    max_rollback_versions: 5
+  
+  # Notification settings
+  notifications:
+    enabled: false
+    webhook_url: ""
+    email_recipients: []
+
+# Training Pipeline Configuration
+training_pipeline:
+  # Output directory for training runs
+  output_dir: models/supervised/training_runs
+  
+  # Model storage
+  model_storage:
+    base_dir: models/supervised/saved_models
+    compression: true
+    backup_count: 5
+  
+  # Scheduling (for automated training)
+  scheduling:
+    enabled: false
+    cron: "0 2 * * 0"  # Weekly on Sunday at 2 AM
+    max_concurrent_runs: 1
+  
+  # Monitoring
+  monitoring:
+    enabled: true
+    log_level: INFO
+    metrics_export: false
+
+# Ensemble Configuration (optional, disabled by default)
+ensemble:
+  enabled: false
+  
+  # If enabled, only these two models can be used together
+  allowed_combinations:
+    - catboost
+    - ft_transformer
+  
+  # Ensemble method
+  method: weighted_average  # weighted_average or stacking
+  
+  # Weights for weighted average
+  weights:
+    catboost: 0.7
+    ft_transformer: 0.3
+  
+  # Stacking meta-learner (if method=stacking)
+  stacking:
+    meta_learner: logistic_regression
+    cv_folds: 5
+
+# Feature Store Integration
+feature_store:
+  enabled: true
+  backend: redis  # redis or memory
+  ttl_seconds: 3600  # 1 hour
+  prefix: fraudtrap:features
+
+# Audit and Logging
+audit:
+  enabled: true
+  log_predictions: true
+  log_feature_importance: true
+  retention_days: 90
+  
+  # Audit storage
+  storage:
+    backend: redis  # redis, postgres, or s3
+    redis_key: fraudtrap:audit
+    max_entries: 100000
+
+# Performance Limits
+performance:
+  # Maximum inference latency (ms)
+  max_inference_latency_ms: 50
+  
+  # Maximum memory usage (MB)
+  max_memory_mb: 4096
+  
+  # Thread pool size for parallel training
+  training_workers: 4
+  
+  # Batch size for batch inference
+  batch_size: 256
+
+# Multi-Tenant Configuration
+multi_tenant:
+  enabled: true
+  
+  # Per-tenant settings
+  per_tenant:
+    # Whether to train separate models per tenant
+    separate_models: true
+    
+    # Minimum samples per tenant before training
+    min_samples: 10000
+    
+    # Maximum models per tenant
+    max_models: 10
+    
+    # Model sharing between tenants
+    model_sharing: false

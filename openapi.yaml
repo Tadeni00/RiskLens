@@ -1,0 +1,999 @@
+openapi: 3.0.3
+info:
+  title: FraudTrap API
+  version: 2.0.0
+  description: |
+    Production-grade fraud detection API for banks and fintechs.
+    Implements a three-phase model lifecycle: Cold Start → Semi-Supervised → Supervised.
+  contact:
+    name: FraudTrap API Team
+    email: api-support@fraudtrap.io
+  license:
+    name: Proprietary
+    url: https://fraudtrap.io/license
+servers:
+  - url: https://api.fraudtrap.io/v1
+    description: Production server
+  - url: http://localhost:8000/v1
+    description: Local development server
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+tags:
+  - name: scoring
+    description: Core fraud scoring endpoints
+  - name: labels
+    description: Label ingestion for training pipeline
+  - name: ops
+    description: Operational endpoints (health, metrics, drift, lifecycle)
+  - name: explainability
+    description: Model explainability and SHAP values
+  - name: admin
+    description: Administrative operations (model reload, experiments)
+tags:
+  - name: scoring
+    description: Core fraud scoring endpoints
+  - name: labels
+    description: Label ingestion for training pipeline
+  - name: ops
+    description: Operational endpoints (health, metrics, drift, lifecycle)
+  - name: explainability
+    description: Model explainability and SHAP values
+  - name: admin
+    description: Administrative operations (model reload, experiments)
+
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API Key for authentication
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token
+
+  schemas:
+    # ==================== Request/Response Schemas ====================
+
+    TransactionRequest:
+      type: object
+      required: [tenant_id, account_id, amount, currency, timestamp, transaction_type, channel]
+      properties:
+        transaction_id:
+          type: string
+          format: uuid
+          description: Unique transaction identifier (idempotency key)
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        tenant_id:
+          type: string
+          description: Client bank/fintech identifier
+          example: "bank_ng_gtb"
+        account_id:
+          type: string
+          description: Tokenized account identifier
+          example: "tok_acct_123"
+        session_id:
+          type: string
+          nullable: true
+          description: Tokenized session identifier
+        amount:
+          type: number
+          format: double
+          minimum: 0.01
+          description: Transaction amount in local currency
+          example: 45000.00
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          description: ISO 4217 currency code
+          example: "NGN"
+        timestamp:
+          type: string
+          format: date-time
+          description: Transaction initiation time (UTC)
+          example: "2026-07-15T14:23:11Z"
+        transaction_type:
+          type: string
+          enum: [PAYMENT, TRANSFER, WITHDRAWAL, TOP_UP, REFUND, LOAN_DISBURSEMENT]
+          example: "PAYMENT"
+        channel:
+          type: string
+          enum: [WEB, MOBILE, API, POS, ATM, USSD]
+          example: "MOBILE"
+        merchant_id:
+          type: string
+          nullable: true
+          example: "tok_merch_456"
+        merchant_category_code:
+          type: string
+          nullable: true
+          pattern: '^[0-9]{4}$'
+          description: MCC code
+          example: "5411"
+        merchant_country:
+          type: string
+          nullable: true
+          pattern: '^[A-Z]{2}$'
+          example: "NG"
+        counterparty_account_id:
+          type: string
+          nullable: true
+          description: Tokenized destination account (for transfers)
+        device_id:
+          type: string
+          nullable: true
+          example: "tok_dev_001"
+        device_type:
+          type: string
+          nullable: true
+          enum: [MOBILE, DESKTOP, TABLET, POS_TERMINAL]
+          example: "MOBILE"
+        ip_address_hash:
+          type: string
+          nullable: true
+          description: Hashed IP address (privacy-safe)
+          example: "a1b2c3d4"
+        user_agent_hash:
+          type: string
+          nullable: true
+          example: "a1b2c3d4"
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+          nullable: true
+          example: 6.5244
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+          nullable: true
+          example: 3.3792
+        country_code:
+          type: string
+          nullable: true
+          pattern: '^[A-Z]{2}$'
+          example: "NG"
+        typing_cadence_ms:
+          type: number
+          format: double
+          nullable: true
+          description: Mean inter-keystroke interval in ms
+          example: 120.5
+        session_duration_seconds:
+          type: number
+          format: double
+          nullable: true
+          example: 45.0
+        field_visit_count:
+          type: integer
+          nullable: true
+          example: 3
+        extra_fields:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: Pass-through for client-specific fields
+
+    ScoringResponse:
+      type: object
+      required: [transaction_id, tenant_id, risk_score, decision, model_phase, model_version, latency_ms, trace_id, scored_at]
+      properties:
+        transaction_id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+        risk_score:
+          type: number
+          format: double
+          minimum: 0.0
+          maximum: 1.0
+        decision:
+          type: string
+          enum: [APPROVE, REVIEW, BLOCK]
+        model_phase:
+          type: string
+          enum: [UNSUPERVISED, SEMI_SUPERVISED, SUPERVISED, RULES]
+        model_version:
+          type: string
+        latency_ms:
+          type: number
+          format: double
+        explanation:
+          $ref: '#/components/schemas/Explanation'
+          nullable: true
+        explanation_type:
+          type: string
+          enum: [sync, async_pending, none]
+          nullable: true
+        triggered_rules:
+          type: array
+          items:
+            type: string
+          default: []
+        trace_id:
+          type: string
+          format: uuid
+        scored_at:
+          type: string
+          format: date-time
+
+    Explanation:
+      type: object
+      required: [model_type, base_value, prediction_value, top_features, latency_ms]
+      properties:
+        model_type:
+          type: string
+          enum: [rules, cold_start, semi_supervised, supervised, gnn]
+        base_value:
+          type: number
+        prediction_value:
+          type: number
+        top_features:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeatureContribution'
+        components:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: number
+        latency_ms:
+          type: number
+
+    FeatureContribution:
+      type: object
+      required: [feature, value, contribution, method]
+      properties:
+        feature:
+          type: string
+        value:
+          type: number
+        contribution:
+          type: number
+        method:
+          type: string
+          enum: [shap, rule_weight, vae_recon, iforest_path, tail_zscore, calibration]
+
+    LabelPayload:
+      type: object
+      required: [transaction_id, tenant_id, label, label_source, labelled_at]
+      properties:
+        transaction_id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+        label:
+          type: integer
+          minimum: 0
+          maximum: 1
+          description: "1=fraud, 0=legitimate"
+        label_source:
+          type: string
+          enum: [CHARGEBACK, MANUAL_REVIEW, DISPUTE_RESOLVED]
+        chargeback_reason_code:
+          type: string
+          nullable: true
+          description: "Visa/MC reason code - used to filter non-fraud chargebacks"
+        labelled_at:
+          type: string
+          format: date-time
+        confidence:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          default: 1.0
+
+    # Response Schemas
+    ScoringResponse:
+      type: object
+      required: [transaction_id, tenant_id, risk_score, decision, model_phase, model_version, latency_ms, trace_id, scored_at]
+      properties:
+        transaction_id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+        risk_score:
+          type: number
+          format: double
+          minimum: 0.0
+          maximum: 1.0
+        decision:
+          type: string
+          enum: [APPROVE, REVIEW, BLOCK]
+        model_phase:
+          type: string
+          enum: [UNSUPERVISED, SEMI_SUPERVISED, SUPERVISED, RULES]
+        model_version:
+          type: string
+        latency_ms:
+          type: number
+          format: double
+        explanation:
+          $ref: '#/components/schemas/Explanation'
+          nullable: true
+        explanation_type:
+          type: string
+          enum: [sync, async_pending, none]
+          nullable: true
+        triggered_rules:
+          type: array
+          items:
+            type: string
+          default: []
+        trace_id:
+          type: string
+          format: uuid
+        scored_at:
+          type: string
+          format: date-time
+
+    Explanation:
+      type: object
+      required: [model_type, base_value, prediction_value, top_features, latency_ms]
+      properties:
+        model_type:
+          type: string
+          enum: [rules, cold_start, semi_supervised, supervised, gnn]
+        base_value:
+          type: number
+        prediction_value:
+          type: number
+        top_features:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeatureContribution'
+        components:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: number
+        latency_ms:
+          type: number
+
+    FeatureContribution:
+      type: object
+      required: [feature, value, contribution, method]
+      properties:
+        feature:
+          type: string
+        value:
+          type: number
+        contribution:
+          type: number
+        method:
+          type: string
+          enum: [shap, rule_weight, vae_recon, iforest_path, tail_zscore, calibration]
+
+    LabelPayload:
+      type: object
+      required: [transaction_id, tenant_id, label, label_source, labelled_at]
+      properties:
+        transaction_id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+        label:
+          type: integer
+          minimum: 0
+          maximum: 1
+          description: "1=fraud, 0=legitimate"
+        label_source:
+          type: string
+          enum: [CHARGEBACK, MANUAL_REVIEW, DISPUTE_RESOLVED]
+        chargeback_reason_code:
+          type: string
+          nullable: true
+          description: "Visa/MC reason code - used to filter non-fraud chargebacks"
+        labelled_at:
+          type: string
+          format: date-time
+        confidence:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          default: 1.0
+
+    # Response Schemas
+    ScoringResponse:
+      type: object
+      required: [transaction_id, tenant_id, risk_score, decision, model_phase, model_version, latency_ms, trace_id, scored_at]
+      properties:
+        transaction_id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+        risk_score:
+          type: number
+          format: double
+          minimum: 0.0
+          maximum: 1.0
+        decision:
+          type: string
+          enum: [APPROVE, REVIEW, BLOCK]
+        model_phase:
+          type: string
+          enum: [UNSUPERVISED, SEMI_SUPERVISED, SUPERVISED, RULES]
+        model_version:
+          type: string
+        latency_ms:
+          type: number
+          format: double
+        explanation:
+          $ref: '#/components/schemas/Explanation'
+          nullable: true
+        explanation_type:
+          type: string
+          enum: [sync, async_pending, none]
+          nullable: true
+        triggered_rules:
+          type: array
+          items:
+            type: string
+          default: []
+        trace_id:
+          type: string
+          format: uuid
+        scored_at:
+          type: string
+          format: date-time
+
+    Explanation:
+      type: object
+      required: [model_type, base_value, prediction_value, top_features, latency_ms]
+      properties:
+        model_type:
+          type: string
+          enum: [rules, cold_start, semi_supervised, supervised, gnn]
+        base_value:
+          type: number
+        prediction_value:
+          type: number
+        top_features:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeatureContribution'
+        components:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: number
+        latency_ms:
+          type: number
+
+    FeatureContribution:
+      type: object
+      required: [feature, value, contribution, method]
+      properties:
+        feature:
+          type: string
+        value:
+          type: number
+        contribution:
+          type: number
+        method:
+          type: string
+          enum: [shap, rule_weight, vae_recon, iforest_path, tail_zscore, calibration]
+
+    LabelPayload:
+      type: object
+      required: [transaction_id, tenant_id, label, label_source, labelled_at]
+      properties:
+        transaction_id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+        label:
+          type: integer
+          minimum: 0
+          maximum: 1
+          description: "1=fraud, 0=legitimate"
+        label_source:
+          type: string
+          enum: [CHARGEBACK, MANUAL_REVIEW, DISPUTE_RESOLVED]
+        chargeback_reason_code:
+          type: string
+          nullable: true
+          description: "Visa/MC reason code - used to filter non-fraud chargebacks"
+        labelled_at:
+          type: string
+          format: date-time
+        confidence:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          default: 1.0
+
+    # Batch Schemas
+    BatchScoreRequest:
+      type: object
+      required: [transactions]
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransactionRequest'
+          maxItems: 1000
+
+    BatchScoreResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/ScoringResponse'
+
+    # Drift & Monitoring
+    DriftMetricsResponse:
+      type: object
+      properties:
+        tenant_id:
+          type: string
+        n_baseline:
+          type: integer
+        n_current:
+          type: integer
+        metrics:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              psi:
+                type: number
+              kl_divergence:
+                type: number
+              mean_shift:
+                type: number
+              std_shift:
+                type: number
+              drift_detected:
+                type: boolean
+              baseline_stats:
+                type: object
+              current_stats:
+                type: object
+
+    LifecycleResponse:
+      type: object
+      properties:
+        tenant_id:
+          type: string
+        current_phase:
+          type: string
+        model_version:
+          type: string
+        total_scored:
+          type: integer
+        fraud_labels:
+          type: integer
+        legit_labels:
+          type: integer
+        decisions:
+          type: object
+          additionalProperties:
+            type: integer
+        phase_counts:
+          type: object
+          additionalProperties:
+            type: integer
+        pr_auc:
+          type: number
+        avg_latency_ms:
+          type: number
+        p95_latency_ms:
+          type: number
+        scoring_history:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+              transactions:
+                type: integer
+              fraud_labels:
+                type: integer
+              avg_score:
+                  type: number
+        transition_readiness:
+          type: object
+          properties:
+            fraud_labels:
+              type: object
+              properties:
+                current:
+                  type: integer
+                target:
+                  type: integer
+                pct:
+                  type: number
+            pr_auc:
+              type: object
+              properties:
+                current:
+                  type: number
+                target:
+                  type: number
+                pct:
+                  type: number
+            champion_challenger:
+              type: object
+              properties:
+                current:
+                  type: string
+                pct:
+                  type: number
+        loaded_models:
+          type: object
+          properties:
+            cold_start:
+              type: boolean
+            semi_supervised:
+              type: boolean
+            supervised:
+              type: boolean
+            simple_model:
+              type: boolean
+        available_tenants:
+          type: array
+          items:
+            type: string
+
+    # Error Schemas
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              nullable: true
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              enum: [VALIDATION_ERROR]
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  message:
+                    type: string
+                  type:
+                    type: string
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+
+tags:
+  - name: scoring
+    description: Core fraud scoring endpoints
+  - name: labels
+    description: Label ingestion for training pipeline
+  - name: ops
+    description: Operational endpoints (health, metrics, drift, lifecycle)
+  - name: explainability
+    description: Model explainability and SHAP values
+  - name: admin
+    description: Administrative operations (model reload, experiments)
+
+paths:
+  /health:
+    get:
+      tags: [ops]
+      summary: Health check
+      responses:
+        '200':
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                  version:
+                    type: string
+                  environment:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /metrics:
+    get:
+      tags: [ops]
+      summary: Prometheus metrics
+      responses:
+        '200':
+          description: Prometheus metrics exposition format
+
+  /v1/recent:
+    get:
+      tags: [ops]
+      summary: Recent scored transactions
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 500
+        - name: tenant_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Recent scores
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ScoringResponse'
+
+  /v1/score:
+    post:
+      tags: [scoring]
+      summary: Score a transaction for fraud risk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionRequest'
+      responses:
+        '200':
+          description: Successful scoring response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoringResponse'
+        '400':
+          description: Validation error
+        '429':
+          description: Rate limit exceeded
+        '500':
+          description: Scoring service error
+
+  /v1/score/batch:
+    post:
+      tags: [scoring]
+      summary: Batch score transactions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchScoreRequest'
+      responses:
+        '200':
+          description: Batch scoring results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchScoreResponse'
+
+  /v1/labels:
+    post:
+      tags: [labels]
+      summary: Ingest ground-truth labels
+      statusCode: 202
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LabelPayload'
+      responses:
+        '202':
+          description: Label accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [accepted]
+                  transaction_id:
+                    type: string
+
+  /v1/phase/{tenant_id}:
+    get:
+      tags: [ops]
+      summary: Get model phase and loaded models for tenant
+      parameters:
+        - name: tenant_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Model phase status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tenant_id:
+                    type: string
+                  current_phase:
+                    type: string
+                  model_version:
+                    type: string
+                  loaded_models:
+                    type: object
+                  available_model_tenants:
+                    type: object
+
+  /v1/explain/{trace_id}:
+    get:
+      tags: [explainability]
+      summary: Retrieve SHAP explanation for a scored transaction
+      parameters:
+        - name: trace_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Explanation found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Explanation'
+        '404':
+          description: Not found
+
+  /v1/drift/{tenant_id}:
+    get:
+      tags: [ops]
+      summary: Get drift metrics (PSI, KL) for a tenant
+      parameters:
+        - name: tenant_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Drift metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DriftMetricsResponse'
+
+  /v1/lifecycle/{tenant_id}:
+    get:
+      tags: [ops]
+      summary: Get model lifecycle metrics for tenant
+      parameters:
+        - name: tenant_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lifecycle metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LifecycleResponse'
+
+  /v1/explain/{trace_id}:
+    get:
+      tags: [explainability]
+      summary: Get SHAP explanation for a scored transaction
+      parameters:
+        - name: trace_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Explanation found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Explanation'
+        '404':
+          description: Not found
+
+  /v1/admin/models/reload:
+    post:
+      tags: [admin]
+      summary: Force model reload from disk
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tenant_id:
+                  type: string
+                force:
+                  type: boolean
+                  default: false
+      responses:
+        '200':
+          description: Reload status
+
+  /v1/recent:
+    get:
+      tags: [ops]
+      summary: Get recent scored transactions
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 500
+        - name: tenant_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Recent scores
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ScoringResponse'

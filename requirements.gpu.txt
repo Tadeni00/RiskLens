@@ -1,0 +1,5 @@
+-r requirements.txt
+
+# Override CPU PyTorch with GPU PyTorch
+torch==2.3.0
+torch-geometric==2.5.3

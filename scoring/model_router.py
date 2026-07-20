@@ -1,0 +1,216 @@
+"""
+FraudTrap — Model Router
+Routes tenants to appropriate models based on phase, availability, and experiments.
+Single Responsibility: Model selection and routing logic.
+"""
+from __future__ import annotations
+import hashlib
+import logging
+from dataclasses import dataclass
+from typing import Optional
+import numpy as np
+
+from loguru import logger
+
+from models.cold_start.ensemble import ColdStartEnsemble
+from models.supervised.ensemble import SupervisedEnsemble
+from models.supervised.semi_supervised import SemiSupervisedBridge
+from models.gnn.gnn_scorer import GNNScorer
+from scoring.simple_model import SimpleFraudModel
+
+
+@dataclass
+class RoutingDecision:
+    """Result of model routing."""
+    model: object
+    model_type: str  # "simple", "cold_start", "semi_supervised", "supervised", "gnn"
+    model_version: str
+    experiment_variant: str = "champion"
+    tenant_phase: str = "UNSUPERVISED"
+
+
+class ModelRouter:
+    """
+    Routes tenants to appropriate models based on phase, availability, and experiments.
+    
+    Single Responsibility: Model selection and traffic routing.
+    """
+    
+    def __init__(
+        self, 
+        registry_models: dict,
+        experiment_config: Optional[dict] = None,
+    ):
+        """
+        Initialize router.
+        
+        Args:
+            registry_models: Dict from ModelLoader with all loaded models
+            experiment_config: Optional A/B test configuration
+        """
+        self.simple_models = registry_models.get("simple_models", {})
+        self.cold_start_models = registry_models.get("cold_start_models", {})
+        self.semi_supervised_models = registry_models.get("semi_supervised_models", {})
+        self.supervised_models = registry_models.get("supervised_models", {})
+        self.shared_cold_start = registry_models.get("cold_start")
+        self.shared_semi_supervised = registry_models.get("semi_supervised")
+        self.shared_supervised = registry_models.get("supervised")
+        self.shared_gnn = registry_models.get("gnn_scorer")
+        
+        self.active_phase = registry_models.get("active_phase", "UNSUPERVISED")
+        self.model_version = registry_models.get("model_version", "unloaded")
+        self.feature_names = registry_models.get("feature_names", [])
+        
+        self.experiment_config = experiment_config or {}
+        self._experiments = self.experiment_config.get("experiments", [])
+        
+        self.logger = logger.bind(component="ModelRouter")
+    
+    def get_model(self, tenant_id: str, transaction_id: Optional[str] = None) -> RoutingDecision:
+        """
+        Get the appropriate model for a tenant.
+        
+        Priority:
+        1. Tenant-specific simple model (production)
+        2. Tenant-specific supervised ensemble
+        3. Tenant-specific semi-supervised
+        4. Tenant-specific cold-start
+        5. Shared supervised
+        6. Shared semi-supervised
+        7. Shared cold-start
+        8. Heuristic fallback
+        """
+        # 1. Tenant simple model (highest priority for production)
+        if tenant_id in self.simple_models:
+            return RoutingDecision(
+                model=self.simple_models[tenant_id],
+                model_type="simple",
+                model_version=self.simple_models[tenant_id].model_version,
+                tenant_phase="SUPERVISED",
+            )
+        
+        # 2. Tenant supervised ensemble
+        if tenant_id in self.supervised_models:
+            variant = self._check_experiment(tenant_id, "supervised")
+            return RoutingDecision(
+                model=self.supervised_models[tenant_id],
+                model_type="supervised",
+                model_version=self.supervised_models[tenant_id].model_version,
+                experiment_variant=variant,
+                tenant_phase="SUPERVISED",
+            )
+        
+        # 3. Tenant semi-supervised
+        if tenant_id in self.semi_supervised_models:
+            variant = self._check_experiment(tenant_id, "semi_supervised")
+            return RoutingDecision(
+                model=self.semi_supervised_models[tenant_id],
+                model_type="semi_supervised",
+                model_version=self.semi_supervised_models[tenant_id].xgb.model_version if hasattr(self.semi_supervised_models[tenant_id], 'xgb') else "unknown",
+                experiment_variant=variant,
+                tenant_phase="SEMI_SUPERVISED",
+            )
+        
+        # 4. Tenant cold-start
+        if tenant_id in self.cold_start_models:
+            return RoutingDecision(
+                model=self.cold_start_models[tenant_id],
+                model_type="cold_start",
+                model_version=self.cold_start_models[tenant_id].model_version,
+                tenant_phase="UNSUPERVISED",
+            )
+        
+        # 5. Shared supervised
+        if self.shared_supervised:
+            return RoutingDecision(
+                model=self.shared_supervised,
+                model_type="supervised",
+                model_version=self.model_version,
+                tenant_phase="SUPERVISED",
+            )
+        
+        # 6. Shared semi-supervised
+        if self.shared_semi_supervised:
+            return RoutingDecision(
+                model=self.shared_semi_supervised,
+                model_type="semi_supervised",
+                model_version=self.model_version,
+                tenant_phase="SEMI_SUPERVISED",
+            )
+        
+        # 7. Shared cold-start
+        if self.shared_cold_start:
+            return RoutingDecision(
+                model=self.shared_cold_start,
+                model_type="cold_start",
+                model_version=self.model_version,
+                tenant_phase="UNSUPERVISED",
+            )
+        
+        # 8. Fallback - no model available
+        self.logger.warning("No model available for tenant={}, using heuristic", tenant_id)
+        return RoutingDecision(
+            model=None,
+            model_type="heuristic",
+            model_version="heuristic",
+            tenant_phase="UNSUPERVISED",
+        )
+    
+    def _check_experiment(self, tenant_id: str, model_type: str) -> str:
+        """Check if tenant should be routed to experiment variant."""
+        if not self._experiments:
+            return "champion"
+        
+        for exp in self._experiments:
+            if exp.get("tenant") == tenant_id and exp.get("model_type") == model_type:
+                if not exp.get("active", False):
+                    continue
+                
+                # Consistent hashing for stable assignment
+                hash_input = f"{transaction_id or tenant_id}:{exp['name']}"
+                hash_val = int(hashlib.sha256(hash_input.encode()).hexdigest(), 16)
+                pct = (hash_val % 100) + 1
+                
+                challenger_pct = exp.get("challenger_traffic_pct", 10)
+                if pct <= challenger_pct:
+                    return "challenger"
+        
+        return "champion"
+    
+    def get_available_tenants(self) -> dict[str, list[str]]:
+        """Get list of tenants with loaded models by type."""
+        return {
+            "simple": sorted(self.simple_models.keys()),
+            "supervised": sorted(self.supervised_models.keys()),
+            "semi_supervised": sorted(self.semi_supervised_models.keys()),
+            "cold_start": sorted(self.cold_start_models.keys()),
+        }
+    
+    def get_tenant_phase(self, tenant_id: str) -> str:
+        """Get current phase for tenant."""
+        if tenant_id in self.simple_models or tenant_id in self.supervised_models:
+            return "SUPERVISED"
+        if tenant_id in self.semi_supervised_models:
+            return "SEMI_SUPERVISED"
+        if tenant_id in self.cold_start_models:
+            return "UNSUPERVISED"
+        return self.active_phase
+    
+    def is_experiment_active(self, experiment_name: str) -> bool:
+        """Check if an experiment is active."""
+        for exp in self._experiments:
+            if exp.get("name") == experiment_name:
+                return exp.get("active", False)
+        return False
+    
+    def record_experiment_exposure(self, tenant_id: str, experiment_name: str, variant: str) -> None:
+        """Record experiment exposure for analytics."""
+        self.logger.info(
+            "Experiment exposure: tenant={} exp={} variant={}",
+            tenant_id, experiment_name, variant
+        )
+
+
+def create_router(registry_models: dict, experiment_config: Optional[dict] = None) -> ModelRouter:
+    """Factory function to create ModelRouter."""
+    return ModelRouter(registry_models, experiment_config)
