@@ -10,6 +10,9 @@ env/
 dist/
 build/
 
+# CatBoost training output
+catboost_info/
+
 # Jupyter
 .ipynb_checkpoints/
 
