@@ -75,7 +75,7 @@ class ModelRouter:
         Priority:
         1. Tenant-specific simple model (production)
         2. Tenant-specific champion model (CatBoost + specialist)
-        3. Tenant-specific semi-supervised (NetPFN)
+        3. Tenant-specific semi-supervised (TabPFN)
         4. Tenant-specific cold-start
         5. Shared champion
         6. Shared semi-supervised
@@ -102,7 +102,7 @@ class ModelRouter:
                 tenant_phase="SUPERVISED",
             )
 
-        # 3. Tenant semi-supervised (NetPFN)
+        # 3. Tenant semi-supervised (TabPFN)
         if tenant_id in self.semi_supervised_models:
             variant = self._check_experiment(tenant_id, "semi_supervised")
             return RoutingDecision(

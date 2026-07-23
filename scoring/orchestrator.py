@@ -57,7 +57,7 @@ try:
     from models.semi_supervised.netpfn import NetPFNWrapper
 except Exception as exc:
     NetPFNWrapper = None
-    logger.warning("NetPFN semi-supervised model package unavailable: {}", exc)
+    logger.warning("NetPFN (TabPFN) semi-supervised model package unavailable: {}", exc)
 
 try:
     from models.supervised.champion import ChampionModel
@@ -108,7 +108,7 @@ class _ModelFileHandler:
         # Only reload on model artifact changes
         if not any(
             getattr(event, "src_path", "").endswith(ext)
-            for ext in (".pkl", ".pt", ".txt")
+            for ext in (".pkl", ".pt", ".txt", ".joblib")
         ):
             return
         now = time.monotonic()
@@ -182,7 +182,7 @@ class ModelRegistry:
             try:
                 staging["semi_supervised"] = NetPFNWrapper.load(semi_path)
                 staging["active_phase"] = "SEMI_SUPERVISED"
-                logger.info("Semi-supervised NetPFN model loaded")
+                logger.info("Semi-supervised TabPFN model loaded")
             except Exception as exc:
                 logger.warning("Failed to load shared semi-supervised model: {}", exc)
 
@@ -377,7 +377,7 @@ class ModelRegistry:
                     loaded[tenant_id] = NetPFNWrapper.load(p2_dir)
             except Exception as exc:
                 logger.warning(
-                    "Could not load NetPFN for tenant {}: {}", tenant_id, exc
+                    "Could not load TabPFN for tenant {}: {}", tenant_id, exc
                 )
         if loaded:
             logger.info(
@@ -619,13 +619,15 @@ class ScoringOrchestrator:
                             pred.fusion_output or 0.0,
                         )
 
-                # NetPFN semi-supervised model
+                # TabPFN semi-supervised model
                 elif NetPFNWrapper is not None and isinstance(model, NetPFNWrapper):
-                    risk_score = float(model.score(X)[0])
+                    preds = model.predict_with_uncertainty(X)
+                    pred = preds[0]
+                    risk_score = pred.probability
                     confidence_info = (
                         ConfidenceInfo(
-                            expert_used="NetPFN",
-                            confidence=1.0 - abs(risk_score - 0.5) * 2,
+                            expert_used="TabPFN",
+                            confidence=pred.confidence,
                         )
                         if ConfidenceInfo
                         else None
@@ -750,7 +752,7 @@ class ScoringOrchestrator:
             return None
 
     def _explain_semi_supervised(self, model, X: np.ndarray) -> Explanation:
-        """Semi-supervised explanation (NetPFN prototype-based)."""
+        """Semi-supervised explanation (TabPFN permutation importance)."""
         try:
             explanations = model.explain(X, top_n=8)
             exp = explanations[0]
@@ -759,7 +761,7 @@ class ScoringOrchestrator:
                     "feature": ft["feature"],
                     "value": ft["value"],
                     "contribution": ft["contribution"],
-                    "method": ft.get("method", "prototype_distance"),
+                    "method": ft.get("method", "permutation_importance"),
                 }
                 for ft in exp.get("top_features", [])
             ]
@@ -776,7 +778,7 @@ class ScoringOrchestrator:
             return None
 
     def _explain_netpfn(self, model, X: np.ndarray) -> Explanation:
-        """NetPFN explanation (prototype-based feature attribution)."""
+        """TabPFN explanation (permutation importance)."""
         try:
             explanations = model.explain(X, top_n=8)
             exp = explanations[0]
@@ -785,12 +787,12 @@ class ScoringOrchestrator:
                     "feature": ft["feature"],
                     "value": ft["value"],
                     "contribution": ft["contribution"],
-                    "method": ft.get("method", "prototype_distance"),
+                    "method": ft.get("method", "permutation_importance"),
                 }
                 for ft in exp.get("top_features", [])
             ]
             return Explanation(
-                model_type="netpfn",
+                model_type="tabpfn",
                 base_value=exp.get("base_value", 0.0),
                 prediction_value=exp["prediction_value"],
                 top_features=top_feats,
@@ -798,7 +800,7 @@ class ScoringOrchestrator:
                 latency_ms=5.0,
             )
         except Exception as exc:
-            logger.warning("NetPFN explanation failed: {}", exc)
+            logger.warning("TabPFN explanation failed: {}", exc)
             return None
 
     def _explain_rules(
@@ -1047,7 +1049,7 @@ class ScoringOrchestrator:
         if ChampionModel is not None and isinstance(model, ChampionModel):
             explanation = self._explain_champion(model, X)
 
-        # NetPFN
+        # TabPFN
         elif NetPFNWrapper is not None and isinstance(model, NetPFNWrapper):
             explanation = self._explain_netpfn(model, X)
 

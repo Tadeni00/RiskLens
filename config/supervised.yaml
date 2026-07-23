@@ -3,35 +3,23 @@
 
 # Phase 2: Semi-Supervised Configuration
 semi_supervised:
-  # NetPFN (Neural Prototypical Few-shot Network)
-  netpfn:
-    # Embedding dimensions
-    embedding_dim: 64
-    hidden_dim: 128
+  # TabPFN (Tabular Prior-data Fitted Network by Prior Labs)
+  # A pretrained tabular foundation model that uses in-context learning
+  # for prediction on small-to-medium labelled datasets.
+  tabpfn:
+    # Number of TabPFN estimators (ensemble size)
+    n_estimators: 4
     
-    # Prototype selection
-    n_prototypes: 16
-    
-    # Training parameters
-    epochs: 100
-    batch_size: 128
-    learning_rate: 0.001
-    weight_decay: 0.0001
+    # Ignore pretraining limits (allows larger datasets)
+    ignore_pretraining_limits: true
     
     # Pseudo-labeling
     confidence_threshold: 0.8
     max_pseudo_ratio: 3.0
     
-    # Early stopping
-    patience: 15
-    min_delta: 0.001
-    
     # Calibration
     calibration_method: isotonic
     enable_calibration: true
-    
-    # Device
-    device: auto  # auto, cpu, cuda
   
   # Training pipeline
   training:

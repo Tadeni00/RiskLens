@@ -1,7 +1,7 @@
 """
 FraudTrap — Training Pipeline
 Manages the full model lifecycle:
-  Phase 1 (unsupervised) → Phase 2 (semi-supervised NetPFN) → Phase 3 (supervised CatBoost + FT-Transformer)
+  Phase 1 (unsupervised) → Phase 2 (semi-supervised TabPFN) → Phase 3 (supervised CatBoost + FT-Transformer)
 Includes dataset construction with point-in-time correct feature joins,
 delayed label handling, and automated phase transition gating.
 """
@@ -311,7 +311,7 @@ class TrainingPipeline:
         return state
 
     def _train_phase2(self, tenant_id: str, state: PhaseState) -> PhaseState:
-        """Train Phase 2: NetPFN semi-supervised model."""
+        """Train Phase 2: TabPFN semi-supervised model."""
         try:
             X, y = self.dataset_builder.build_supervised_dataset(tenant_id)
         except ValueError as e:
@@ -337,12 +337,10 @@ class TrainingPipeline:
         except Exception:
             pass
 
-        # Train NetPFN
+        # Train TabPFN
         config = SemiSupervisedConfig(
-            epochs=50,
-            batch_size=256,
-            learning_rate=1e-3,
-            early_stopping_patience=7,
+            n_estimators=4,
+            ignore_pretraining_limits=True,
         )
         trainer = SemiSupervisedTrainer(config)
 
@@ -372,7 +370,7 @@ class TrainingPipeline:
         state.current_model_version = result.model_version
         state.pseudo_label_count = result.n_pseudo
         logger.info(
-            "Phase 2 NetPFN saved → {} | metrics={}",
+            "Phase 2 TabPFN saved → {} | metrics={}",
             save_path,
             state.metrics,
         )

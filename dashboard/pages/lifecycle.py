@@ -61,7 +61,7 @@ def _generate_synthetic_data():
             "Actions": "View",
         },
         {
-            "Model": "NetPFN",
+            "Model": "TabPFN",
             "Version": "1.4.3",
             "Status": "Specialist",
             "PR-AUC": 0.7654,
@@ -205,7 +205,7 @@ def render(tenant_id: str):
             },
             {
                 "name": "Phase 2 — Semi-supervised",
-                "model": "NetPFN Prototype Network",
+                "model": "TabPFN Foundation Model",
                 "min_labels": 500,
                 "current": 3847,
                 "target": 5000,

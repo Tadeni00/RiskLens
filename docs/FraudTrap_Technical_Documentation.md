@@ -79,7 +79,7 @@ FraudTrap follows a layered architecture where each layer adds intelligence to t
 
 **Layer 5 — Rules Engine**: Before any machine learning model runs, a deterministic rules engine evaluates the transaction in under 1 millisecond. It checks blocklists (is this account or device blocked?), velocity rules (too many transactions too fast?), geographic rules (impossible travel speed?), and threshold rules (amount exceeds limit?). If any rule triggers a hard block, the transaction is immediately rejected without running the ML model.
 
-**Layer 6 — ML Model Router**: If the rules engine does not block the transaction, the system routes to the appropriate ML model based on the tenant's phase. Phase 1 tenants get the cold-start ensemble. Phase 2 tenants get the NetPFN prototype-based model. Phase 3 tenants get the CatBoost champion with confidence-aware routing to FT-Transformer specialist for low-confidence cases.
+**Layer 6 — ML Model Router**: If the rules engine does not block the transaction, the system routes to the appropriate ML model based on the tenant's phase. Phase 1 tenants get the cold-start ensemble. Phase 2 tenants get the TabPFN foundation model. Phase 3 tenants get the CatBoost champion with confidence-aware routing to FT-Transformer specialist for low-confidence cases.
 
 **Layer 7 — Decision Engine**: The ML model's raw score is combined with the heuristic floor (a minimum risk score based on basic signals), adjusted by any rule risk boosts, calibrated for probability accuracy, and mapped to a decision (APPROVE, REVIEW, or BLOCK).
 
@@ -230,7 +230,7 @@ The core innovation of FraudTrap is that it does not require labels to start pro
 
 **Phase 1 — Cold Start**: Used when a tenant has fewer than 500 fraud labels. Relies entirely on unsupervised anomaly detection. No labeled fraud data is needed.
 
-**Phase 2 — Semi-Supervised**: Used when a tenant has between 500 and 5,000 fraud labels. Uses NetPFN (Neural Prototypical Few-shot Network) for prototype-based few-shot learning with pseudo-labels from the cold-start ensemble.
+**Phase 2 — Semi-Supervised**: Used when a tenant has between 500 and 5,000 fraud labels. Uses TabPFN (Tabular Prior-data Fitted Network) for in-context learning with pseudo-labels from the cold-start ensemble.
 
 **Phase 3 — Supervised**: Used when a tenant has more than 5,000 fraud labels. Uses confidence-aware routing with CatBoost champion (100% of transactions) and FT-Transformer specialist (low-confidence cases, ~10-15%). Meta Fusion combines outputs for final score.
 
@@ -284,11 +284,11 @@ Each detector has blind spots. The VAE may miss sparse anomalies because it lear
 
 ## 10. Phase 2: Semi-Supervised Learning
 
-When a tenant accumulates enough fraud labels (at least 500 confirmed cases from chargebacks and manual reviews), Phase 2 introduces NetPFN (Neural Prototypical Few-shot Network) for prototype-based few-shot learning while preserving the cold-start foundation.
+When a tenant accumulates enough fraud labels (at least 500 confirmed cases from chargebacks and manual reviews), Phase 2 introduces TabPFN (Tabular Prior-data Fitted Network) for in-context learning while preserving the cold-start foundation.
 
 ### Pseudo-Labeling
 
-The core challenge of Phase 2 is that 500 labels is not enough for a robust supervised model. FraudTrap addresses this with NetPFN (Neural Prototypical Few-shot Network), which uses prototype-based learning to discriminate between fraud and legitimate transactions in a learned embedding space. High-confidence predictions from the cold-start ensemble become pseudo-labels for prototype learning.
+The core challenge of Phase 2 is that 500 labels is not enough for a robust supervised model. FraudTrap addresses this with TabPFN (Tabular Prior-data Fitted Network), which uses in-context learning to classify between fraud and legitimate transactions. High-confidence predictions from the cold-start ensemble become pseudo-labels for training.
 
 The system maintains two thresholds that evolve as the label count grows:
 
@@ -306,20 +306,19 @@ Label propagation helps spread limited labels across the graph, expanding the ef
 
 ### Adaptive Training
 
-NetPFN learns fraud and legitimate prototypes in a learned embedding space. The model uses:
+TabPFN uses in-context learning to classify transactions. The model stores training examples and predicts via transformer attention, producing well-calibrated probabilities without explicit training.
 
-### Distance-Based Classification
+### Transformer-Based Prediction
 
-NetPFN classifies transactions by computing distances to fraud and legitimate prototypes in the embedding space:
+TabPFN classifies transactions by attending to provided examples using transformer attention:
 
 ```
-embedding = encoder(transaction_features)
-distance_to_fraud = ||embedding - fraud_prototype||
-distance_to_legit = ||embedding - legit_prototype||
-risk_score = softmax(distance_to_fraud, distance_to_legit)
+TabPFN stores labeled examples in context
+Transformers attend over (query, support set) pairs
+risk_score = softmax(attention_weights)
 ```
 
-Prototypes are updated incrementally as new labeled data arrives. The model transitions smoothly from unsupervised to supervised learning without sudden jumps in behavior.
+TabPFN naturally produces well-calibrated probabilities through its transformer-based attention mechanism. The model transitions smoothly from unsupervised to supervised learning without sudden jumps in behavior.
 
 ---
 
@@ -404,7 +403,7 @@ The routing logic is straightforward:
 
 1. Look up the tenant's current phase from Redis.
 2. If the tenant has fewer than 500 fraud labels, route to Phase 1 (Cold Start).
-3. If the tenant has between 500 and 5,000 fraud labels, route to Phase 2 (Semi-Supervised NetPFN).
+3. If the tenant has between 500 and 5,000 fraud labels, route to Phase 2 (Semi-Supervised TabPFN).
 4. If the tenant has more than 5,000 fraud labels, route to Phase 3 (Confidence-Aware Routing: CatBoost champion + FT-Transformer specialist).
 
 The phase is stored in Redis and updated automatically when the label count crosses a threshold. The routing check adds less than 1 millisecond to the scoring path.
@@ -472,13 +471,12 @@ The raw score is normalized to [0, 1] using calibration points stored during tra
 ### Phase 2 Fusion
 
 ```
-embedding = NetPFN_encoder(transaction_features)
-distance_to_fraud = ||embedding - fraud_prototype||
-distance_to_legit = ||embedding - legit_prototype||
-risk_score = softmax(distance_to_fraud, distance_to_legit)
+TabPFN stores labeled examples in context
+Transformers attend over (query, support set) pairs
+risk_score = softmax(attention_weights)
 ```
 
-NetPFN classifies transactions by computing distances to fraud and legitimate prototypes in the embedding space. Prototypes are updated incrementally as new labeled data arrives.
+TabPFN classifies transactions by attending to provided examples using transformer attention. It naturally produces well-calibrated probabilities.
 
 ### Phase 3 Fusion
 
@@ -592,7 +590,7 @@ Isotonic regression is flexible and can capture complex calibration curves. It i
 
 Platt scaling fits a logistic regression model to the raw predictions. It learns parameters A and B such that `calibrated = sigmoid(A × raw + B)`. Platt scaling is parametric (assumes a sigmoid shape) but is faster at inference time and more stable with small datasets.
 
-Platt scaling is available as an alternative calibration method for Phase 2 NetPFN.
+Platt scaling is available as an alternative calibration method for Phase 2 TabPFN.
 
 ### Calibration Evaluation
 
@@ -886,9 +884,9 @@ A single model deployed and forgotten will degrade over time as fraud patterns e
 
 FT-Transformer captures non-linear interactions that tree models miss, but it is slower than CatBoost. By invoking it only for low-confidence cases (~10-15% of transactions), we get the best of both worlds: CatBoost's speed for easy cases and FT-Transformer's accuracy for hard cases. This keeps latency within SLA while improving accuracy on uncertain transactions.
 
-### Why NetPFN for Phase 2 instead of XGBoost?
+### Why TabPFN for Phase 2 instead of XGBoost?
 
-With only 500-5,000 labels, traditional supervised models like XGBoost overfit. NetPFN (Neural Prototypical Few-shot Network) uses prototype-based learning that generalizes better with limited data. It learns fraud and legitimate prototypes in a learned embedding space, classifying new transactions by distance to prototypes. This approach is more robust than pseudo-labeling with XGBoost when labels are scarce.
+With only 500-5,000 labels, traditional supervised models like XGBoost overfit. TabPFN (Tabular Prior-data Fitted Network) uses in-context learning that generalizes better with limited data. It stores labeled examples and classifies new transactions via transformer attention. This approach is more robust than pseudo-labeling with XGBoost when labels are scarce.
 
 ### Why Isotonic Regression for calibration?
 

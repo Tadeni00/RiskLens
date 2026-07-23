@@ -72,7 +72,7 @@ graph TD
     RE --> MR[ML Model Router<br/>Phase Detection]
     
     MR --> CS[Cold Start Layer<br/>VAE + IF + Tail]
-    MR --> SS[Semi-Supervised Layer<br/>NetPFN]
+    MR --> SS[Semi-Supervised Layer<br/>TabPFN]
     MR --> SV[Supervised Layer<br/>CatBoost Champion]
     
     SV --> CE{Confidence<br/>Check}
@@ -110,7 +110,7 @@ graph TD
 | **Rules** | Rules Engine | Python | Sub-millisecond deterministic checks |
 | **Behaviour** | Profile Engine | Redis + Python | Real-time entity profiling |
 | **ML Phase 1** | Cold Start | VAE + IF + Tail | Zero-label anomaly detection |
-| **ML Phase 2** | Semi-Supervised | NetPFN | Few-shot learning with pseudo-labels |
+| **ML Phase 2** | Semi-Supervised | TabPFN | Foundation model for limited labels |
 | **ML Phase 3** | Champion | CatBoost | Production fraud classifier |
 | **ML Phase 3** | Specialist | FT-Transformer | Low-confidence edge cases |
 | **ML Phase 3** | Meta Fusion | Logistic Regression | Combines champion + specialist |
@@ -130,7 +130,7 @@ FraudTrap implements a **gated progression** from unsupervised to supervised lea
 ```mermaid
 graph LR
     A["New Tenant<br/>0 Labels"] -->|"Phase 1"| B["Cold Start<br/>VAE + IF + Tail"]
-    B -->|"100+ Labels"| C["Semi-Supervised<br/>NetPFN"]
+    B -->|"100+ Labels"| C["Semi-Supervised<br/>TabPFN"]
     C -->|"5000+ Labels"| D["Supervised<br/>CatBoost + FT-Transformer"]
 
     style A fill:#D69E2E,color:#000
@@ -142,7 +142,7 @@ graph LR
 | Phase | Name | Models | Labels Required | Latency |
 |-------|------|--------|-----------------|---------|
 | 1 | Cold Start | VAE + Isolation Forest + Empirical Tail Detector | 0 | ~15ms |
-| 2 | Semi-Supervised | NetPFN (Neural Prototypical Few-shot Network) | 100+ | ~10ms |
+| 2 | Semi-Supervised | TabPFN (Prior Labs) | 100+ | ~10ms |
 | 3 | Supervised | CatBoost Champion + FT-Transformer Specialist | 5,000+ | ~4ms |
 
 ---
@@ -190,7 +190,7 @@ risk_score = 0.55 × VAE_reconstruction_error
 
 **Purpose**: Bridge the gap between zero-label cold start and fully supervised learning.
 
-As fraud labels accumulate from analyst reviews, chargebacks, and customer reports, the semi-supervised layer activates. It uses **NetPFN** (Neural Prototypical Few-shot Network) — a prototype-based architecture designed for few-label scenarios.
+As fraud labels accumulate from analyst reviews, chargebacks, and customer reports, the semi-supervised layer activates. It uses **TabPFN** (Tabular Prior-data Fitted Network) — a pretrained tabular foundation model by Prior Labs that excels on small-to-medium labelled datasets.
 
 ### Architecture
 
@@ -198,22 +198,17 @@ As fraud labels accumulate from analyst reviews, chargebacks, and customer repor
 Transaction Features
         │
         ▼
-┌─────────────────┐
-│ Feature Encoder  │  (learns embedding space)
-└────────┬────────┘
+┌─────────────────────────┐
+│ TabPFN Foundation Model  │  (pretrained transformer)
+│  Distribution Embedder   │
+│  Row/Cross-row Attention │
+│  In-context Learning     │
+└────────┬────────────────┘
          │
          ▼
-┌─────────────────┐
-│ Prototype Layer  │  (few-shot discrimination)
-│  Fraud prototype │
-│  Legit prototype │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Distance-based   │  (confidence = closeness to prototype)
-│ classification   │
-└─────────────────┘
+┌─────────────────────────┐
+│ Calibrated Probabilities │  (fraud probability + uncertainty)
+└─────────────────────────┘
 ```
 
 ### Label Sources
@@ -229,19 +224,19 @@ Transaction Features
 
 1. **Pseudo-label generation** — Cold Start scores unlabeled transactions
 2. **Confidence filtering** — Only high-confidence pseudo-labels are used (threshold: 0.8)
-3. **Prototype learning** — NetPFN learns fraud and legitimate prototypes in embedding space
-4. **Distance-based classification** — New transactions are classified by proximity to prototypes
-5. **Continuous retraining** — As new labels arrive, prototypes are updated incrementally
+3. **In-context fitting** — TabPFN stores the labelled dataset for in-context learning
+4. **Calibrated prediction** — TabPFN produces well-calibrated probabilities via transformer attention
+5. **Uncertainty estimation** — Prediction entropy quantifies model uncertainty per transaction
 
-### Why NetPFN Instead of XGBoost
+### Why TabPFN Instead of XGBoost
 
-| Aspect | XGBoost Bridge | NetPFN |
+| Aspect | XGBoost Bridge | TabPFN |
 |--------|---------------|--------|
 | Label efficiency | Needs 500+ labels | Works with 100+ |
-| Pseudo-label handling | Binary threshold | Learned confidence weighting |
-| Feature interactions | Tree-based splits | Learned embedding space |
-| Class imbalance | Sample weighting | Prototype-based discrimination |
-| Adaptability | Retrain from scratch | Update prototypes incrementally |
+| Training | Gradient boosting | In-context learning (no training) |
+| Uncertainty | Not naturally available | Entropy-based uncertainty |
+| Calibration | Requires post-hoc calibration | Naturally well-calibrated |
+| Adaptability | Retrain from scratch | Add new data to context |
 
 ---
 
@@ -419,7 +414,7 @@ Phase 1: Cold Start
     │
     ▼  (100+ fraud labels)
 Phase 2: Semi-Supervised
-    │  NetPFN (Neural Prototypical Few-shot Network)
+    │  TabPFN (Prior Labs foundation model)
     │  Pseudo-labels + confidence-aware routing
     │
     ▼  (5000+ labels, PR-AUC ≥ 0.78)
@@ -594,7 +589,8 @@ A **9-page enterprise operations console** built with Streamlit.
 | Category | Technology | Purpose |
 |----------|------------|---------|
 | **API** | FastAPI | REST API with Swagger docs |
-| **ML** | PyTorch | VAE, FT-Transformer, NetPFN |
+| **ML** | PyTorch | VAE, FT-Transformer |
+| **ML** | TabPFN | Semi-supervised foundation model (Prior Labs) |
 | **ML** | CatBoost | Production fraud classifier |
 | **ML** | scikit-learn | Isolation Forest, calibration, metrics |
 | **ML** | SHAP | Feature attributions |
@@ -632,7 +628,7 @@ fraudtrap/
 ├── ingestion/              # Kafka producer/consumer, schemas
 ├── models/
 │   ├── cold_start/         # VAE + Isolation Forest + Tail Detector
-│   ├── semi_supervised/    # NetPFN (Neural Prototypical Few-shot Network)
+│   ├── semi_supervised/    # TabPFN (Prior Labs tabular foundation model)
 │   ├── supervised/         # Champion, FT-Transformer, Meta Fusion, Challengers
 │   └── explainability/     # SHAP, Counterfactual, Formatter, Cache
 ├── monitoring/             # Drift, metrics, alerts, rollup
@@ -660,7 +656,7 @@ fraudtrap/
 - ✅ Confidence-aware routing (CatBoost + FT-Transformer)
 - ✅ Behaviour profiling (5 entity types)
 - ✅ Cold-start detection (VAE + IF + Tail)
-- ✅ Semi-supervised learning (NetPFN)
+- ✅ Semi-supervised learning (TabPFN)
 - ✅ Drift detection (PSI, KL divergence)
 - ✅ Explainability (SHAP + Counterfactual)
 - ✅ Probability calibration (Isotonic Regression)
@@ -681,7 +677,7 @@ fraudtrap/
 
 - ✅ Three-phase ML lifecycle (Cold Start → Semi-Supervised → Supervised)
 - ✅ CatBoost champion with FT-Transformer specialist
-- ✅ NetPFN semi-supervised learning
+- ✅ TabPFN semi-supervised learning
 - ✅ Behavioural profiling (5 entity types)
 - ✅ SHAP + counterfactual explainability
 - ✅ Drift detection (PSI, KL divergence)

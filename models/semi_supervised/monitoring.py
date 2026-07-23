@@ -1,7 +1,7 @@
 """
 FraudTrap — Phase 2: Semi-Supervised Monitoring
 Tracks uncertainty distribution, pseudo-label acceptance rate,
-calibration drift, and prediction confidence for the NetPFN layer.
+calibration drift, and prediction confidence for the TabPFN layer.
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ class SemiSupervisedMetrics:
 
 class SemiSupervisedMonitor:
     """
-    Monitoring for the Phase 2 NetPFN layer.
+    Monitoring for the Phase 2 TabPFN layer.
 
     Tracks:
     - Uncertainty distribution (should remain stable or decrease over time)

@@ -18,7 +18,7 @@ class FeatureAttribution:
     value: float
     impact: float
     direction: str  # "increase" or "decrease"
-    method: str  # "shap", "prototype_distance", "rule_weight"
+    method: str  # "shap", "permutation_importance", "rule_weight"
 
 
 @dataclass(frozen=True)
@@ -99,7 +99,7 @@ class CounterfactualExplanation:
 class ConfidenceInfo:
     """Model confidence metadata."""
 
-    expert_used: str  # "CatBoost", "FTTransformer", "NetPFN", etc.
+    expert_used: str  # "CatBoost", "FTTransformer", "TabPFN", etc.
     confidence: float = 0.0
     ft_invoked: bool = False
     fusion_output: Optional[float] = None

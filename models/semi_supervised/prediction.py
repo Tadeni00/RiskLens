@@ -1,6 +1,6 @@
 """
 FraudTrap — Semi-Supervised Prediction Types
-Strongly typed output for Phase 2 NetPFN predictions.
+Strongly typed output for Phase 2 TabPFN predictions.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from typing import Optional, List, Dict, Any
 @dataclass(frozen=True)
 class SemiSupervisedPrediction:
     """
-    Strongly typed output from the NetPFN semi-supervised model.
+    Strongly typed output from the TabPFN semi-supervised model.
 
     Attributes:
         probability: Calibrated fraud probability in [0, 1].

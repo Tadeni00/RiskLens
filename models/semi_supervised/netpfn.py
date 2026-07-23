@@ -1,369 +1,148 @@
 """
-FraudTrap — Phase 2: NetPFN (Neural Prototypical Few-shot Network)
-A prototype-based neural classifier designed for few-label, weak-label,
-and pseudo-label fraud detection scenarios.
+FraudTrap — Phase 2: TabPFN (Tabular Prior-data Fitted Network)
 
-NetPFN learns class prototypes in a learned embedding space and classifies
-by distance to prototypes. It excels when:
-- Confirmed fraud labels are scarce (< 5000)
-- Weak labels (chargebacks, analyst feedback) are noisy
-- Pseudo-labels from cold-start are available
-- Class imbalance is extreme
+A pretrained tabular foundation model by Prior Labs used as the core of
+the semi-supervised learning layer. TabPFN performs prediction via
+in-context learning — it stores the labelled training set and computes
+predictions in a single forward pass through a transformer architecture.
+
+Unlike gradient-boosted trees or neural networks trained from scratch:
+  - It is pretrained on synthetic tabular tasks
+  - It excels on small-to-medium labelled datasets (≤50 000 samples)
+  - It provides naturally calibrated probabilities
+  - It requires no hyperparameter tuning for strong baselines
 
 Architecture:
-  Input Features → Encoder Network → Embedding Space →
-  Class Prototypes → Distance-based Classification →
-  Calibrated Fraud Probability + Uncertainty Estimate
+  Input Features → Distribution Embedder → Row/Cross-row Attention
+  → Per-row Tokens → Calibrated Class Probabilities
+
+Reference:
+  Hollmann et al., "Accurate predictions on small data with a tabular
+  foundation model", Nature (2025).
+  https://github.com/PriorLabs/TabPFN
 """
 
 from __future__ import annotations
+
 import hashlib
 import json
+import logging
 import pickle
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, List, Tuple, Dict, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+from sklearn.calibration import calibration_curve
+from sklearn.metrics import average_precision_score, roc_auc_score
 from sklearn.preprocessing import StandardScaler
-from loguru import logger
 
-from scoring.calibration import ProbabilityCalibrator
 from models.semi_supervised.prediction import SemiSupervisedPrediction
 
-# ── Encoder Network ──────────────────────────────────────────────────────────
+logger = logging.getLogger(__name__)
 
 
-class PrototypeEncoder(nn.Module):
+# ── Entropy-based Uncertainty ─────────────────────────────────────────────────
+
+
+def _entropy_uncertainty(probas: np.ndarray) -> np.ndarray:
     """
-    Feature encoder that maps raw transaction features into a learned
-    embedding space where class prototypes are computed.
+    Compute prediction uncertainty from class probability entropy.
 
-    Architecture: Linear → LayerNorm → ReLU → Linear → LayerNorm → ReLU → Linear
+    For binary classification with probabilities p = [p_legit, p_fraud]:
+        H(p) = -p_legit * log(p_legit) - p_fraud * log(p_fraud)
+        Normalised: H_norm = H(p) / log(2)   (max entropy for 2 classes)
+
+    Returns values in [0, 1] where 0 = certain, 1 = maximally uncertain.
     """
-
-    def __init__(
-        self,
-        input_dim: int,
-        embedding_dim: int = 64,
-        hidden_dims: Optional[List[int]] = None,
-        dropout: float = 0.2,
-    ):
-        super().__init__()
-        self.input_dim = input_dim
-        self.embedding_dim = embedding_dim
-
-        if hidden_dims is None:
-            hidden_dims = [128, 96]
-
-        layers: list[nn.Module] = []
-        prev_dim = input_dim
-        for h_dim in hidden_dims:
-            layers.extend(
-                [
-                    nn.Linear(prev_dim, h_dim),
-                    nn.LayerNorm(h_dim),
-                    nn.ReLU(),
-                    nn.Dropout(dropout),
-                ]
-            )
-            prev_dim = h_dim
-        layers.append(nn.Linear(prev_dim, embedding_dim))
-        layers.append(nn.LayerNorm(embedding_dim))
-
-        self.net = nn.Sequential(*layers)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.net(x)
+    eps = 1e-12
+    probas_clipped = np.clip(probas, eps, 1.0 - eps)
+    # If 1-D, treat as p_fraud only
+    if probas_clipped.ndim == 1:
+        p = np.stack([1.0 - probas_clipped, probas_clipped], axis=1)
+    else:
+        p = probas_clipped
+    H = -(p * np.log(p)).sum(axis=1)
+    return H / np.log(2)  # normalise to [0, 1]
 
 
-# ── NetPFN Model ─────────────────────────────────────────────────────────────
-
-
-class NetPFNModel(nn.Module):
-    """
-    Neural Prototypical Few-shot Network for semi-supervised fraud detection.
-
-    Key properties:
-    - Learns class prototypes from limited labelled data
-    - Supports weak labels via weighted prototype updates
-    - Produces calibrated probabilities + uncertainty estimates
-    - Uncertainty = distance to nearest prototype relative to class spread
-
-    Training modes:
-    - Full supervision: use confirmed labels
-    - Semi-supervised: combine confirmed + pseudo labels
-    - Weak supervision: weight samples by label quality
-    """
-
-    def __init__(
-        self,
-        input_dim: int,
-        embedding_dim: int = 64,
-        hidden_dims: Optional[List[int]] = None,
-        dropout: float = 0.2,
-        temperature: float = 10.0,
-        prototype_momentum: float = 0.9,
-    ):
-        super().__init__()
-        self.input_dim = input_dim
-        self.embedding_dim = embedding_dim
-        self.temperature = temperature
-        self.prototype_momentum = prototype_momentum
-
-        self.encoder = PrototypeEncoder(
-            input_dim=input_dim,
-            embedding_dim=embedding_dim,
-            hidden_dims=hidden_dims,
-            dropout=dropout,
-        )
-
-        # Class prototypes (learned parameters)
-        self.register_buffer(
-            "prototypes",
-            torch.zeros(2, embedding_dim),  # [legit_proto, fraud_proto]
-        )
-        self.register_buffer(
-            "prototype_counts",
-            torch.zeros(2, dtype=torch.long),
-        )
-        self.register_buffer(
-            "class_spread",
-            torch.ones(2, dtype=torch.float32),  # intra-class distance
-        )
-
-    def _compute_prototypes(
-        self,
-        embeddings: torch.Tensor,
-        labels: torch.Tensor,
-        weights: Optional[torch.Tensor] = None,
-    ) -> None:
-        """
-        Update class prototypes using exponential moving average.
-        If weights provided, use weighted averaging (for weak/pseudo labels).
-        """
-        with torch.no_grad():
-            for c in range(2):
-                mask = labels == c
-                if mask.sum() == 0:
-                    continue
-
-                class_embeddings = embeddings[mask]
-                if weights is not None:
-                    class_weights = weights[mask].unsqueeze(1)
-                    class_weights = class_weights / class_weights.sum()
-                    proto = (class_embeddings * class_weights).sum(dim=0)
-                else:
-                    proto = class_embeddings.mean(dim=0)
-
-                # EMA update
-                self.prototypes[c] = (
-                    self.prototype_momentum * self.prototypes[c]
-                    + (1 - self.prototype_momentum) * proto
-                )
-
-                # Update class spread (mean intra-class distance)
-                dists = torch.cdist(
-                    class_embeddings, self.prototypes[c].unsqueeze(0)
-                ).squeeze()
-                self.class_spread[c] = 0.9 * self.class_spread[c] + 0.1 * dists.mean()
-
-                self.prototype_counts[c] += int(mask.sum())
-
-    def forward(
-        self,
-        x: torch.Tensor,
-        labels: Optional[torch.Tensor] = None,
-        weights: Optional[torch.Tensor] = None,
-        update_prototypes: bool = True,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
-        Forward pass.
-
-        Returns:
-            probabilities: Fraud probabilities in [0, 1]
-            confidence: Prediction confidence in [0, 1]
-            uncertainty: Prediction uncertainty in [0, 1]
-        """
-        embeddings = self.encoder(x)
-
-        if labels is not None and update_prototypes:
-            self._compute_prototypes(embeddings, labels, weights)
-
-        # Compute distances to prototypes
-        dist_to_legit = torch.cdist(embeddings, self.prototypes[0:1]).squeeze(
-            -1
-        )  # (batch,)
-        dist_to_fraud = torch.cdist(embeddings, self.prototypes[1:2]).squeeze(
-            -1
-        )  # (batch,)
-
-        # Convert distances to probabilities via softmax with temperature
-        neg_dists = torch.stack([-dist_to_legit, -dist_to_fraud], dim=1)
-        probs = F.softmax(neg_dists * self.temperature, dim=1)
-
-        fraud_prob = probs[:, 1]
-
-        # Confidence: max class probability
-        confidence = probs.max(dim=1).values
-
-        # Uncertainty: entropy-based + prototype distance ratio
-        entropy = -(probs * torch.log(probs + 1e-8)).sum(dim=1)
-        max_entropy = np.log(2)
-        entropy_uncertainty = entropy / max_entropy
-
-        # Distance ratio: how close is the sample to the decision boundary
-        total_dist = dist_to_legit + dist_to_fraud + 1e-8
-        distance_uncertainty = torch.abs(dist_to_legit - dist_to_fraud) / total_dist
-        distance_uncertainty = (
-            1.0 - distance_uncertainty
-        )  # closer to boundary = more uncertain
-
-        # Combined uncertainty
-        uncertainty = 0.6 * entropy_uncertainty + 0.4 * distance_uncertainty
-        uncertainty = uncertainty.clamp(0.0, 1.0)
-
-        return fraud_prob, confidence, uncertainty
-
-    def predict(
-        self, x: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Inference mode forward pass (no prototype update)."""
-        self.eval()
-        with torch.no_grad():
-            return self.forward(x, update_prototypes=False)
-
-    def get_embeddings(self, x: torch.Tensor) -> torch.Tensor:
-        """Get embedding vectors for input features."""
-        self.eval()
-        with torch.no_grad():
-            return self.encoder(x)
-
-    def get_prototype_distances(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
-        """Get distances to each class prototype."""
-        self.eval()
-        with torch.no_grad():
-            embeddings = self.encoder(x)
-            dist_legit = torch.cdist(embeddings, self.prototypes[0:1]).squeeze(-1)
-            dist_fraud = torch.cdist(embeddings, self.prototypes[1:2]).squeeze(-1)
-            return {
-                "dist_legit": dist_legit,
-                "dist_fraud": dist_fraud,
-            }
-
-
-# ── Loss Function ────────────────────────────────────────────────────────────
-
-
-class NetPFNLoss(nn.Module):
-    """
-    Combined loss for NetPFN training:
-    - Prototype-based cross-entropy loss
-    - Prototype compactness regularizer (intra-class distances should be small)
-    - Prototype separation regularizer (inter-class distances should be large)
-    """
-
-    def __init__(
-        self,
-        compactness_weight: float = 0.1,
-        separation_weight: float = 0.1,
-    ):
-        super().__init__()
-        self.compactness_weight = compactness_weight
-        self.separation_weight = separation_weight
-
-    def forward(
-        self,
-        fraud_prob: torch.Tensor,
-        confidence: torch.Tensor,
-        labels: torch.Tensor,
-        weights: Optional[torch.Tensor],
-        model: NetPFNModel,
-    ) -> torch.Tensor:
-        # Binary cross-entropy for classification
-        bce = F.binary_cross_entropy(fraud_prob, labels.float(), reduction="none")
-        if weights is not None:
-            bce = bce * weights
-        classification_loss = bce.mean()
-
-        # Compactness: mean intra-class distance should be small
-        compactness_loss = model.class_spread.mean()
-
-        # Separation: distance between prototypes should be large
-        proto_dist = torch.cdist(
-            model.prototypes.unsqueeze(0),
-            model.prototypes.unsqueeze(0),
-        ).squeeze()
-        # We want to maximize the off-diagonal distance
-        separation_loss = -proto_dist[0, 1]
-
-        total = (
-            classification_loss
-            + self.compactness_weight * compactness_loss
-            + self.separation_weight * separation_loss
-        )
-        return total
-
-
-# ── Wrapper with Scaler + Calibration ────────────────────────────────────────
+# ── NetPFN Wrapper ────────────────────────────────────────────────────────────
 
 
 class NetPFNWrapper:
     """
-    Production wrapper around NetPFNModel.
+    Production wrapper around Prior Labs TabPFN for FraudTrap's semi-supervised
+    layer.
 
-    Handles:
-    - Feature scaling (StandardScaler)
-    - PyTorch ↔ NumPy interface
-    - Probability calibration (Isotonic/Platt)
-    - Strongly typed predictions
-    - Version pinning
-    - Persistence (save/load)
+    Interface:
+        fit(X, y, sample_weights)          – store labelled data
+        predict(X)                         – hard class predictions
+        predict_proba(X)                   – calibrated fraud probabilities
+        predict_with_uncertainty(X)        – typed predictions with uncertainty
+        score(X)                           – alias for predict_proba
+        explain(X, top_n)                  – feature attributions
+        save(path) / load(path)            – persistence
+
+    TabPFN performs in-context learning: calling ``fit()`` stores the
+    labelled dataset; calling ``predict*`` runs a forward pass that
+    conditions on the stored data.  There is no gradient-based training.
+
+    Uncertainty is derived from prediction entropy.  This is a meaningful
+    signal for TabPFN because its transformer architecture produces
+    well-calibrated probabilities even on small datasets.
     """
 
     def __init__(
         self,
-        input_dim: int,
+        input_dim: int = 0,
         feature_names: Optional[List[str]] = None,
-        embedding_dim: int = 64,
-        hidden_dims: Optional[List[int]] = None,
-        dropout: float = 0.2,
-        temperature: float = 10.0,
         calibration_method: str = "isotonic",
         model_version: str = "1.0.0",
+        n_estimators: int = 4,
+        ignore_pretraining_limits: bool = True,
     ):
         self.input_dim = input_dim
         self.feature_names = feature_names or []
         self.calibration_method = calibration_method
         self.model_version = model_version
+        self.n_estimators = n_estimators
+        self.ignore_pretraining_limits = ignore_pretraining_limits
 
         self.scaler = StandardScaler()
-        self.model = NetPFNModel(
-            input_dim=input_dim,
-            embedding_dim=embedding_dim,
-            hidden_dims=hidden_dims,
-            dropout=dropout,
-            temperature=temperature,
-        )
-        self.calibrator: Optional[ProbabilityCalibrator] = None
+        self.calibrator: Optional[Any] = None
         self.is_fitted = False
 
-        # Version pinning
+        # Version pinning / metadata
         self.training_hash: Optional[str] = None
         self.feature_hash: Optional[str] = None
         self.dataset_hash: Optional[str] = None
         self.trained_at: Optional[str] = None
-
-        # Training stats
         self.confirmed_label_count: int = 0
         self.pseudo_label_count: int = 0
         self.training_iteration: int = 0
         self.pr_auc_: float = 0.0
         self.roc_auc_: float = 0.0
+
+        # TabPFN classifier (lazy — created in fit())
+        self._classifier: Any = None
+
+    # ── Internal helpers ──────────────────────────────────────────────────
+
+    def _get_classifier(self) -> Any:
+        """Lazily import and return a TabPFNClassifier instance."""
+        try:
+            from tabpfn import TabPFNClassifier
+        except ImportError as exc:
+            raise ImportError(
+                "tabpfn package is required.  Install with: pip install tabpfn"
+            ) from exc
+
+        return TabPFNClassifier(
+            n_estimators=self.n_estimators,
+            ignore_pretraining_limits=self.ignore_pretraining_limits,
+        )
 
     def _compute_hashes(self, X: np.ndarray, y: np.ndarray) -> Dict[str, str]:
         feature_str = (
@@ -371,8 +150,8 @@ class NetPFNWrapper:
         )
         feature_hash = hashlib.sha256(feature_str.encode()).hexdigest()[:16]
 
-        if len(X) > 10000:
-            idx = np.random.choice(len(X), 10000, replace=False)
+        if len(X) > 10_000:
+            idx = np.random.default_rng(42).choice(len(X), 10_000, replace=False)
             X_sample, y_sample = X[idx], y[idx]
         else:
             X_sample, y_sample = X, y
@@ -384,41 +163,85 @@ class NetPFNWrapper:
             ]
         )
         dataset_hash = hashlib.sha256(data_stats.tobytes()).hexdigest()[:16]
-
         return {"feature_hash": feature_hash, "dataset_hash": dataset_hash}
 
+    # ── Public API ────────────────────────────────────────────────────────
+
+    def fit(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        sample_weights: Optional[np.ndarray] = None,
+    ) -> "NetPFNWrapper":
+        """
+        Fit the TabPFN model on the labelled training data.
+
+        In TabPFN, ``fit`` stores the training set for in-context
+        learning at prediction time.  No gradient updates occur.
+        """
+        t0 = time.time()
+
+        self.input_dim = X.shape[1]
+        X_scaled = self.scaler.fit_transform(X)
+
+        self._classifier = self._get_classifier()
+        self._classifier.fit(X_scaled, y)
+
+        self.is_fitted = True
+        self.trained_at = datetime.now(timezone.utc).isoformat()
+
+        hashes = self._compute_hashes(X, y)
+        self.feature_hash = hashes["feature_hash"]
+        self.dataset_hash = hashes["dataset_hash"]
+
+        logger.info(
+            "TabPFN fitted on %d samples (%d features) in %.1fs",
+            X.shape[0],
+            X.shape[1],
+            time.time() - t0,
+        )
+        return self
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """Return hard class predictions (0 or 1)."""
+        if not self.is_fitted:
+            raise RuntimeError("NetPFNWrapper must be fitted before predict")
+        X_scaled = self.scaler.transform(X)
+        return self._classifier.predict(X_scaled)
+
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
-        """Return calibrated fraud probabilities."""
+        """Return calibrated fraud probabilities (1-D array)."""
         if not self.is_fitted:
             raise RuntimeError("NetPFNWrapper must be fitted before scoring")
-
         X_scaled = self.scaler.transform(X)
-        X_tensor = torch.FloatTensor(X_scaled)
-
-        fraud_prob, _, _ = self.model.predict(X_tensor)
-        raw_probs = fraud_prob.numpy()
+        probas_2d = self._classifier.predict_proba(X_scaled)
+        fraud_prob = probas_2d[:, 1]
 
         if self.calibrator is not None:
-            return self.calibrator.transform(raw_probs)
-        return raw_probs
+            fraud_prob = self.calibrator.transform(fraud_prob)
+        return fraud_prob
+
+    def score(self, X: np.ndarray) -> np.ndarray:
+        """Alias for predict_proba — returns calibrated fraud probabilities."""
+        return self.predict_proba(X)
 
     def predict_with_uncertainty(self, X: np.ndarray) -> List[SemiSupervisedPrediction]:
         """Return fully typed predictions with uncertainty estimates."""
         if not self.is_fitted:
             raise RuntimeError("NetPFNWrapper must be fitted before scoring")
-
         X_scaled = self.scaler.transform(X)
-        X_tensor = torch.FloatTensor(X_scaled)
+        probas_2d = self._classifier.predict_proba(X_scaled)
+        fraud_prob = probas_2d[:, 1]
 
-        fraud_prob, confidence, uncertainty = self.model.predict(X_tensor)
-
-        probs = fraud_prob.numpy()
         if self.calibrator is not None:
-            probs = self.calibrator.transform(probs)
+            fraud_prob = self.calibrator.transform(fraud_prob)
+
+        uncertainty = _entropy_uncertainty(probas_2d)
+        confidence = 1.0 - uncertainty
 
         return [
             SemiSupervisedPrediction(
-                probability=float(probs[i]),
+                probability=float(fraud_prob[i]),
                 confidence=float(confidence[i]),
                 uncertainty=float(uncertainty[i]),
                 model_version=self.model_version,
@@ -426,83 +249,97 @@ class NetPFNWrapper:
             for i in range(len(X))
         ]
 
-    def score(self, X: np.ndarray) -> np.ndarray:
-        """Return calibrated fraud probabilities (alias for predict_proba)."""
-        return self.predict_proba(X)
-
     def explain(self, X: np.ndarray, top_n: int = 8) -> List[Dict[str, Any]]:
         """
-        Feature attribution via prototype distance decomposition.
-        For each sample, compute contribution of each feature to
-        the distance to each prototype.
-        """
-        X_scaled = self.scaler.transform(X)
-        X_tensor = torch.FloatTensor(X_scaled)
+        Feature attribution via permutation-based importance.
 
-        embeddings = self.model.get_embeddings(X_tensor)
-        distances = self.model.get_prototype_distances(X_tensor)
+        For each sample, measure how much each feature contributes to the
+        prediction by observing the change in fraud probability when that
+        feature is replaced with its median value from the training set.
+        """
+        if not self.is_fitted:
+            raise RuntimeError("NetPFNWrapper must be fitted before explain")
+
+        X_scaled = self.scaler.transform(X)
+        base_probas = self._classifier.predict_proba(X_scaled)
+        base_fraud = base_probas[:, 1]
+
+        # Reference: median of training data (stored in scaler)
+        x_median = self.scaler.transform(
+            self.scaler.inverse_transform(np.zeros((1, self.input_dim)))
+        ).flatten()
+        # Actually use scaler center_ as the "median" proxy
+        x_median = self.scaler.center_
+
+        feature_names = (
+            self.feature_names
+            if self.feature_names
+            else [f"f_{j}" for j in range(self.input_dim)]
+        )
 
         explanations = []
         for i in range(len(X)):
-            dist_legit = float(distances["dist_legit"][i])
-            dist_fraud = float(distances["dist_fraud"][i])
-            total = dist_legit + dist_fraud + 1e-8
+            x_orig = X_scaled[i : i + 1].copy()
+            x_perturbed = x_orig.copy()
+            feat_importances = []
 
-            fraud_prob = float(self.model.predict(X_tensor[i : i + 1])[0][0])
+            for j in range(self.input_dim):
+                x_perturbed_j = x_orig.copy()
+                x_perturbed_j[0, j] = x_median[j]
+                p_perturbed = self._classifier.predict_proba(x_perturbed_j)[0, 1]
+                importance = abs(float(base_fraud[i] - p_perturbed))
+                feat_importances.append(
+                    (feature_names[j], float(x_orig[0, j]), importance)
+                )
 
-            # Feature contribution: per-feature deviation from prototype
-            feature_names = (
-                self.feature_names
-                if self.feature_names
-                else [f"f_{j}" for j in range(X.shape[1])]
-            )
-
-            fraud_proto = self.model.prototypes[1].numpy()
-            legit_proto = self.model.prototypes[0].numpy()
-
-            # Per-feature distance contribution
-            feat_contributions = []
-            for j, fname in enumerate(feature_names):
-                feat_val = float(X_scaled[i, j])
-                fraud_dist_j = abs(feat_val - fraud_proto[j])
-                legit_dist_j = abs(feat_val - legit_proto[j])
-                # Contribution: how much more/less aligned with fraud vs legit
-                contribution = legit_dist_j - fraud_dist_j
-                feat_contributions.append((fname, feat_val, contribution))
-
-            feat_contributions.sort(key=lambda x: abs(x[2]), reverse=True)
+            feat_importances.sort(key=lambda t: t[2], reverse=True)
             top_features = [
                 {
                     "feature": name,
                     "value": val,
-                    "contribution": float(contrib),
-                    "method": "prototype_distance",
+                    "contribution": imp,
+                    "method": "permutation_importance",
                 }
-                for name, val, contrib in feat_contributions[:top_n]
+                for name, val, imp in feat_importances[:top_n]
             ]
 
             explanations.append(
                 {
-                    "model_type": "netpfn",
-                    "base_value": 0.5,
-                    "prediction_value": fraud_prob,
+                    "model_type": "tabpfn",
+                    "base_value": float(np.mean(base_fraud)),
+                    "prediction_value": float(base_fraud[i]),
                     "top_features": top_features,
                     "components": {
-                        "dist_legit": dist_legit,
-                        "dist_fraud": dist_fraud,
-                        "prototype_counts": self.model.prototype_counts.tolist(),
+                        "n_training_samples": self._n_training_samples(),
+                        "model_version": self.model_version,
                     },
                 }
             )
-
         return explanations
 
+    def _n_training_samples(self) -> int:
+        """Return the number of training samples stored by TabPFN."""
+        if self._classifier is None:
+            return 0
+        # TabPFN stores X_train_ and y_train_ after fit()
+        X_train = getattr(self._classifier, "X_train_", None)
+        if X_train is not None:
+            return len(X_train)
+        return 0
+
+    # ── Persistence ───────────────────────────────────────────────────────
+
     def save(self, path: Path) -> None:
+        """Save the wrapper and all metadata to disk."""
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
 
-        torch.save(self.model.state_dict(), path / "netpfn_model.pt")
+        # Save the TabPFN classifier via joblib (sklearn-compatible)
+        import joblib
 
+        joblib.dump(self._classifier, path / "tabpfn_model.joblib")
+
+        # Save metadata
         with open(path / "netpfn_metadata.pkl", "wb") as f:
             pickle.dump(
                 {
@@ -510,6 +347,8 @@ class NetPFNWrapper:
                     "feature_names": self.feature_names,
                     "calibration_method": self.calibration_method,
                     "model_version": self.model_version,
+                    "n_estimators": self.n_estimators,
+                    "ignore_pretraining_limits": self.ignore_pretraining_limits,
                     "scaler": self.scaler,
                     "calibrator": self.calibrator,
                     "is_fitted": self.is_fitted,
@@ -522,35 +361,27 @@ class NetPFNWrapper:
                     "training_iteration": self.training_iteration,
                     "pr_auc": self.pr_auc_,
                     "roc_auc": self.roc_auc_,
-                    "model_config": {
-                        "embedding_dim": self.model.embedding_dim,
-                        "temperature": self.model.temperature,
-                        "prototype_momentum": self.model.prototype_momentum,
-                    },
-                    "prototypes": self.model.prototypes,
-                    "prototype_counts": self.model.prototype_counts,
-                    "class_spread": self.model.class_spread,
                 },
                 f,
             )
 
-        logger.info("NetPFNWrapper saved to {}", path)
+        logger.info("NetPFNWrapper (TabPFN) saved to %s", path)
 
     @classmethod
     def load(cls, path: Path) -> "NetPFNWrapper":
+        """Load a previously saved wrapper from disk."""
         path = Path(path)
 
         with open(path / "netpfn_metadata.pkl", "rb") as f:
             payload = pickle.load(f)
 
-        config = payload.get("model_config", {})
         obj = cls(
-            input_dim=payload["input_dim"],
+            input_dim=payload.get("input_dim", 0),
             feature_names=payload.get("feature_names", []),
-            embedding_dim=config.get("embedding_dim", 64),
-            temperature=config.get("temperature", 10.0),
             calibration_method=payload.get("calibration_method", "isotonic"),
             model_version=payload.get("model_version", "1.0.0"),
+            n_estimators=payload.get("n_estimators", 4),
+            ignore_pretraining_limits=payload.get("ignore_pretraining_limits", True),
         )
 
         obj.scaler = payload["scaler"]
@@ -566,22 +397,27 @@ class NetPFNWrapper:
         obj.pr_auc_ = payload.get("pr_auc", 0.0)
         obj.roc_auc_ = payload.get("roc_auc", 0.0)
 
-        # Restore model state
-        obj.model.load_state_dict(
-            torch.load(path / "netpfn_model.pt", map_location="cpu")
-        )
-        obj.model.eval()
+        # Load the TabPFN classifier
+        import joblib
 
-        # Restore buffers
-        if "prototypes" in payload:
-            obj.model.prototypes = payload["prototypes"]
-        if "prototype_counts" in payload:
-            obj.model.prototype_counts = payload["prototype_counts"]
-        if "class_spread" in payload:
-            obj.model.class_spread = payload["class_spread"]
+        model_path = path / "tabpfn_model.joblib"
+        if model_path.exists():
+            obj._classifier = joblib.load(model_path)
+        else:
+            # Fallback: try loading legacy PyTorch checkpoint (pre-migration)
+            legacy_pt = path / "netpfn_model.pt"
+            if legacy_pt.exists():
+                logger.warning(
+                    "Legacy PyTorch checkpoint found at %s. "
+                    "This is from the old prototype-based implementation "
+                    "and is NOT compatible with TabPFN.  Please retrain.",
+                    legacy_pt,
+                )
+            obj._classifier = None
+            obj.is_fitted = False
 
         logger.info(
-            "NetPFNWrapper loaded from {} (version={})",
+            "NetPFNWrapper (TabPFN) loaded from %s (version=%s)",
             path,
             obj.model_version,
         )

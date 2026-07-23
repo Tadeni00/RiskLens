@@ -22,7 +22,7 @@ def pipeline_diagram(active_step: int = None, completed_steps: list = None):
         ("Feature Store", "DATABASE", "Redis-backed feature assembly"),
         ("Behavior Engine", "ACTIVITY", "5 entity profiles updated"),
         ("Cold Start Layer", "SHIELD", "VAE + Isolation Forest + Tail"),
-        ("Semi-supervised", "LAYERS", "NetPFN prototype network"),
+        ("Semi-supervised", "LAYERS", "TabPFN foundation model"),
         ("Supervised Layer", "BRAIN", "CatBoost Champion + FT-Transformer"),
         ("Confidence Check", "TARGET", "Route to specialist if needed"),
         ("Explainability", "EYE", "SHAP + Counterfactual"),
@@ -119,7 +119,7 @@ def architecture_diagram():
     <!-- Phase 2: Semi-supervised -->
     <rect x="350" y="330" width="200" height="60" rx="8" fill="{Colors.rgba(Colors.PHASE_2, 0.12)}" stroke="{Colors.PHASE_2}" stroke-width="1.5"/>
     <text x="450" y="356" text-anchor="middle" fill="{Colors.PHASE_2}" font-size="11" font-weight="700">Phase 2: Semi-supervised</text>
-    <text x="450" y="374" text-anchor="middle" fill="{Colors.TEXT_SECONDARY}" font-size="10">NetPFN Prototypical Network</text>
+    <text x="450" y="374" text-anchor="middle" fill="{Colors.TEXT_SECONDARY}" font-size="10">TabPFN Foundation Model</text>
 
     <!-- Phase 3: Supervised -->
     <rect x="600" y="330" width="200" height="60" rx="8" fill="{Colors.rgba(Colors.PHASE_3, 0.12)}" stroke="{Colors.PHASE_3}" stroke-width="1.5"/>

@@ -1,6 +1,6 @@
 """
 FraudTrap — Phase 2 & 3 Architecture Tests
-Covers: NetPFN, SemiSupervisedTrainer, ConfidenceEstimator, FTTransformer,
+Covers: TabPFN (NetPFNWrapper), SemiSupervisedTrainer, ConfidenceEstimator, FTTransformer,
 MetaFusionLayer, ChampionModel confidence-aware routing.
 """
 
@@ -66,13 +66,12 @@ def fitted_cold_start(synthetic_labeled_data):
 
 @pytest.fixture
 def fitted_netpfn(synthetic_labeled_data):
-    """Fit a NetPFN model for testing."""
+    """Fit a TabPFN model for testing."""
     from models.semi_supervised.netpfn import NetPFNWrapper
 
     X, y = synthetic_labeled_data
     model = NetPFNWrapper(input_dim=X.shape[1])
-    model.scaler.fit(X)
-    model.is_fitted = True
+    model.fit(X, y)
     return model, X, y
 
 
@@ -200,10 +199,10 @@ class TestPseudoLabelResult:
         assert len(result.review_ids) == 0
 
 
-# ── NetPFN tests ──────────────────────────────────────────────────────────────
+# ── TabPFN tests ──────────────────────────────────────────────────────────────
 
 
-class TestNetPFN:
+class TestTabPFN:
     def test_fit_and_score(self, fitted_netpfn):
         model, X, y = fitted_netpfn
         scores = model.score(X[:50])
@@ -428,8 +427,8 @@ class TestPhaseTransitions:
 
 
 class TestLatencyBudget:
-    def test_netpfn_scoring_under_50ms(self, fitted_netpfn):
-        """NetPFN scoring must complete in < 50ms for single sample."""
+    def test_tabpfn_scoring_under_50ms(self, fitted_netpfn):
+        """TabPFN scoring must complete in < 50ms for single sample."""
         model, X, _ = fitted_netpfn
         sample = X[:1]
         times = []
@@ -438,7 +437,7 @@ class TestLatencyBudget:
             model.score(sample)
             times.append((time.perf_counter() - t0) * 1000)
         p95 = np.percentile(times, 95)
-        assert p95 < 50.0, f"NetPFN scoring P95={p95:.2f}ms exceeds 50ms budget"
+        assert p95 < 50.0, f"TabPFN scoring P95={p95:.2f}ms exceeds 50ms budget"
 
     def test_confidence_scoring_under_10ms(self, fitted_confidence_estimator):
         """Confidence estimation must complete in < 10ms for single sample."""
