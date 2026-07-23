@@ -129,10 +129,10 @@ FraudTrap implements a **gated progression** from unsupervised to supervised lea
 
 ```mermaid
 graph LR
-    A[New Tenant<br/>0 Labels] -->|Phase 1| B[Cold Start<br/>VAE + IF + Tail]
-    B -->|100+ Labels| C[Semi-Supervised<br/>NetPFN]
-    C -->|5000+ Labels| D[Supervised<br/>CatBoost + FT-Transformer]
-    
+    A["New Tenant<br/>0 Labels"] -->|"Phase 1"| B["Cold Start<br/>VAE + IF + Tail"]
+    B -->|"100+ Labels"| C["Semi-Supervised<br/>NetPFN"]
+    C -->|"5000+ Labels"| D["Supervised<br/>CatBoost + FT-Transformer"]
+
     style A fill:#D69E2E,color:#000
     style B fill:#D69E2E,color:#000
     style C fill:#2D6CDF,color:#fff
