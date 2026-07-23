@@ -49,16 +49,10 @@ except Exception as exc:
     logger.warning("Cold-start ensemble unavailable: {}", exc)
 
 try:
-    from models.supervised.semi_supervised import SemiSupervisedBridge
+    from models.semi_supervised.netpfn import NetPFNWrapper
 except Exception as exc:
-    SemiSupervisedBridge = None
-    logger.warning("Semi-supervised model package unavailable: {}", exc)
-
-try:
-    from models.supervised.ensemble import SupervisedEnsemble
-except Exception as exc:
-    SupervisedEnsemble = None
-    logger.warning("Supervised ensemble model package unavailable: {}", exc)
+    NetPFNWrapper = None
+    logger.warning("NetPFN semi-supervised model package unavailable: {}", exc)
 
 try:
     from models.supervised.champion import ChampionModel
@@ -71,6 +65,17 @@ try:
 except Exception as exc:
     GNNScorer = None
     logger.warning("GNN scorer unavailable: {}", exc)
+
+try:
+    from models.explainability.engine import ExplainabilityEngine, ExplainabilityConfig
+    from models.explainability.types import ConfidenceInfo
+    EXPLAINABILITY_AVAILABLE = True
+except Exception as exc:
+    ExplainabilityEngine = None
+    ExplainabilityConfig = None
+    ConfidenceInfo = None
+    EXPLAINABILITY_AVAILABLE = False
+    logger.warning("Explainability engine unavailable: {}", exc)
 
 settings = get_settings()
 
@@ -112,8 +117,7 @@ class ModelRegistry:
     """
     def __init__(self):
         self.cold_start: Optional[ColdStartEnsemble] = None
-        self.semi_supervised: Optional[SemiSupervisedBridge] = None
-        self.supervised: Optional[SupervisedEnsemble] = None
+        self.semi_supervised: Optional[NetPFNWrapper] = None
         self.champion: Optional[ChampionModel] = None
         self.gnn_scorer: Optional[GNNScorer] = None
         self.active_phase: str = "UNSUPERVISED"
@@ -124,8 +128,8 @@ class ModelRegistry:
         self.dataset_hash: Optional[str] = None
         self.trained_at: Optional[str] = None
         
-        self.supervised_models: dict[str, SupervisedEnsemble] = {}
-        self.semi_supervised_models: dict[str, SemiSupervisedBridge] = {}
+        self.champion_models: dict[str, ChampionModel] = {}
+        self.semi_supervised_models: dict[str, NetPFNWrapper] = {}
         self.cold_start_models: dict[str, ColdStartEnsemble] = {}
         self.simple_models: dict[str, SimpleFraudModel] = {}
         
@@ -150,7 +154,7 @@ class ModelRegistry:
         staging["simple_models"] = self._load_simple_models(model_dir)
         staging["cold_start_models"] = self._load_cold_start_models(model_dir)
         staging["semi_supervised_models"] = self._load_semi_supervised_models(model_dir, staging.get("cold_start_models", {}))
-        staging["supervised_models"] = self._load_supervised_models(model_dir)
+        staging["champion_models"] = self._load_supervised_models(model_dir)
         
         # Load shared models
         cold_path = model_dir / "cold_start"
@@ -160,27 +164,36 @@ class ModelRegistry:
             logger.info("Cold-start model loaded (version={})", self.model_version)
 
         semi_path = model_dir / "semi_supervised"
-        if semi_path.exists() and staging.get("cold_start") and SemiSupervisedBridge:
-            staging["semi_supervised"] = SemiSupervisedBridge.load(semi_path, staging["cold_start"])
-            staging["active_phase"] = "SEMI_SUPERVISED"
-            logger.info("Semi-supervised model loaded")
+        if semi_path.exists() and NetPFNWrapper:
+            try:
+                staging["semi_supervised"] = NetPFNWrapper.load(semi_path)
+                staging["active_phase"] = "SEMI_SUPERVISED"
+                logger.info("Semi-supervised NetPFN model loaded")
+            except Exception as exc:
+                logger.warning("Failed to load shared semi-supervised model: {}", exc)
 
         sup_path = model_dir / "supervised"
-        if sup_path.exists() and SupervisedEnsemble:
-            staging["supervised"] = SupervisedEnsemble.load(sup_path)
-            staging["active_phase"] = "SUPERVISED"
-            staging["feature_names"] = staging["supervised"].feature_names
-            self._extract_version_info(staging["supervised"])
-            logger.info("Supervised ensemble loaded (version={})", self.model_version)
+        if sup_path.exists() and ChampionModel:
+            try:
+                staging["champion"] = ChampionModel.load(sup_path)
+                staging["active_phase"] = "SUPERVISED"
+                staging["feature_names"] = staging["champion"].feature_names
+                self._extract_version_info(staging["champion"])
+                logger.info("Champion model loaded (version={})", self.model_version)
+            except Exception as exc:
+                logger.warning("Failed to load shared champion model: {}", exc)
         
         # Load champion model (preferred over ensemble for production)
         champion_path = model_dir / "champion"
         if champion_path.exists() and ChampionModel:
-            staging["champion"] = ChampionModel.load(champion_path)
-            staging["active_phase"] = "SUPERVISED"
-            staging["feature_names"] = staging["champion"].feature_names
-            self._extract_version_info(staging["champion"])
-            logger.info("Champion model loaded (version={})", self.model_version)
+            try:
+                staging["champion"] = ChampionModel.load(champion_path)
+                staging["active_phase"] = "SUPERVISED"
+                staging["feature_names"] = staging["champion"].feature_names
+                self._extract_version_info(staging["champion"])
+                logger.info("Champion model loaded (version={})", self.model_version)
+            except Exception as exc:
+                logger.warning("Failed to load champion model: {}", exc)
 
         gnn_path = model_dir / "gnn"
         if gnn_path.exists() and GNNScorer:
@@ -214,11 +227,10 @@ class ModelRegistry:
         self.simple_models = s.get("simple_models", {})
         self.cold_start_models = s.get("cold_start_models", {})
         self.semi_supervised_models = s.get("semi_supervised_models", {})
-        self.supervised_models = s.get("supervised_models", {})
+        self.champion_models = s.get("champion_models", {})
         
         self.cold_start = s.get("cold_start")
         self.semi_supervised = s.get("semi_supervised")
-        self.supervised = s.get("supervised")
         self.champion = s.get("champion")
         self.gnn_scorer = s.get("gnn_scorer")
         self.active_phase = s.get("active_phase", "UNSUPERVISED")
@@ -320,43 +332,38 @@ class ModelRegistry:
             logger.info("Loaded {} tenant cold-start model(s): {}", len(loaded), ", ".join(sorted(loaded)))
         return loaded
 
-    def _load_semi_supervised_models(self, model_dir: Path, cold_models: dict) -> dict[str, SemiSupervisedBridge]:
-        loaded: dict[str, SemiSupervisedBridge] = {}
+    def _load_semi_supervised_models(self, model_dir: Path, cold_models: dict) -> dict[str, NetPFNWrapper]:
+        loaded: dict[str, NetPFNWrapper] = {}
         for p2_dir in sorted(model_dir.glob("*/phase2")):
             tenant_id = p2_dir.parent.name
             try:
-                cold_model = cold_models.get(tenant_id)
-                if not cold_model:
-                    p1_dir = p2_dir.parent / "phase1"
-                    if p1_dir.exists() and ColdStartEnsemble:
-                        cold_model = ColdStartEnsemble.load(p1_dir)
-                if SemiSupervisedBridge and cold_model:
-                    loaded[tenant_id] = SemiSupervisedBridge.load(p2_dir, cold_model)
+                if NetPFNWrapper:
+                    loaded[tenant_id] = NetPFNWrapper.load(p2_dir)
             except Exception as exc:
-                logger.warning("Could not load semi-supervised bridge for tenant {}: {}", tenant_id, exc)
+                logger.warning("Could not load NetPFN for tenant {}: {}", tenant_id, exc)
         if loaded:
             logger.info("Loaded {} tenant semi-supervised model(s): {}", len(loaded), ", ".join(sorted(loaded)))
         return loaded
 
-    def _load_supervised_models(self, model_dir: Path) -> dict[str, SupervisedEnsemble]:
-        loaded: dict[str, SupervisedEnsemble] = {}
+    def _load_supervised_models(self, model_dir: Path) -> dict[str, ChampionModel]:
+        loaded: dict[str, ChampionModel] = {}
         for p3_dir in sorted(model_dir.glob("*/phase3")):
             tenant_id = p3_dir.parent.name
             try:
-                if SupervisedEnsemble:
-                    loaded[tenant_id] = SupervisedEnsemble.load(p3_dir)
+                if ChampionModel:
+                    loaded[tenant_id] = ChampionModel.load(p3_dir)
             except Exception as exc:
-                logger.warning("Could not load supervised ensemble for tenant {}: {}", tenant_id, exc)
+                logger.warning("Could not load champion model for tenant {}: {}", tenant_id, exc)
         if loaded:
-            logger.info("Loaded {} tenant supervised ensemble(s): {}", len(loaded), ", ".join(sorted(loaded)))
+            logger.info("Loaded {} tenant champion model(s): {}", len(loaded), ", ".join(sorted(loaded)))
         return loaded
 
     def get_active_model(self, tenant_id: str | None = None):
         # Watchdog handles reloads; no polling needed
         with self._lock:
             if tenant_id:
-                if tenant_id in self.supervised_models:
-                    return self.supervised_models[tenant_id]
+                if tenant_id in self.champion_models:
+                    return self.champion_models[tenant_id]
                 if tenant_id in self.semi_supervised_models:
                     return self.semi_supervised_models[tenant_id]
                 if tenant_id in self.cold_start_models:
@@ -368,8 +375,6 @@ class ModelRegistry:
             if self.active_phase == "SUPERVISED":
                 if self.champion:
                     return self.champion
-                if self.supervised:
-                    return self.supervised
             if self.active_phase == "SEMI_SUPERVISED" and self.semi_supervised:
                 return self.semi_supervised
             if self.cold_start:
@@ -379,7 +384,7 @@ class ModelRegistry:
     def get_model_version(self, tenant_id: str | None = None) -> str:
         with self._lock:
             if tenant_id:
-                if tenant_id in self.supervised_models:
+                if tenant_id in self.champion_models:
                     return "supervised-ensemble"
                 if tenant_id in self.semi_supervised_models:
                     return "semi-supervised-bridge"
@@ -428,6 +433,7 @@ class ScoringOrchestrator:
         self._redis: Optional[redis.Redis] = None
         self.rules_engine: Optional[RulesEngine] = None
         self._gnn_future = None  # For async GNN scoring
+        self._explainability: Optional[Any] = None  # ExplainabilityEngine
 
     def _get_redis(self) -> Optional[redis.Redis]:
         if self._redis is None:
@@ -513,63 +519,66 @@ class ScoringOrchestrator:
         risk_score = self._heuristic_score(features, rule_result)
         explanation = None
         uncertainty = None
+        confidence_info = None
 
         if model is not None and feature_array is not None:
             try:
                 X = feature_array.reshape(1, -1)
-                model_score = float(model.score(X)[0])
+
+                # Cold-start model: anomaly scoring
                 if ColdStartEnsemble is not None and isinstance(model, ColdStartEnsemble):
-                    risk_score = model_score
+                    risk_score = float(model.score(X)[0])
+                    confidence_info = ConfidenceInfo(
+                        expert_used="ColdStartEnsemble",
+                        confidence=1.0 - risk_score,
+                    ) if ConfidenceInfo else None
+
+                # Champion model: confidence-aware routing
                 elif ChampionModel is not None and isinstance(model, ChampionModel):
-                    # Champion model - use score directly
-                    risk_score = model_score
+                    predictions = model.score_with_confidence(X)
+                    pred = predictions[0]
+                    risk_score = pred.probability
+                    confidence_info = ConfidenceInfo(
+                        expert_used="FTTransformer" if pred.ft_invoked else "CatBoost",
+                        confidence=pred.confidence,
+                        ft_invoked=pred.ft_invoked,
+                        fusion_output=pred.fusion_output,
+                    ) if ConfidenceInfo else None
+
+                    # Log specialist invocation
+                    if pred.ft_invoked:
+                        logger.debug(
+                            "FT-Transformer invoked: prob={:.4f}, confidence={:.4f}, fusion={:.4f}",
+                            pred.probability, pred.confidence,
+                            pred.fusion_output or 0.0,
+                        )
+
+                # NetPFN semi-supervised model
+                elif NetPFNWrapper is not None and isinstance(model, NetPFNWrapper):
+                    risk_score = float(model.score(X)[0])
+                    confidence_info = ConfidenceInfo(
+                        expert_used="NetPFN",
+                        confidence=1.0 - abs(risk_score - 0.5) * 2,
+                    ) if ConfidenceInfo else None
+
+                # Fallback: heuristic
                 else:
                     policy_floor = self._heuristic_score(features, rule_result)
-                    risk_score = max(model_score, policy_floor)
+                    risk_score = policy_floor
 
                 if rule_result and rule_result.triggered and not rule_result.hard_block:
                     risk_score = min(1.0, risk_score + rule_result.risk_boost)
 
-                # Explanation for champion model
-                if ChampionModel is not None and isinstance(model, ChampionModel):
-                    if risk_score >= settings.score_review_low:
-                        explanation = self._explain_champion(model, X)
-                    else:
-                        explanation = self._explain_rules(txn, features)
+                # ── Explainability Engine (new pipeline) ───────────────────────
+                if EXPLAINABILITY_AVAILABLE and risk_score >= settings.score_review_low:
+                    explanation = self._explain_with_engine(
+                        txn.tenant_id, txn.transaction_id, X,
+                        risk_score, model, confidence_info,
+                    )
                 
-                # Uncertainty estimation for supervised models
-                elif (SupervisedEnsemble is not None and isinstance(model, SupervisedEnsemble) 
-                    and risk_score >= settings.score_review_low):
-                    # SYNC: High-value decisions get full SHAP explanation
-                    explanation = self._explain_supervised(model, X)
-                
-                # COLD-START: Sync for REVIEW, async for others
-                elif ColdStartEnsemble is not None and isinstance(model, ColdStartEnsemble):
-                    if decision == "REVIEW":
-                        explanation = self._explain_cold_start(model, X)
-                    else:
-                        _EXPLANATION_EXECUTOR.submit(self._explain_cold_start_async, model, X, trace_id)
-                        explanation = None  # Available later via /v1/explain/{trace_id}
-                
-                # SEMI-SUPERVISED: Sync for REVIEW, async for others
-                elif SemiSupervisedBridge is not None and isinstance(model, SemiSupervisedBridge):
-                    if decision == "REVIEW":
-                        explanation = self._explain_semi_supervised(model, X)
-                    else:
-                        _EXPLANATION_EXECUTOR.submit(self._explain_semi_supervised_async, model, X, trace_id)
-                        explanation = None
-                
-                # Rules explanation (sync - very fast)
-                elif self.rules_engine:
-                    explanation = self._explain_rules(txn, features)
-                
-                # Fallback: cold-start (legacy path)
-                elif ColdStartEnsemble is not None and isinstance(model, ColdStartEnsemble):
-                    explanation = self._explain_cold_start(model, X)
-                
-                # Fallback: semi-supervised (legacy path)
-                elif SemiSupervisedBridge is not None and isinstance(model, SemiSupervisedBridge):
-                    explanation = self._explain_semi_supervised(model, X)
+                # Fallback: legacy explanation methods
+                if explanation is None:
+                    explanation = self._explain_legacy(txn, features, model, X, risk_score)
                 
                 # MC Dropout uncertainty for GNN (async, non-blocking)
                 if GNNScorer is not None and self.registry.gnn_scorer and self.registry.gnn_scorer.is_fitted:
@@ -659,7 +668,7 @@ class ScoringOrchestrator:
             return None
 
     def _explain_semi_supervised(self, model, X: np.ndarray) -> Explanation:
-        """Semi-supervised explanation (blended cold-start + XGBoost SHAP)."""
+        """Semi-supervised explanation (NetPFN prototype-based)."""
         try:
             explanations = model.explain(X, top_n=8)
             exp = explanations[0]
@@ -668,7 +677,7 @@ class ScoringOrchestrator:
                     "feature": ft["feature"],
                     "value": ft["value"],
                     "contribution": ft["contribution"],
-                    "method": ft["method"],
+                    "method": ft.get("method", "prototype_distance"),
                 }
                 for ft in exp.get("top_features", [])
             ]
@@ -682,6 +691,32 @@ class ScoringOrchestrator:
             )
         except Exception as exc:
             logger.warning("Semi-supervised explanation failed: {}", exc)
+            return None
+
+    def _explain_netpfn(self, model, X: np.ndarray) -> Explanation:
+        """NetPFN explanation (prototype-based feature attribution)."""
+        try:
+            explanations = model.explain(X, top_n=8)
+            exp = explanations[0]
+            top_feats = [
+                {
+                    "feature": ft["feature"],
+                    "value": ft["value"],
+                    "contribution": ft["contribution"],
+                    "method": ft.get("method", "prototype_distance"),
+                }
+                for ft in exp.get("top_features", [])
+            ]
+            return Explanation(
+                model_type="netpfn",
+                base_value=exp.get("base_value", 0.0),
+                prediction_value=exp["prediction_value"],
+                top_features=top_feats,
+                components=exp.get("components"),
+                latency_ms=5.0,
+            )
+        except Exception as exc:
+            logger.warning("NetPFN explanation failed: {}", exc)
             return None
 
     def _explain_rules(self, txn: TransactionRequest, features: dict[str, float]) -> Explanation:
@@ -793,6 +828,138 @@ class ScoringOrchestrator:
                 self._cache_explanation(trace_id, explanation)
         except Exception as exc:
             logger.warning("Async supervised explanation failed: {}", exc)
+
+    def _explain_with_engine(
+        self,
+        tenant_id: str,
+        transaction_id: str,
+        X: np.ndarray,
+        risk_score: float,
+        model,
+        confidence_info,
+    ) -> Optional[Explanation]:
+        """
+        Generate explanation using the new ExplainabilityEngine.
+        Returns the existing Explanation schema for backward compatibility.
+        """
+        try:
+            if self._explainability is None:
+                self._init_explainability(tenant_id, model)
+            
+            if self._explainability is None:
+                return None
+            
+            feature_names = self.registry.feature_names or []
+            if not feature_names:
+                return None
+            
+            full_exp = self._explainability.explain(
+                tenant_id=tenant_id,
+                transaction_id=transaction_id,
+                X=X,
+                fraud_probability=risk_score,
+                feature_names=feature_names,
+                confidence=confidence_info,
+            )
+            
+            if full_exp is None or full_exp.formatted is None:
+                return None
+            
+            # Convert to existing Explanation schema
+            top_feats = []
+            if full_exp.shap and full_exp.shap.top_features:
+                for attr in full_exp.shap.top_features:
+                    top_feats.append({
+                        "feature": attr.feature,
+                        "value": attr.value,
+                        "contribution": attr.impact,
+                        "method": attr.method,
+                    })
+            
+            # Add counterfactual info as a feature
+            if full_exp.counterfactual and full_exp.counterfactual.changes:
+                top_feats.append({
+                    "feature": "counterfactual",
+                    "value": full_exp.counterfactual.prediction_delta,
+                    "contribution": 0.0,
+                    "method": full_exp.counterfactual.source,
+                })
+            
+            return Explanation(
+                model_type="explainability",
+                base_value=full_exp.shap.base_value if full_exp.shap else 0.0,
+                prediction_value=risk_score,
+                top_features=top_feats,
+                latency_ms=full_exp.total_latency_ms,
+                confidence=full_exp.formatted.confidence.__dict__ if full_exp.formatted and full_exp.formatted.confidence else None,
+                counterfactual=full_exp.counterfactual.__dict__ if full_exp.counterfactual else None,
+                formatted_report=full_exp.formatted.to_dict() if full_exp.formatted else None,
+            )
+        
+        except Exception as exc:
+            logger.warning("ExplainabilityEngine failed: {}", exc)
+            return None
+    
+    def _init_explainability(self, tenant_id: str, model) -> None:
+        """Initialize the explainability engine for a tenant."""
+        try:
+            if ExplainabilityEngine is None:
+                return
+            
+            config = ExplainabilityConfig(
+                enabled=True,
+                shap_top_features=5,
+                counterfactual_enabled=True,
+            )
+            
+            self._explainability = ExplainabilityEngine(config=config)
+            
+            # Fit with available data
+            feature_names = self.registry.feature_names or []
+            if feature_names and hasattr(model, 'feature_importance_'):
+                # Use a dummy background dataset for SHAP initialization
+                X_bg = np.zeros((100, len(feature_names)), dtype=np.float32)
+                self._explainability.fit(
+                    model=model,
+                    X_background=X_bg,
+                    feature_names=feature_names,
+                    tenant_id=tenant_id,
+                )
+            
+            logger.info("ExplainabilityEngine initialized for tenant={}", tenant_id)
+        
+        except Exception as exc:
+            logger.warning("ExplainabilityEngine init failed: {}", exc)
+            self._explainability = None
+    
+    def _explain_legacy(
+        self,
+        txn: TransactionRequest,
+        features: dict,
+        model,
+        X: np.ndarray,
+        risk_score: float,
+    ) -> Optional[Explanation]:
+        """Legacy explanation fallback for when ExplainabilityEngine is unavailable."""
+        explanation = None
+        
+        # Champion model
+        if ChampionModel is not None and isinstance(model, ChampionModel):
+            explanation = self._explain_champion(model, X)
+        
+        # NetPFN
+        elif NetPFNWrapper is not None and isinstance(model, NetPFNWrapper):
+            explanation = self._explain_netpfn(model, X)
+        
+        # Rules fallback
+        if explanation is None and self.rules_engine:
+            explanation = self._explain_rules(txn, features)
+        
+        # Cold-start
+        elif explanation is None and ColdStartEnsemble is not None and isinstance(model, ColdStartEnsemble):
+            explanation = self._explain_cold_start(model, X)
+        
+        return explanation
 
     def _cache_explanation(self, trace_id: str, explanation: Explanation) -> None:
         """Cache explanation in Redis for /v1/explain/{trace_id} lookup."""

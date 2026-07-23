@@ -1,44 +1,208 @@
 # FraudTrap — Supervised Learning Configuration
-# Champion-Challenger Architecture Settings
+# Phase 2 & 3 Architecture Settings
 
-# Champion Configuration
-champion:
-  # Algorithm (only catboost for champion)
-  algorithm: catboost
+# Phase 2: Semi-Supervised Configuration
+semi_supervised:
+  # NetPFN (Neural Prototypical Few-shot Network)
+  netpfn:
+    # Embedding dimensions
+    embedding_dim: 64
+    hidden_dim: 128
+    
+    # Prototype selection
+    n_prototypes: 16
+    
+    # Training parameters
+    epochs: 100
+    batch_size: 128
+    learning_rate: 0.001
+    weight_decay: 0.0001
+    
+    # Pseudo-labeling
+    confidence_threshold: 0.8
+    max_pseudo_ratio: 3.0
+    
+    # Early stopping
+    patience: 15
+    min_delta: 0.001
+    
+    # Calibration
+    calibration_method: isotonic
+    enable_calibration: true
+    
+    # Device
+    device: auto  # auto, cpu, cuda
   
-  # CatBoost hyperparameters
-  params:
-    iterations: 1000
-    depth: 6
-    learning_rate: 0.05
-    loss_function: Logloss
-    eval_metric: AUC
-    auto_class_weights: Balanced
-    bootstrap_type: Bernoulli
-    subsample: 0.8
-    random_seed: 42
-    early_stopping_rounds: 50
+  # Training pipeline
+  training:
+    # Minimum labeled samples to activate semi-supervised
+    min_labeled_samples: 100
+    
+    # Maximum labeled samples before graduating to supervised
+    max_labeled_samples: 10000
+    
+    # Class imbalance handling
+    positive_weight: auto  # auto = compute from data
+    
+    # Monitoring
+    enable_drift_detection: true
+    enable_calibration_monitoring: true
+
+# Phase 3: Supervised Configuration
+supervised:
+  # Champion: CatBoost + Specialist Routing
+  champion:
+    algorithm: catboost
+    
+    # CatBoost hyperparameters
+    catboost:
+      iterations: 1000
+      depth: 6
+      learning_rate: 0.05
+      loss_function: Logloss
+      eval_metric: AUC
+      auto_class_weights: Balanced
+      bootstrap_type: Bernoulli
+      subsample: 0.8
+      random_seed: 42
+      early_stopping_rounds: 50
+    
+    # Specialist routing
+    specialist:
+      enabled: true
+      
+      # Confidence threshold for specialist invocation
+      confidence_threshold: 0.9
+      
+      # Distance threshold for FT-Transformer
+      distance_threshold: 0.5
+      
+      # Maximum FT-Transformer invocation rate (0-1)
+      max_ft_invocation_rate: 0.2
+      
+      # Latency budget (ms) for specialist invocation
+      latency_budget_ms: 30
+  
+  # FT-Transformer Specialist
+  ft_transformer:
+    # Architecture
+    d_token: 64
+    n_heads: 4
+    n_layers: 2
+    dropout: 0.1
+    
+    # Training
+    n_epochs: 50
+    batch_size: 256
+    learning_rate: 0.001
+    weight_decay: 0.0001
+    
+    # Early stopping
+    patience: 10
+    min_delta: 0.001
+    
+    # Device
+    device: auto  # auto, cpu, cuda
+    
+    # Latency budget (ms)
+    inference_latency_ms: 15
+  
+  # Meta-Fusion Layer
+  meta_fusion:
+    # Fusion method
+    method: logistic_regression  # logistic_regression or gbdt
+    
+    # If using GBDT fusion
+    gbdt:
+      n_estimators: 50
+      max_depth: 3
+      learning_rate: 0.05
+    
+    # Training
+    cv_folds: 5
+    min_samples: 100
+  
+  # Confidence Estimator
+  confidence:
+    # Distance threshold for low confidence
+    distance_threshold: 0.5
+    
+    # Conformal prediction
+    enable_conformal: true
+    conformal_alpha: 0.1  # 90% coverage
+    
+    # Calibration
+    calibration_method: isotonic
   
   # Calibration
   calibration:
-    method: isotonic  # isotonic or platt
+    method: isotonic
     enabled: true
   
-  # Version pinning
-  versioning:
-    enabled: true
-    auto_increment: true
+  # Evaluation
+  evaluation:
+    metrics:
+      - pr_auc
+      - roc_auc
+      - f2_score
+      - precision
+      - recall
+      - f1
+      - accuracy
+      - fpr
+      - calibration_error
+      - brier_score
+      - ft_invocation_rate
+      - specialist_accuracy
+    
+    # Threshold analysis
+    threshold_analysis:
+      enabled: true
+      n_thresholds: 9
+      threshold_range: [0.1, 0.9]
+    
+    # Latency measurement
+    latency:
+      enabled: true
+      n_samples: 1000
+      warmup_samples: 10
+  
+  # Promotion criteria
+  promotion:
+    # Minimum PR-AUC improvement over champion
+    min_pr_auc_improvement: 0.01
+    
+    # Maximum allowed FPR
+    max_fpr: 0.01
+    
+    # Maximum allowed calibration error
+    max_calibration_error: 0.05
+    
+    # Maximum allowed latency ratio (challenger/champion)
+    max_latency_ratio: 2.0
+    
+    # Minimum validation samples
+    min_validation_samples: 1000
 
-# Challengers Configuration
+# Challengers Configuration (offline benchmark only)
 challengers:
-  # List of challenger algorithms to train
+  # Offline benchmark algorithms (not used in production)
   algorithms:
-    - xgboost
     - lightgbm
-    - ft_transformer
-    - tabnet
+    - xgboost
   
-  # XGBoost hyperparameters
+  # LightGBM hyperparameters (offline benchmark)
+  lightgbm:
+    n_estimators: 500
+    max_depth: 6
+    learning_rate: 0.05
+    num_leaves: 63
+    subsample: 0.8
+    colsample_bytree: 0.8
+    is_unbalance: true
+    random_state: 42
+  
+  # XGBoost hyperparameters (offline benchmark)
   xgboost:
     n_estimators: 500
     max_depth: 6
@@ -50,116 +214,6 @@ challengers:
     reg_lambda: 1.0
     eval_metric: aucpr
     random_state: 42
-  
-  # LightGBM hyperparameters
-  lightgbm:
-    n_estimators: 500
-    max_depth: 6
-    learning_rate: 0.05
-    num_leaves: 63
-    subsample: 0.8
-    colsample_bytree: 0.8
-    is_unbalance: true
-    random_state: 42
-  
-  # FT-Transformer hyperparameters
-  ft_transformer:
-    n_epochs: 100
-    batch_size: 256
-    learning_rate: 0.001
-    d_token: 64
-    n_heads: 4
-    n_layers: 2
-    dropout: 0.1
-    device: cpu
-  
-  # TabNet hyperparameters
-  tabnet:
-    n_d: 64
-    n_a: 64
-    n_steps: 3
-    gamma: 1.3
-    n_independent: 2
-    n_shared: 2
-    max_epochs: 100
-    patience: 10
-    batch_size: 256
-    virtual_batch_size: 128
-  
-  # Training settings
-  training:
-    train_ratio: 0.7
-    val_ratio: 0.15
-    test_ratio: 0.15
-    random_seed: 42
-
-# Evaluation Configuration
-evaluation:
-  # Metrics to compute
-  metrics:
-    - pr_auc
-    - roc_auc
-    - f2_score
-    - precision
-    - recall
-    - f1
-    - accuracy
-    - fpr
-    - calibration_error
-    - brier_score
-  
-  # Threshold analysis
-  threshold_analysis:
-    enabled: true
-    n_thresholds: 9
-    threshold_range: [0.1, 0.9]
-  
-  # Latency measurement
-  latency:
-    enabled: true
-    n_samples: 1000
-    warmup_samples: 10
-  
-  # Output
-  output:
-    save_reports: true
-    report_format: json
-    include_confusion_matrix: true
-
-# Promotion Configuration
-promotion:
-  # Criteria for champion promotion
-  criteria:
-    # Minimum PR-AUC improvement over champion
-    min_pr_auc_improvement: 0.01
-    
-    # Maximum allowed FPR (False Positive Rate)
-    max_fpr: 0.01
-    
-    # Maximum allowed calibration error
-    max_calibration_error: 0.05
-    
-    # Maximum allowed latency ratio (challenger/champion)
-    max_latency_ratio: 2.0
-    
-    # Minimum number of validation samples required
-    min_validation_samples: 1000
-  
-  # Approval settings
-  approval:
-    require_manual_approval: false
-    auto_approve: true
-  
-  # Rollback settings
-  rollback:
-    enabled: true
-    max_rollback_versions: 5
-  
-  # Notification settings
-  notifications:
-    enabled: false
-    webhook_url: ""
-    email_recipients: []
 
 # Training Pipeline Configuration
 training_pipeline:
@@ -183,28 +237,6 @@ training_pipeline:
     enabled: true
     log_level: INFO
     metrics_export: false
-
-# Ensemble Configuration (optional, disabled by default)
-ensemble:
-  enabled: false
-  
-  # If enabled, only these two models can be used together
-  allowed_combinations:
-    - catboost
-    - ft_transformer
-  
-  # Ensemble method
-  method: weighted_average  # weighted_average or stacking
-  
-  # Weights for weighted average
-  weights:
-    catboost: 0.7
-    ft_transformer: 0.3
-  
-  # Stacking meta-learner (if method=stacking)
-  stacking:
-    meta_learner: logistic_regression
-    cv_folds: 5
 
 # Feature Store Integration
 feature_store:

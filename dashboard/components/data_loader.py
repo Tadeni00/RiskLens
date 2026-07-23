@@ -13,10 +13,31 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+CURRENCY_SYMBOLS = {"NGN": "₦", "KES": "KSh", "ZAR": "R", "USD": "$", "GBP": "£"}
+
+
+def currency_fmt(amount: float, currency: str = "USD") -> str:
+    sym = CURRENCY_SYMBOLS.get(currency, "$")
+    if amount >= 1_000_000:
+        return f"{sym}{amount / 1_000_000:.2f}M"
+    if amount >= 1_000:
+        return f"{sym}{amount / 1_000:.1f}K"
+    return f"{sym}{amount:,.2f}"
+
 
 def _get_rng() -> np.random.Generator:
     """Return a new RNG seeded from OS entropy (unique per call)."""
     return np.random.default_rng()
+
+
+COUNTRY_CURRENCY = {"NG": "NGN", "KE": "KES", "ZA": "ZAR", "GB": "GBP", "US": "USD"}
+COUNTRY_TENANT = {
+    "NG": "bank_ng_gtb",
+    "KE": "bank_ke_equity",
+    "ZA": "fintech_za_yoco",
+    "GB": "bank_ng_gtb",
+    "US": "bank_ke_equity",
+}
 
 
 def make_transactions(n: int = 5000, fraud_rate: float = 0.015) -> pd.DataFrame:
@@ -24,22 +45,24 @@ def make_transactions(n: int = 5000, fraud_rate: float = 0.015) -> pd.DataFrame:
     n_fraud = int(n * fraud_rate)
     n_legit = n - n_fraud
     now = datetime.now(timezone.utc)
+    countries = list(COUNTRY_CURRENCY.keys())
 
     rows = []
     for i in range(n):
         is_fraud = i < n_fraud
         delta_days = rng.integers(0, 90)
         ts = now - timedelta(days=int(delta_days), hours=int(rng.integers(0, 24)))
+        country = rng.choice(countries)
         rows.append({
             "transaction_id":   f"txn_{i:06d}",
             "trace_id":         f"trace_{uuid.uuid4().hex[:12]}",
-            "tenant_id":        rng.choice(["bank_ng_gtb", "bank_ke_equity", "fintech_za_yoco"]),
+            "tenant_id":        COUNTRY_TENANT.get(country, "bank_ng_gtb"),
             "amount":           float(rng.lognormal(9.5 if is_fraud else 8.5, 1.2)),
-            "currency":         rng.choice(["NGN", "KES", "ZAR"]),
+            "currency":         COUNTRY_CURRENCY.get(country, "USD"),
             "timestamp":        ts,
             "transaction_type": rng.choice(["PAYMENT", "TRANSFER", "WITHDRAWAL", "TOP_UP"]),
             "channel":          rng.choice(["MOBILE", "WEB", "POS", "ATM"]),
-            "country_code":     rng.choice(["NG", "KE", "ZA", "GB", "US"]),
+            "country_code":     country,
             "is_fraud":         int(is_fraud),
             "risk_score":       float(rng.beta(8, 2) if is_fraud else rng.beta(1, 8)),
             "decision":         ("BLOCK" if is_fraud and rng.random() > 0.2

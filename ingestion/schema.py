@@ -118,8 +118,9 @@ class Explanation(BaseModel):
     Unified explanation format for all model types.
     Supports SHAP (supervised), rule weights (rules), component breakdown (cold-start),
     and calibration breakdown (semi-supervised).
+    Enhanced with counterfactual and confidence data from the ExplainabilityEngine.
     """
-    model_type: str = Field(description="Model type: rules, cold_start, semi_supervised, supervised, gnn")
+    model_type: str = Field(description="Model type: rules, cold_start, semi_supervised, supervised, champion, explainability")
     base_value: float = Field(description="Model baseline (expected value)")
     prediction_value: float = Field(description="Final risk score")
     top_features: list[FeatureContribution] = Field(
@@ -130,6 +131,19 @@ class Explanation(BaseModel):
         description="Phase-specific component breakdown (e.g., vae/iforest/tail for cold-start)"
     )
     latency_ms: float = Field(description="Time to compute explanation")
+    # Extended fields from ExplainabilityEngine
+    confidence: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="Model confidence metadata (expert_used, confidence, ft_invoked)"
+    )
+    counterfactual: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="Counterfactual explanation (nearest_neighbor or dice)"
+    )
+    formatted_report: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="Analyst-friendly formatted report"
+    )
 
 
 class ScoringResponse(BaseModel):

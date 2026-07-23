@@ -1,26 +1,35 @@
 """
-FraudTrap — Champion Model (CatBoost)
+FraudTrap — Champion Model (CatBoost) with Confidence-Aware Routing
 Single-model production fraud detector with native categorical handling.
-Replaces the full stacking ensemble for production inference.
+Includes optional FT-Transformer specialist consultation for low-confidence cases.
+
+Architecture:
+  Transaction → CatBoost → Calibrated Probability → Confidence Estimator
+    → High Confidence? → Return prediction directly
+    → Low Confidence?  → FT-Transformer → Meta Fusion → Final probability
 """
 from __future__ import annotations
 import hashlib
 import json
 import pickle
+import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 import numpy as np
 import pandas as pd
 from catboost import CatBoostClassifier, Pool
 from loguru import logger
 
 from scoring.calibration import ProbabilityCalibrator
+from models.supervised.prediction import SupervisedPrediction
+from models.supervised.confidence import ConfidenceEstimator, ConfidenceEstimatorConfig
+from models.supervised.meta_fusion import MetaFusionLayer
 
 
 class ChampionModel:
     """
-    Production CatBoost fraud detector.
+    Production CatBoost fraud detector with confidence-aware routing.
     
     Key features:
     - Native categorical feature handling (no target encoding leakage)
@@ -29,6 +38,8 @@ class ChampionModel:
     - Built-in feature importance
     - Probability calibration support
     - Version pinning for reproducibility
+    - Optional FT-Transformer specialist for low-confidence cases
+    - Trainable meta-fusion layer
     """
     
     def __init__(
@@ -39,6 +50,9 @@ class ChampionModel:
         iterations: int = 500,
         depth: int = 6,
         learning_rate: float = 0.05,
+        confidence_threshold: float = 0.92,
+        enable_specialist: bool = False,
+        fusion_method: str = "logistic_regression",
         **catboost_kwargs
     ):
         self.feature_names = feature_names or []
@@ -71,6 +85,14 @@ class ChampionModel:
         
         # Feature importance
         self.feature_importance_: Optional[np.ndarray] = None
+        
+        # ── Confidence-aware routing ──────────────────────────────────────────
+        self.enable_specialist = enable_specialist
+        self.confidence_estimator = ConfidenceEstimator(
+            config=ConfidenceEstimatorConfig(threshold=confidence_threshold)
+        )
+        self.ft_transformer = None  # Lazy-loaded FTTransformerPredictor
+        self.meta_fusion = MetaFusionLayer(method=fusion_method) if enable_specialist else None
 
     # ── Hash computation ────────────────────────────────────────────────────────
     
@@ -255,6 +277,68 @@ class ChampionModel:
             self.pr_auc_, self.roc_auc_, self.f2_score_
         )
 
+    # ── Specialist Setup ────────────────────────────────────────────────────────
+    
+    def setup_specialist(
+        self,
+        ft_transformer: Any,
+        meta_fusion: Optional[MetaFusionLayer] = None,
+        confidence_threshold: float = 0.92,
+    ) -> None:
+        """
+        Configure the FT-Transformer specialist and meta-fusion layer.
+        
+        Args:
+            ft_transformer: Trained FTTransformerPredictor instance
+            meta_fusion: Trained MetaFusionLayer (optional)
+            confidence_threshold: Threshold below which FT is consulted
+        """
+        self.ft_transformer = ft_transformer
+        if meta_fusion is not None:
+            self.meta_fusion = meta_fusion
+        self.enable_specialist = True
+        self.confidence_estimator.set_threshold(confidence_threshold)
+        logger.info(
+            "Specialist configured: confidence_threshold={:.3f}",
+            confidence_threshold,
+        )
+
+    def fit_specialist(
+        self,
+        X_cal: np.ndarray,
+        y_cal: np.ndarray,
+        ft_transformer: Any,
+    ) -> None:
+        """
+        Train the meta-fusion layer on a calibration set where both
+        CatBoost and FT-Transformer predictions are available.
+        
+        Args:
+            X_cal: Calibration features
+            y_cal: Calibration labels
+            ft_transformer: Trained FTTransformerPredictor
+        """
+        cat_probs = self.predict_proba(X_cal)
+        ft_probs = ft_transformer.predict_proba(X_cal)
+        confidences = np.array([
+            self.confidence_estimator.estimate(p) for p in cat_probs
+        ])
+
+        self.meta_fusion = MetaFusionLayer()
+        self.meta_fusion.fit(
+            catboost_probs=cat_probs,
+            ft_probs=ft_probs,
+            catboost_confidences=confidences,
+            y_true=y_cal,
+        )
+        self.ft_transformer = ft_transformer
+        self.enable_specialist = True
+
+        # Fit conformal on calibration set
+        self.confidence_estimator.fit_conformal(cat_probs, y_cal)
+
+        logger.info("Specialist trained and configured")
+
     # ── Scoring ────────────────────────────────────────────────────────────────
     
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
@@ -276,6 +360,86 @@ class ChampionModel:
         """Return binary predictions at given threshold."""
         probs = self.predict_proba(X)
         return (probs >= threshold).astype(int)
+
+    def score_with_confidence(
+        self, X: np.ndarray
+    ) -> List[SupervisedPrediction]:
+        """
+        Score with confidence-aware routing.
+        
+        For each transaction:
+        1. Get CatBoost calibrated probability
+        2. Estimate confidence
+        3. If confident → return directly
+        4. If not confident → consult FT-Transformer → meta-fuse
+        
+        Returns list of strongly typed SupervisedPrediction objects.
+        """
+        if not self.is_fitted and self.model is None:
+            raise RuntimeError("ChampionModel must be fitted before scoring")
+
+        t_start = time.perf_counter()
+
+        cat_probs = self.predict_proba(X)
+        results: List[SupervisedPrediction] = []
+
+        # Batch collect low-confidence samples for FT-Transformer
+        low_conf_indices: List[int] = []
+        low_conf_cat_probs: List[float] = []
+
+        for i in range(len(X)):
+            prob = float(cat_probs[i])
+            confidence = self.confidence_estimator.estimate(prob)
+
+            if self.enable_specialist and not self.confidence_estimator.is_confident(prob):
+                low_conf_indices.append(i)
+                low_conf_cat_probs.append(prob)
+
+        # Batch FT-Transformer prediction for efficiency
+        ft_probs_map: Dict[int, float] = {}
+        if low_conf_indices and self.ft_transformer is not None:
+            X_low = X[low_conf_indices]
+            ft_probs = self.ft_transformer.predict_proba(X_low)
+            for j, idx in enumerate(low_conf_indices):
+                ft_probs_map[idx] = float(ft_probs[j])
+
+        # Assemble final predictions
+        for i in range(len(X)):
+            prob = float(cat_probs[i])
+            confidence = self.confidence_estimator.estimate(prob)
+            ft_invoked = i in ft_probs_map
+            fusion_output = None
+
+            if ft_invoked:
+                ft_prob = ft_probs_map[i]
+                if self.meta_fusion is not None and self.meta_fusion.is_fitted:
+                    fusion_output = self.meta_fusion.predict(
+                        catboost_prob=prob,
+                        ft_prob=ft_prob,
+                        catboost_confidence=confidence,
+                    )
+                else:
+                    # Fallback: weighted average
+                    fusion_output = 0.7 * prob + 0.3 * ft_prob
+                prob = fusion_output
+
+            latency_ms = (time.perf_counter() - t_start) * 1000
+
+            results.append(SupervisedPrediction(
+                probability=float(np.clip(prob, 0.0, 1.0)),
+                confidence=float(np.clip(confidence, 0.0, 1.0)),
+                ft_invoked=ft_invoked,
+                fusion_output=fusion_output,
+                latency_ms=latency_ms,
+                model_version=self.model_version,
+                catboost_version=self.model_version,
+                ft_transformer_version=(
+                    self.ft_transformer.model_version
+                    if self.ft_transformer is not None else ""
+                ),
+            ))
+
+        return results
 
     # ── Feature Importance ─────────────────────────────────────────────────────
     
@@ -326,6 +490,10 @@ class ChampionModel:
                 "learning_rate": self.learning_rate,
                 "catboost_kwargs": self.catboost_kwargs,
                 "calibrator": self.calibrator,
+                # Specialist config
+                "enable_specialist": self.enable_specialist,
+                "confidence_threshold": self.confidence_estimator.config.threshold,
+                "fusion_method": self.meta_fusion.method if self.meta_fusion else "logistic_regression",
             }, f)
         
         # Save feature importance
@@ -336,7 +504,11 @@ class ChampionModel:
             })
             importance_df.to_csv(path / "feature_importance.csv", index=False)
         
-        logger.info("ChampionModel saved to {}", path)
+        # Save specialist components
+        if self.enable_specialist and self.meta_fusion is not None:
+            self.meta_fusion.save(path / "meta_fusion")
+        
+        logger.info("ChampionModel saved to {} (specialist={})", path, self.enable_specialist)
 
     @classmethod
     def load(cls, path: Path) -> "ChampionModel":
@@ -354,11 +526,14 @@ class ChampionModel:
             iterations=payload.get("iterations", 1000),
             depth=payload.get("depth", 6),
             learning_rate=payload.get("learning_rate", 0.05),
+            enable_specialist=payload.get("enable_specialist", False),
+            confidence_threshold=payload.get("confidence_threshold", 0.92),
+            fusion_method=payload.get("fusion_method", "logistic_regression"),
         )
         
         # Restore attributes
         for k, v in payload.items():
-            if k not in ("calibrator",):
+            if k not in ("calibrator", "enable_specialist", "confidence_threshold", "fusion_method"):
                 setattr(obj, k, v)
         
         obj.calibrator = payload.get("calibrator")
@@ -368,7 +543,15 @@ class ChampionModel:
         obj.model.load_model(str(path / "champion_model.cbm"))
         
         obj.is_fitted = True
-        logger.info("ChampionModel loaded from {} (version={})", path, obj.model_version)
+        
+        # Load specialist components
+        meta_fusion_path = path / "meta_fusion"
+        if meta_fusion_path.exists():
+            obj.meta_fusion = MetaFusionLayer.load(meta_fusion_path)
+            logger.info("Meta-fusion loaded from {}", meta_fusion_path)
+        
+        logger.info("ChampionModel loaded from {} (version={}, specialist={})",
+                     path, obj.model_version, obj.enable_specialist)
         return obj
 
 

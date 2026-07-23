@@ -26,9 +26,10 @@ services:
       KAFKA_LOG_RETENTION_HOURS: 168
     healthcheck:
       test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
+      interval: 30s
+      timeout: 30s
+      retries: 10
+      start_period: 60s
 
   redis:
     image: redis:7.2-alpine

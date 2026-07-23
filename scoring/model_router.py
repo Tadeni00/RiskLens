@@ -13,9 +13,8 @@ import numpy as np
 from loguru import logger
 
 from models.cold_start.ensemble import ColdStartEnsemble
-from models.supervised.ensemble import SupervisedEnsemble
-from models.supervised.semi_supervised import SemiSupervisedBridge
-from models.gnn.gnn_scorer import GNNScorer
+from models.semi_supervised.netpfn import NetPFNWrapper
+from models.supervised.champion import ChampionModel
 from scoring.simple_model import SimpleFraudModel
 
 
@@ -51,11 +50,10 @@ class ModelRouter:
         self.simple_models = registry_models.get("simple_models", {})
         self.cold_start_models = registry_models.get("cold_start_models", {})
         self.semi_supervised_models = registry_models.get("semi_supervised_models", {})
-        self.supervised_models = registry_models.get("supervised_models", {})
+        self.champion_models = registry_models.get("champion_models", {})
         self.shared_cold_start = registry_models.get("cold_start")
         self.shared_semi_supervised = registry_models.get("semi_supervised")
-        self.shared_supervised = registry_models.get("supervised")
-        self.shared_gnn = registry_models.get("gnn_scorer")
+        self.shared_champion = registry_models.get("champion")
         
         self.active_phase = registry_models.get("active_phase", "UNSUPERVISED")
         self.model_version = registry_models.get("model_version", "unloaded")
@@ -72,10 +70,10 @@ class ModelRouter:
         
         Priority:
         1. Tenant-specific simple model (production)
-        2. Tenant-specific supervised ensemble
-        3. Tenant-specific semi-supervised
+        2. Tenant-specific champion model (CatBoost + specialist)
+        3. Tenant-specific semi-supervised (NetPFN)
         4. Tenant-specific cold-start
-        5. Shared supervised
+        5. Shared champion
         6. Shared semi-supervised
         7. Shared cold-start
         8. Heuristic fallback
@@ -89,24 +87,24 @@ class ModelRouter:
                 tenant_phase="SUPERVISED",
             )
         
-        # 2. Tenant supervised ensemble
-        if tenant_id in self.supervised_models:
+        # 2. Tenant champion model
+        if tenant_id in self.champion_models:
             variant = self._check_experiment(tenant_id, "supervised")
             return RoutingDecision(
-                model=self.supervised_models[tenant_id],
+                model=self.champion_models[tenant_id],
                 model_type="supervised",
-                model_version=self.supervised_models[tenant_id].model_version,
+                model_version=self.champion_models[tenant_id].model_version,
                 experiment_variant=variant,
                 tenant_phase="SUPERVISED",
             )
         
-        # 3. Tenant semi-supervised
+        # 3. Tenant semi-supervised (NetPFN)
         if tenant_id in self.semi_supervised_models:
             variant = self._check_experiment(tenant_id, "semi_supervised")
             return RoutingDecision(
                 model=self.semi_supervised_models[tenant_id],
                 model_type="semi_supervised",
-                model_version=self.semi_supervised_models[tenant_id].xgb.model_version if hasattr(self.semi_supervised_models[tenant_id], 'xgb') else "unknown",
+                model_version=self.semi_supervised_models[tenant_id].model_version,
                 experiment_variant=variant,
                 tenant_phase="SEMI_SUPERVISED",
             )
@@ -120,10 +118,10 @@ class ModelRouter:
                 tenant_phase="UNSUPERVISED",
             )
         
-        # 5. Shared supervised
-        if self.shared_supervised:
+        # 5. Shared champion
+        if self.shared_champion:
             return RoutingDecision(
-                model=self.shared_supervised,
+                model=self.shared_champion,
                 model_type="supervised",
                 model_version=self.model_version,
                 tenant_phase="SUPERVISED",
@@ -181,14 +179,14 @@ class ModelRouter:
         """Get list of tenants with loaded models by type."""
         return {
             "simple": sorted(self.simple_models.keys()),
-            "supervised": sorted(self.supervised_models.keys()),
+            "champion": sorted(self.champion_models.keys()),
             "semi_supervised": sorted(self.semi_supervised_models.keys()),
             "cold_start": sorted(self.cold_start_models.keys()),
         }
     
     def get_tenant_phase(self, tenant_id: str) -> str:
         """Get current phase for tenant."""
-        if tenant_id in self.simple_models or tenant_id in self.supervised_models:
+        if tenant_id in self.simple_models or tenant_id in self.champion_models:
             return "SUPERVISED"
         if tenant_id in self.semi_supervised_models:
             return "SEMI_SUPERVISED"

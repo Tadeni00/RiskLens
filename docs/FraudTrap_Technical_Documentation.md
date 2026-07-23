@@ -79,7 +79,7 @@ FraudTrap follows a layered architecture where each layer adds intelligence to t
 
 **Layer 5 — Rules Engine**: Before any machine learning model runs, a deterministic rules engine evaluates the transaction in under 1 millisecond. It checks blocklists (is this account or device blocked?), velocity rules (too many transactions too fast?), geographic rules (impossible travel speed?), and threshold rules (amount exceeds limit?). If any rule triggers a hard block, the transaction is immediately rejected without running the ML model.
 
-**Layer 6 — ML Model Router**: If the rules engine does not block the transaction, the system routes to the appropriate ML model based on the tenant's phase. Phase 1 tenants get the cold-start ensemble. Phase 2 tenants get the semi-supervised XGBoost model. Phase 3 tenants get the CatBoost champion model.
+**Layer 6 — ML Model Router**: If the rules engine does not block the transaction, the system routes to the appropriate ML model based on the tenant's phase. Phase 1 tenants get the cold-start ensemble. Phase 2 tenants get the NetPFN prototype-based model. Phase 3 tenants get the CatBoost champion with confidence-aware routing to FT-Transformer specialist for low-confidence cases.
 
 **Layer 7 — Decision Engine**: The ML model's raw score is combined with the heuristic floor (a minimum risk score based on basic signals), adjusted by any rule risk boosts, calibrated for probability accuracy, and mapped to a decision (APPROVE, REVIEW, or BLOCK).
 
@@ -230,9 +230,9 @@ The core innovation of FraudTrap is that it does not require labels to start pro
 
 **Phase 1 — Cold Start**: Used when a tenant has fewer than 500 fraud labels. Relies entirely on unsupervised anomaly detection. No labeled fraud data is needed.
 
-**Phase 2 — Semi-Supervised**: Used when a tenant has between 500 and 5,000 fraud labels. Combines supervised learning (XGBoost) with the cold-start ensemble using pseudo-labels and dynamic blending.
+**Phase 2 — Semi-Supervised**: Used when a tenant has between 500 and 5,000 fraud labels. Uses NetPFN (Neural Prototypical Few-shot Network) for prototype-based few-shot learning with pseudo-labels from the cold-start ensemble.
 
-**Phase 3 — Supervised**: Used when a tenant has more than 5,000 fraud labels. Deploys a CatBoost champion model with a Champion-Challenger architecture for continuous offline evaluation.
+**Phase 3 — Supervised**: Used when a tenant has more than 5,000 fraud labels. Uses confidence-aware routing with CatBoost champion (100% of transactions) and FT-Transformer specialist (low-confidence cases, ~10-15%). Meta Fusion combines outputs for final score.
 
 Each tenant is independently routed to the appropriate phase. A single FraudTrap deployment can run Phase 1 for a new fintech, Phase 2 for a growing bank, and Phase 3 for a mature bank simultaneously.
 
@@ -284,11 +284,11 @@ Each detector has blind spots. The VAE may miss sparse anomalies because it lear
 
 ## 10. Phase 2: Semi-Supervised Learning
 
-When a tenant accumulates enough fraud labels (at least 500 confirmed cases from chargebacks and manual reviews), Phase 2 introduces a supervised signal while preserving the cold-start foundation.
+When a tenant accumulates enough fraud labels (at least 500 confirmed cases from chargebacks and manual reviews), Phase 2 introduces NetPFN (Neural Prototypical Few-shot Network) for prototype-based few-shot learning while preserving the cold-start foundation.
 
 ### Pseudo-Labeling
 
-The core challenge of Phase 2 is that 500 labels is not enough for a robust supervised model. FraudTrap addresses this with pseudo-labeling: high-confidence predictions from the model itself become additional training labels.
+The core challenge of Phase 2 is that 500 labels is not enough for a robust supervised model. FraudTrap addresses this with NetPFN (Neural Prototypical Few-shot Network), which uses prototype-based learning to discriminate between fraud and legitimate transactions in a learned embedding space. High-confidence predictions from the cold-start ensemble become pseudo-labels for prototype learning.
 
 The system maintains two thresholds that evolve as the label count grows:
 
@@ -306,26 +306,26 @@ Label propagation helps spread limited labels across the graph, expanding the ef
 
 ### Adaptive Training
 
-The XGBoost model is trained on a combination of confirmed labels (weighted 3x) and pseudo-labels (weighted 1x). The model uses 300 estimators, max depth 6, learning rate 0.05, subsample 0.8, and column sample 0.8. Class imbalance is handled with `scale_pos_weight`. The model is calibrated using Platt scaling (sigmoid calibration).
+NetPFN learns fraud and legitimate prototypes in a learned embedding space. The model uses:
 
-### Dynamic Blending
+### Distance-Based Classification
 
-The Phase 2 score is a blend of the XGBoost model and the cold-start ensemble:
+NetPFN classifies transactions by computing distances to fraud and legitimate prototypes in the embedding space:
 
 ```
-xgb_weight = min(0.70, 0.30 + 0.40 × label_quality)
-coldstart_weight = 1 - xgb_weight
+embedding = encoder(transaction_features)
+distance_to_fraud = ||embedding - fraud_prototype||
+distance_to_legit = ||embedding - legit_prototype||
+risk_score = softmax(distance_to_fraud, distance_to_legit)
 ```
 
-Where `label_quality = confirmed_labels / (confirmed_labels + pseudo_labels)`.
-
-Early in Phase 2 (few confirmed labels, many pseudo-labels), the blend is approximately 30% XGBoost and 70% cold-start. As more confirmed labels accumulate, the XGBoost weight increases toward 70%. This ensures the system transitions smoothly from unsupervised to supervised learning without sudden jumps in behavior.
+Prototypes are updated incrementally as new labeled data arrives. The model transitions smoothly from unsupervised to supervised learning without sudden jumps in behavior.
 
 ---
 
 ## 11. Phase 3: Champion-Challenger Supervised Learning
 
-Phase 3 deploys a Champion-Challenger architecture where CatBoost serves production traffic and multiple challenger models are trained and evaluated offline.
+Phase 3 deploys confidence-aware routing where CatBoost serves as the production champion (100% of transactions) and FT-Transformer acts as a specialist for low-confidence cases (~10-15% of transactions). Meta Fusion combines their outputs for the final score.
 
 ### Why CatBoost as Champion
 
@@ -341,25 +341,32 @@ CatBoost (Categorical Boosting) is chosen as the production model for several re
 
 **GPU support**: CatBoost can leverage GPU acceleration for training when available.
 
-### Why Challengers Exist Offline
+### Why FT-Transformer is a Specialist, Not a Challenger
 
-Challengers are never used in production inference. They exist to continuously evaluate whether the champion should be replaced. The rationale:
+FT-Transformer is invoked selectively for low-confidence cases (~10-15% of transactions) where CatBoost's confidence is below a threshold. The rationale:
 
-**Risk mitigation**: An unvalidated model in production could miss new fraud patterns or increase false positives, directly impacting revenue and customer experience.
+**Specialist role**: FT-Transformer captures non-linear interactions that tree models miss. By invoking it only for uncertain cases, we get the best of both worlds: CatBoost's speed for easy cases and FT-Transformer's accuracy for hard cases.
 
-**Algorithm diversity**: Different algorithms may excel on different data distributions. XGBoost might handle certain fraud patterns better than CatBoost. LightGBM might be faster. FT-Transformer might capture non-linear interactions that tree models miss. By training all of them offline, FraudTrap can detect when a different algorithm would be superior.
+**Risk mitigation**: An unvalidated model in production could miss new fraud patterns or increase false positives. By using FT-Transformer as a specialist (not a full challenger), we limit its impact to uncertain cases.
 
-**Continuous improvement**: The Champion-Challenger architecture ensures the system never stagnates. Even if the champion is excellent today, a challenger trained on newer data might be better tomorrow.
+**Offline challengers**: LightGBM and XGBoost are trained offline and evaluated continuously. They exist to detect when a different algorithm would be superior, but are never used in production inference.
 
-### The Challenger Models
+### The Specialist and Offline Challengers
 
-**XGBoost Challenger**: Extreme Gradient Boosting with 500 estimators, max depth 6, learning rate 0.05. Uses `scale_pos_weight` for class imbalance and `eval_metric=aucpr` for optimization.
+**FT-Transformer Specialist**: A tabular transformer that tokenizes features and applies self-attention. Uses 64-dimensional tokens, 4 attention heads, 2 transformer layers, and a classification head. Invoked for low-confidence cases (~10-15% of transactions) where CatBoost confidence is below threshold. Falls back to GradientBoosting if PyTorch is unavailable.
 
-**LightGBM Challenger**: Light Gradient Boosting Machine with 500 estimators, max depth 6, 63 leaves. Uses `is_unbalance=True` for class imbalance handling.
+**Meta Fusion Layer**: Logistic regression combining CatBoost and FT-Transformer outputs with confidence-weighted gating:
 
-**FT-Transformer Challenger**: A tabular transformer that tokenizes features and applies self-attention. Uses 64-dimensional tokens, 4 attention heads, 2 transformer layers, and a classification head. Falls back to GradientBoosting if PyTorch is unavailable.
+```
+if catboost_confidence < threshold:
+    final_score = meta_fusion(catboost_score, ft_transformer_score)
+else:
+    final_score = catboost_score
+```
 
-**TabNet Challenger**: A sparse attention-based model that performs automatic feature selection. Uses 64-dimensional encoding, 3 attention steps, and sparsemax attention.
+**Offline Challengers** (never in production):
+- **LightGBM**: Light Gradient Boosting Machine with 500 estimators, max depth 6, 63 leaves. Uses `is_unbalance=True` for class imbalance handling.
+- **XGBoost**: Extreme Gradient Boosting with 500 estimators, max depth 6, learning rate 0.05. Uses `scale_pos_weight` for class imbalance and `eval_metric=aucpr` for optimization.
 
 ### Promotion Criteria
 
@@ -397,8 +404,8 @@ The routing logic is straightforward:
 
 1. Look up the tenant's current phase from Redis.
 2. If the tenant has fewer than 500 fraud labels, route to Phase 1 (Cold Start).
-3. If the tenant has between 500 and 5,000 fraud labels, route to Phase 2 (Semi-Supervised).
-4. If the tenant has more than 5,000 fraud labels, route to Phase 3 (Supervised).
+3. If the tenant has between 500 and 5,000 fraud labels, route to Phase 2 (Semi-Supervised NetPFN).
+4. If the tenant has more than 5,000 fraud labels, route to Phase 3 (Confidence-Aware Routing: CatBoost champion + FT-Transformer specialist).
 
 The phase is stored in Redis and updated automatically when the label count crosses a threshold. The routing check adds less than 1 millisecond to the scoring path.
 
@@ -422,7 +429,7 @@ The scoring orchestrator is the central component that wires all other component
 
 **Step 4 — Rules Engine (<1ms)**: The orchestrator passes the transaction and features to the rules engine. If any rule triggers a hard block, the orchestrator immediately returns a BLOCK decision with risk score 1.0. The ML model is not consulted. This saves computation and ensures deterministic enforcement of compliance rules.
 
-**Step 5 — ML Scoring (10-30ms)**: If the rules engine does not block, the orchestrator routes to the appropriate ML model based on the tenant's phase. The model receives the feature vector and returns a risk score.
+**Step 5 — ML Scoring (10-30ms)**: If the rules engine does not block, the orchestrator routes to the appropriate ML model based on the tenant's phase. For Phase 3 tenants, confidence-aware routing invokes FT-Transformer specialist for low-confidence cases. The model receives the feature vector and returns a risk score.
 
 **Step 6 — Policy Floor**: The orchestrator applies the policy floor: `risk_score = max(model_score, heuristic_score)`. The heuristic score is a simple formula based on basic signals (amount, new device, impossible travel, velocity). This ensures a minimum risk level even if the model outputs a very low score.
 
@@ -465,22 +472,24 @@ The raw score is normalized to [0, 1] using calibration points stored during tra
 ### Phase 2 Fusion
 
 ```
-xgb_weight = min(0.70, 0.30 + 0.40 × label_quality)
-coldstart_weight = 1 - xgb_weight
-
-risk_score = xgb_weight × XGBoost_calibrated_score
-           + coldstart_weight × ColdStart_score
+embedding = NetPFN_encoder(transaction_features)
+distance_to_fraud = ||embedding - fraud_prototype||
+distance_to_legit = ||embedding - legit_prototype||
+risk_score = softmax(distance_to_fraud, distance_to_legit)
 ```
 
-The XGBoost score is calibrated using Platt scaling. The cold-start score is the same Phase 1 ensemble score. The blend weight shifts from 30% XGBoost (early Phase 2) to 70% XGBoost (mature Phase 2) as confirmed labels accumulate.
+NetPFN classifies transactions by computing distances to fraud and legitimate prototypes in the embedding space. Prototypes are updated incrementally as new labeled data arrives.
 
 ### Phase 3 Fusion
 
 ```
-risk_score = CatBoost_calibrated_score
+if CatBoost_confidence < threshold:
+    risk_score = meta_fusion(CatBoost_score, FT_Transformer_score)
+else:
+    risk_score = CatBoost_score
 ```
 
-The CatBoost score is calibrated using Isotonic Regression. The policy floor is still applied: `risk_score = max(risk_score, heuristic_score)`.
+The CatBoost score is calibrated using Isotonic Regression. For low-confidence cases, Meta Fusion combines CatBoost and FT-Transformer outputs using a logistic regression meta-learner. The policy floor is still applied: `risk_score = max(risk_score, heuristic_score)`.
 
 ### The Policy Floor
 
@@ -583,7 +592,7 @@ Isotonic regression is flexible and can capture complex calibration curves. It i
 
 Platt scaling fits a logistic regression model to the raw predictions. It learns parameters A and B such that `calibrated = sigmoid(A × raw + B)`. Platt scaling is parametric (assumes a sigmoid shape) but is faster at inference time and more stable with small datasets.
 
-Platt scaling is used for XGBoost calibration in Phase 2.
+Platt scaling is available as an alternative calibration method for Phase 2 NetPFN.
 
 ### Calibration Evaluation
 
@@ -689,7 +698,7 @@ The training pipeline runs on a weekly cron schedule (Monday 02:00 UTC). It:
 1. Pulls labeled data with a 70-day chargeback buffer (chargebacks can take weeks to arrive).
 2. Engineers features over a 180-day training window.
 3. Trains the CatBoost champion with early stopping and validation split.
-4. Trains all challengers (XGBoost, LightGBM, FT-Transformer, TabNet).
+4. Trains offline challengers (LightGBM, XGBoost) and FT-Transformer specialist.
 5. Evaluates all models on a held-out test set.
 6. Registers all models in MLflow and the model registry.
 7. Runs promotion evaluation against the current champion.
@@ -872,6 +881,14 @@ ML models can be wrong. A model might output 0.05 for a transaction with impossi
 ### Why Champion-Challenger instead of a single model?
 
 A single model deployed and forgotten will degrade over time as fraud patterns evolve. The Champion-Challenger architecture ensures continuous evaluation. Even if no challenger beats the champion today, the evaluation process catches degradation and provides a mechanism for improvement.
+
+### Why FT-Transformer as a specialist, not a full challenger?
+
+FT-Transformer captures non-linear interactions that tree models miss, but it is slower than CatBoost. By invoking it only for low-confidence cases (~10-15% of transactions), we get the best of both worlds: CatBoost's speed for easy cases and FT-Transformer's accuracy for hard cases. This keeps latency within SLA while improving accuracy on uncertain transactions.
+
+### Why NetPFN for Phase 2 instead of XGBoost?
+
+With only 500-5,000 labels, traditional supervised models like XGBoost overfit. NetPFN (Neural Prototypical Few-shot Network) uses prototype-based learning that generalizes better with limited data. It learns fraud and legitimate prototypes in a learned embedding space, classifying new transactions by distance to prototypes. This approach is more robust than pseudo-labeling with XGBoost when labels are scarce.
 
 ### Why Isotonic Regression for calibration?
 

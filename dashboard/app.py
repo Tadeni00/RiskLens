@@ -1,86 +1,138 @@
 """
-FraudPolice Dashboard — Main Entry Point
-Streamlit multi-page app serving both data scientists and compliance teams.
-Run: streamlit run dashboard/app.py
+FraudTrap — Enterprise Fraud Intelligence Platform
+Main application entry point with professional sidebar navigation.
 """
-import os
+import sys
+from pathlib import Path
+from datetime import datetime
+
+# Ensure project root is in path
+PROJECT_ROOT = Path(__file__).parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 import streamlit as st
 
+# ── Page Config ──────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="FraudPolice · Analytics",
+    page_title="FraudTrap — Enterprise Fraud Intelligence",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded",
+    menu_items={
+        "About": "FraudTrap — Enterprise Fraud Intelligence Platform",
+        "Report a bug": "https://github.com/fraudtrap/issues",
+    }
 )
 
-# ── Custom CSS ────────────────────────────────────────────────────────────────
-st.markdown("""
-<style>
-    [data-testid="stSidebar"] { background: #0F1117; }
-    [data-testid="stSidebar"] * { color: #FAFAFA !important; }
-    .metric-card {
-        background: #1A1D27; border-radius: 8px; padding: 1rem 1.2rem;
-        border: 1px solid #2A2D3A; margin-bottom: 0.5rem;
-    }
-    .metric-value { font-size: 1.8rem; font-weight: 600; color: #FAFAFA; }
-    .metric-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.05em; }
-    .alert-critical { background: #3D1515; border-left: 3px solid #E24B4A; padding: 0.75rem 1rem; border-radius: 4px; }
-    .alert-warning  { background: #3D2F0A; border-left: 3px solid #EF9F27; padding: 0.75rem 1rem; border-radius: 4px; }
-    .alert-ok       { background: #0F2A1A; border-left: 3px solid #1D9E75; padding: 0.75rem 1rem; border-radius: 4px; }
-    .phase-badge {
-        display: inline-block; padding: 3px 12px; border-radius: 99px;
-        font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em;
-    }
-    div[data-testid="stMetricValue"] { font-size: 1.6rem !important; }
-    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
-    .stTabs [data-baseweb="tab"] { padding: 6px 16px; border-radius: 6px; }
-</style>
-""", unsafe_allow_html=True)
+# ── Theme Injection ──────────────────────────────────────────────────────────
+from dashboard.theme.css import inject_global_css
+inject_global_css()
 
-# ── Sidebar navigation ────────────────────────────────────────────────────────
+# ── Navigation ───────────────────────────────────────────────────────────────
+from dashboard.components.navigation import (
+    sidebar_header, sidebar_tenant_selector, sidebar_section_label
+)
+
 with st.sidebar:
-    st.markdown("## 🛡️ FraudPolice")
-    st.markdown("---")
-    page = st.radio(
-        "Navigate",
-        options=[
-            "📊 Overview",
-            "🔬 EDA & Data Quality",
-            "🤖 Model Performance",
-            "🔍 Explainability",
-            "📡 Live Monitoring",
-            "⚠️ Drift Detection",
-            "🔄 Model Lifecycle",
-            "📋 Compliance",
-        ],
+    sidebar_header()
+
+    # Tenant selector
+    sidebar_section_label("Environment")
+    tenants = [
+        "bank_ng_gtb", "bank_ng_access", "bank_ng_zenith",
+        "fintech_ng_opay", "fintech_ng_kuda",
+        "bank_za_fnb", "fintech_za_yoco",
+        "all_tenants"
+    ]
+    selected_tenant = sidebar_tenant_selector(tenants)
+
+    st.markdown('<div style="height:16px"></div>', unsafe_allow_html=True)
+
+    # Main navigation
+    sidebar_section_label("Navigation")
+
+    PAGES = {
+        "📊 Overview": "overview",
+        "🔍 Risk Intelligence": "intelligence",
+        "🧠 Behavior Profiles": "behavior",
+        "🤖 Models": "models",
+        "💡 Explainability": "explainability",
+        "📈 Drift Monitoring": "drift",
+        "📡 Live Monitoring": "monitoring",
+        "📋 Compliance": "compliance",
+        "🔄 Model Lifecycle": "lifecycle",
+    }
+
+    selected_page = st.radio(
+        "Navigation",
+        list(PAGES.keys()),
+        key="nav_radio",
         label_visibility="collapsed",
     )
-    st.markdown("---")
-    tenant_id = st.selectbox(
-        "Tenant",
-        options=["bank_ng_gtb", "bank_ke_equity", "fintech_za_yoco", "all_tenants"],
-        index=0,
-    )
-    st.caption(f"Environment: **{os.getenv('ENVIRONMENT', 'development')}**")
 
-# ── Page routing ──────────────────────────────────────────────────────────────
-PAGE_MAP = {
-    "📊 Overview":         "overview",
-    "🔬 EDA & Data Quality": "eda",
-    "🤖 Model Performance": "model_performance",
-    "🔍 Explainability":   "explainability",
-    "📡 Live Monitoring":  "live_monitoring",
-    "⚠️ Drift Detection":  "drift",
-    "🔄 Model Lifecycle":  "lifecycle",
-    "📋 Compliance":       "compliance",
-}
+    st.markdown('<div style="height:16px"></div>', unsafe_allow_html=True)
 
-if page in PAGE_MAP:
-    module_name = PAGE_MAP[page]
-    try:
-        mod = __import__(f"dashboard.pages.{module_name}", fromlist=["render"])
-        mod.render(tenant_id)
-    except Exception as exc:
-        st.error(f"Failed to load **{page}** page: {exc}")
-        st.exception(exc)
+    # Sidebar footer
+    sidebar_section_label("System")
+    st.markdown(f"""
+<div style="padding:0 12px;font-size:12px;color:#6F7B8F">
+    <div style="display:flex;justify-content:space-between;padding:4px 0">
+        <span>Environment</span><span style="color:#17A673">Production</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0">
+        <span>API Status</span><span style="color:#17A673">Connected</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0">
+        <span>Version</span><span>2.1.0</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# ── Global Header ────────────────────────────────────────────────────────────
+from dashboard.components.navigation import global_header
+global_header(
+    tenant=selected_tenant,
+    environment="production",
+    champion_model="CatBoost v1.0",
+    ml_phase="Phase 3",
+    last_refresh=datetime.now(),
+)
+
+# ── Page Router ──────────────────────────────────────────────────────────────
+page_module = PAGES[selected_page]
+
+try:
+    if page_module == "overview":
+        from dashboard.pages.overview import render
+        render(selected_tenant)
+    elif page_module == "intelligence":
+        from dashboard.pages.intelligence import render
+        render(selected_tenant)
+    elif page_module == "behavior":
+        from dashboard.pages.behavior import render
+        render(selected_tenant)
+    elif page_module == "models":
+        from dashboard.pages.models import render
+        render(selected_tenant)
+    elif page_module == "explainability":
+        from dashboard.pages.explainability import render
+        render(selected_tenant)
+    elif page_module == "drift":
+        from dashboard.pages.drift import render
+        render(selected_tenant)
+    elif page_module == "monitoring":
+        from dashboard.pages.monitoring import render
+        render(selected_tenant)
+    elif page_module == "compliance":
+        from dashboard.pages.compliance import render
+        render(selected_tenant)
+    elif page_module == "lifecycle":
+        from dashboard.pages.lifecycle import render
+        render(selected_tenant)
+    else:
+        from dashboard.pages.overview import render
+        render(selected_tenant)
+except Exception as e:
+    st.error(f"Error loading page: {e}")
+    st.exception(e)

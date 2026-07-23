@@ -1,7 +1,15 @@
 """
-FraudTrap — Challenger Framework
-Offline-only challenger models for Champion-Challenger architecture.
-Supports XGBoost, LightGBM, FT-Transformer, and TabNet.
+FraudTrap — Challenger Framework (Offline Benchmark Models)
+Offline-only challenger models for regression testing and performance comparison.
+These models NEVER participate in production inference.
+
+Phase 3 architecture:
+  Champion: CatBoost (with optional FT-Transformer specialist)
+  Benchmarks: LightGBM, XGBoost (offline evaluation only)
+  
+FT-Transformer is now a production specialist model in the confidence-aware
+architecture (see models/supervised/ft_transformer.py), not a challenger.
+TabNet has been removed entirely.
 """
 from __future__ import annotations
 import hashlib
@@ -379,360 +387,7 @@ class LightGBMChallenger(BaseChallenger):
         return self.model.predict_proba(X)[:, 1]
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# FT-Transformer Challenger (Tabular Transformer)
-# ═══════════════════════════════════════════════════════════════════════════════
 
-class FTTransformerChallenger(BaseChallenger):
-    """
-    FT-Transformer challenger model.
-    
-    A simple tabular transformer implementation for fraud detection.
-    Uses feature tokenization and self-attention.
-    """
-    
-    def __init__(self, **kwargs):
-        super().__init__(algorithm="ft_transformer", **kwargs)
-        self._device = kwargs.get("device", "cpu")
-        self._n_epochs = kwargs.get("n_epochs", 100)
-        self._batch_size = kwargs.get("batch_size", 256)
-        self._learning_rate = kwargs.get("learning_rate", 1e-3)
-        self._d_token = kwargs.get("d_token", 64)
-        self._n_heads = kwargs.get("n_heads", 4)
-        self._n_layers = kwargs.get("n_layers", 2)
-        self._dropout = kwargs.get("dropout", 0.1)
-        self._scaler = None
-        self._encoder = None
-    
-    def _build_model(self, **kwargs):
-        # Use sklearn as fallback if torch not available
-        try:
-            import torch
-            import torch.nn as nn
-            
-            self._encoder = self._FTTransformerEncoder(
-                n_features=len(self.feature_names),
-                d_token=self._d_token,
-                n_heads=self._n_heads,
-                n_layers=self._n_layers,
-                dropout=self._dropout,
-            )
-            return self._encoder
-        except ImportError:
-            # Fallback to sklearn model
-            from sklearn.ensemble import GradientBoostingClassifier
-            return GradientBoostingClassifier(
-                n_estimators=200,
-                max_depth=4,
-                learning_rate=0.05,
-                random_state=42,
-            )
-    
-    def _fit_model(self, X: np.ndarray, y: np.ndarray, **kwargs):
-        from sklearn.preprocessing import StandardScaler
-        
-        self._scaler = StandardScaler()
-        X_scaled = self._scaler.fit_transform(X)
-        
-        try:
-            import torch
-            import torch.nn as nn
-            from torch.utils.data import DataLoader, TensorDataset
-            
-            # Convert to tensors
-            X_tensor = torch.FloatTensor(X_scaled).to(self._device)
-            y_tensor = torch.FloatTensor(y).unsqueeze(1).to(self._device)
-            
-            dataset = TensorDataset(X_tensor, y_tensor)
-            loader = DataLoader(dataset, batch_size=self._batch_size, shuffle=True)
-            
-            # Training loop
-            optimizer = torch.optim.Adam(self.model.parameters(), lr=self._learning_rate)
-            criterion = nn.BCELoss()
-            
-            self.model.train()
-            for epoch in range(self._n_epochs):
-                total_loss = 0
-                for batch_X, batch_y in loader:
-                    optimizer.zero_grad()
-                    output = self.model(batch_X)
-                    loss = criterion(output, batch_y)
-                    loss.backward()
-                    optimizer.step()
-                    total_loss += loss.item()
-                
-                if (epoch + 1) % 10 == 0:
-                    logger.debug("Epoch {}/{}: loss={:.4f}", epoch + 1, self._n_epochs, total_loss / len(loader))
-        except ImportError:
-            # Fallback to sklearn fitting
-            self.model.fit(X_scaled, y)
-    
-    def _predict_proba(self, X: np.ndarray) -> np.ndarray:
-        X_scaled = self._scaler.transform(X)
-        
-        try:
-            import torch
-            
-            self.model.eval()
-            with torch.no_grad():
-                X_tensor = torch.FloatTensor(X_scaled).to(self._device)
-                output = self.model(X_tensor).cpu().numpy().ravel()
-                return output
-        except ImportError:
-            return self.model.predict_proba(X_scaled)[:, 1]
-    
-    class _FTTransformerEncoder:
-        """Simple FT-Transformer encoder (placeholder when torch unavailable)."""
-        
-        def __init__(self, n_features, d_token=64, n_heads=4, n_layers=2, dropout=0.1):
-            self.n_features = n_features
-            self.d_token = d_token
-            
-            try:
-                import torch
-                import torch.nn as nn
-                
-                # Feature embeddings
-                self.feature_embeddings = nn.Linear(1, d_token)
-                self.cls_token = nn.Parameter(torch.randn(1, 1, d_token))
-                
-                # Transformer encoder
-                encoder_layer = nn.TransformerEncoderLayer(
-                    d_model=d_token,
-                    nhead=n_heads,
-                    dim_feedforward=d_token * 4,
-                    dropout=dropout,
-                    batch_first=True,
-                )
-                self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=n_layers)
-                
-                # Classification head
-                self.head = nn.Sequential(
-                    nn.Linear(d_token, d_token),
-                    nn.ReLU(),
-                    nn.Dropout(dropout),
-                    nn.Linear(d_token, 1),
-                    nn.Sigmoid(),
-                )
-                
-                self._use_torch = True
-            except ImportError:
-                self._use_torch = False
-                # Fallback to sklearn
-                from sklearn.ensemble import GradientBoostingClassifier
-                self.head = GradientBoostingClassifier(
-                    n_estimators=200,
-                    max_depth=4,
-                    learning_rate=0.05,
-                    random_state=42,
-                )
-        
-        def forward(self, x):
-            if not self._use_torch:
-                return self.head.predict_proba(x)[:, 1]
-            
-            import torch
-            
-            batch_size = x.shape[0]
-            
-            # Embed each feature separately
-            x = x.unsqueeze(-1)  # (batch, n_features, 1)
-            x = self.feature_embeddings(x)  # (batch, n_features, d_token)
-            
-            # Prepend CLS token
-            cls_tokens = self.cls_token.expand(batch_size, -1, -1)
-            x = torch.cat([cls_tokens, x], dim=1)
-            
-            # Transformer
-            x = self.transformer(x)
-            
-            # Use CLS token for classification
-            cls_output = x[:, 0, :]
-            return self.head(cls_output)
-    
-    def save(self, path: Path) -> None:
-        """Override save to handle torch model."""
-        path = Path(path)
-        path.mkdir(parents=True, exist_ok=True)
-        
-        # Save model (torch or sklearn)
-        try:
-            import torch
-            torch.save({
-                "model_state": self.model.state_dict() if hasattr(self.model, 'state_dict') else None,
-                "feature_names": self.feature_names,
-                "algorithm": self.algorithm,
-                "metrics": {
-                    "pr_auc": self.pr_auc_,
-                    "roc_auc": self.roc_auc_,
-                    "f2_score": self.f2_score_,
-                    "fpr": self.fpr_,
-                    "calibration_error": self.calibration_error_,
-                },
-                "model_version": self.model_version,
-                "training_hash": self.training_hash,
-                "feature_hash": self.feature_hash,
-                "dataset_hash": self.dataset_hash,
-                "trained_at": self.trained_at,
-                "scaler": self._scaler,
-                "config": {
-                    "d_token": self._d_token,
-                    "n_heads": self._n_heads,
-                    "n_layers": self._n_layers,
-                    "dropout": self._dropout,
-                },
-            }, path / "model.pt")
-        except ImportError:
-            # Fallback to pickle for sklearn
-            super().save(path)
-    
-    @classmethod
-    def load(cls, path: Path) -> "FTTransformerChallenger":
-        """Override load to handle torch model."""
-        path = Path(path)
-        
-        try:
-            import torch
-            
-            checkpoint = torch.load(path / "model.pt", map_location="cpu")
-            
-            obj = cls(
-                feature_names=checkpoint["feature_names"],
-                d_token=checkpoint["config"]["d_token"],
-                n_heads=checkpoint["config"]["n_heads"],
-                n_layers=checkpoint["config"]["n_layers"],
-                dropout=checkpoint["config"]["dropout"],
-            )
-            
-            obj.model = obj._build_model()
-            if checkpoint["model_state"]:
-                obj.model.load_state_dict(checkpoint["model_state"])
-            
-            obj._scaler = checkpoint["scaler"]
-            obj.algorithm = checkpoint["algorithm"]
-            obj.pr_auc_ = checkpoint["metrics"]["pr_auc"]
-            obj.roc_auc_ = checkpoint["metrics"]["roc_auc"]
-            obj.f2_score_ = checkpoint["metrics"]["f2_score"]
-            obj.fpr_ = checkpoint["metrics"]["fpr"]
-            obj.calibration_error_ = checkpoint["metrics"]["calibration_error"]
-            obj.model_version = checkpoint["model_version"]
-            obj.training_hash = checkpoint["training_hash"]
-            obj.feature_hash = checkpoint["feature_hash"]
-            obj.dataset_hash = checkpoint["dataset_hash"]
-            obj.trained_at = checkpoint["trained_at"]
-            obj.is_fitted = True
-            
-            # Load calibrator
-            calibrator_path = path / "calibrator"
-            if calibrator_path.exists():
-                obj.calibrator = ProbabilityCalibrator.load(calibrator_path)
-            
-            return obj
-        except ImportError:
-            return super().load(path)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# TabNet Challenger
-# ═══════════════════════════════════════════════════════════════════════════════
-
-class TabNetChallenger(BaseChallenger):
-    """
-    TabNet challenger model.
-    
-    Uses sparse attention for feature selection.
-    """
-    
-    def __init__(self, **kwargs):
-        super().__init__(algorithm="tabnet", **kwargs)
-        self._n_d = kwargs.get("n_d", 64)
-        self._n_a = kwargs.get("n_a", 64)
-        self._n_steps = kwargs.get("n_steps", 3)
-        self._gamma = kwargs.get("gamma", 1.3)
-        self._n_independent = kwargs.get("n_independent", 2)
-        self._n_shared = kwargs.get("n_shared", 2)
-        self._scaler = None
-    
-    def _build_model(self, **kwargs):
-        try:
-            from pytorch_tabnet.tab_model import TabNetClassifier
-            
-            return TabNetClassifier(
-                n_d=self._n_d,
-                n_a=self._n_a,
-                n_steps=self._n_steps,
-                gamma=self._gamma,
-                n_independent=self._n_independent,
-                n_shared=self._n_shared,
-                optimizer_params=dict(lr=2e-2),
-                scheduler_params={"step_size": 50, "gamma": 0.9},
-                scheduler_fn="StepLR",
-                mask_type="sparsemax",
-                verbose=0,
-                seed=42,
-            )
-        except ImportError:
-            # Fallback to sklearn
-            from sklearn.ensemble import GradientBoostingClassifier
-            return GradientBoostingClassifier(
-                n_estimators=200,
-                max_depth=4,
-                learning_rate=0.05,
-                random_state=42,
-            )
-    
-    def _fit_model(self, X: np.ndarray, y: np.ndarray, **kwargs):
-        from sklearn.preprocessing import StandardScaler
-        
-        self._scaler = StandardScaler()
-        X_scaled = self._scaler.fit_transform(X)
-        
-        try:
-            from pytorch_tabnet.tab_model import TabNetClassifier
-            eval_set = kwargs.get("eval_set")
-            if eval_set:
-                X_val, y_val = eval_set
-                X_val_scaled = self._scaler.transform(X_val)
-                self.model.fit(
-                    X_scaled, y,
-                    eval_set=[(X_val_scaled, y_val)],
-                    eval_metric=["auc"],
-                    max_epochs=kwargs.get("max_epochs", 100),
-                    patience=kwargs.get("patience", 10),
-                    batch_size=kwargs.get("batch_size", 256),
-                    virtual_batch_size=kwargs.get("virtual_batch_size", 128),
-                )
-            else:
-                self.model.fit(
-                    X_scaled, y,
-                    max_epochs=kwargs.get("max_epochs", 100),
-                    patience=kwargs.get("patience", 10),
-                    batch_size=kwargs.get("batch_size", 256),
-                    virtual_batch_size=kwargs.get("virtual_batch_size", 128),
-                )
-        except ImportError:
-            self.model.fit(X_scaled, y)
-    
-    def _predict_proba(self, X: np.ndarray) -> np.ndarray:
-        X_scaled = self._scaler.transform(X)
-        return self.model.predict_proba(X_scaled)[:, 1]
-    
-    def get_feature_importance(self, top_n: int = 20) -> List[dict]:
-        """Get TabNet feature importance (attention masks)."""
-        try:
-            importance = self.model.feature_importances_
-            importance_dict = dict(zip(self.feature_names, importance))
-            sorted_features = sorted(
-                importance_dict.items(),
-                key=lambda x: x[1],
-                reverse=True
-            )
-            return [
-                {"feature": feat, "importance": float(imp)}
-                for feat, imp in sorted_features[:top_n]
-            ]
-        except Exception:
-            return []
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -741,10 +396,13 @@ class TabNetChallenger(BaseChallenger):
 
 def create_challenger(algorithm: str, **kwargs) -> BaseChallenger:
     """
-    Factory function to create a challenger model.
+    Factory function to create an offline benchmark challenger model.
+    
+    Note: FT-Transformer is now a production specialist, not a challenger.
+    Use models.supervised.ft_transformer.FTTransformerPredictor for production.
     
     Args:
-        algorithm: Algorithm name (xgboost, lightgbm, ft_transformer, tabnet)
+        algorithm: Algorithm name (xgboost, lightgbm)
         **kwargs: Additional parameters
     
     Returns:
@@ -753,8 +411,6 @@ def create_challenger(algorithm: str, **kwargs) -> BaseChallenger:
     challengers = {
         "xgboost": XGBoostChallenger,
         "lightgbm": LightGBMChallenger,
-        "ft_transformer": FTTransformerChallenger,
-        "tabnet": TabNetChallenger,
     }
     
     if algorithm.lower() not in challengers:
@@ -764,5 +420,5 @@ def create_challenger(algorithm: str, **kwargs) -> BaseChallenger:
 
 
 def get_available_algorithms() -> List[str]:
-    """Get list of available challenger algorithms."""
-    return ["xgboost", "lightgbm", "ft_transformer", "tabnet"]
+    """Get list of available offline benchmark challenger algorithms."""
+    return ["xgboost", "lightgbm"]

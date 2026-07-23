@@ -1,7 +1,7 @@
 """
 FraudTrap — Training Pipeline
 Manages the full model lifecycle:
-  Phase 1 (unsupervised) → Phase 2 (semi-supervised) → Phase 3 (supervised)
+  Phase 1 (unsupervised) → Phase 2 (semi-supervised NetPFN) → Phase 3 (supervised CatBoost + FT-Transformer)
 Includes dataset construction with point-in-time correct feature joins,
 delayed label handling, and automated phase transition gating.
 """
@@ -22,8 +22,11 @@ from sklearn.metrics import average_precision_score, f1_score
 
 from config.settings import get_settings
 from models.cold_start.ensemble import ColdStartEnsemble
-from models.supervised.ensemble import SupervisedEnsemble
-from models.supervised.semi_supervised import SemiSupervisedBridge
+from models.semi_supervised.netpfn import NetPFNWrapper
+from models.semi_supervised.trainer import SemiSupervisedTrainer, SemiSupervisedConfig
+from models.supervised.champion import ChampionModel
+from models.supervised.ft_transformer import FTTransformerPredictor
+from models.supervised.meta_fusion import MetaFusionLayer
 
 settings = get_settings()
 
@@ -273,39 +276,187 @@ class TrainingPipeline:
         return state
 
     def _train_phase2(self, tenant_id: str, state: PhaseState) -> PhaseState:
+        """Train Phase 2: NetPFN semi-supervised model."""
         try:
             X, y = self.dataset_builder.build_supervised_dataset(tenant_id)
         except ValueError as e:
             logger.warning("Phase2 dataset error: {}. Staying in semi-supervised.", e)
             return state
+
         feature_names = list(X.columns)
-        model = SemiSupervisedBridge()
-        model.fit(X.values, y.values, feature_names=feature_names)
+        X_values = X.values
+        y_values = y.values
+
+        # Get cold-start model for pseudo-label generation
+        cold_start_path = MODEL_DIR / tenant_id / "phase1"
+        cold_start = None
+        if cold_start_path.exists():
+            cold_start = ColdStartEnsemble.load(cold_start_path)
+
+        # Also try to load unlabelled data for pseudo-labels
+        X_unlabelled = None
+        try:
+            df_unlabelled = self.dataset_builder.build_unsupervised_dataset(tenant_id)
+            if len(df_unlabelled) > 0:
+                X_unlabelled = df_unlabelled[feature_names].fillna(0.0).values
+        except Exception:
+            pass
+
+        # Train NetPFN
+        config = SemiSupervisedConfig(
+            epochs=50,
+            batch_size=256,
+            learning_rate=1e-3,
+            early_stopping_patience=7,
+        )
+        trainer = SemiSupervisedTrainer(config)
+
+        X_combined, y_combined, weights, pseudo_result = trainer.prepare_dataset(
+            X_confirmed=X_values,
+            y_confirmed=y_values,
+            X_unlabelled=X_unlabelled,
+            cold_start=cold_start,
+        )
+
+        wrapper, result = trainer.train(
+            X=X_combined,
+            y=y_combined,
+            sample_weights=weights,
+            feature_names=feature_names,
+        )
+
+        # Save model
         save_path = MODEL_DIR / tenant_id / "phase2"
-        model.save(save_path)
-        state.metrics = model.metrics
-        state.current_model_version = f"phase2_{int(time.time())}"
-        logger.info("Phase 2 model saved → {}", save_path)
+        wrapper.save(save_path)
+
+        state.metrics = {
+            "pr_auc": result.pr_auc,
+            "roc_auc": result.roc_auc,
+            "calibration_error": result.calibration_error,
+        }
+        state.current_model_version = result.model_version
+        state.pseudo_label_count = result.n_pseudo
+        logger.info(
+            "Phase 2 NetPFN saved → {} | metrics={}",
+            save_path, state.metrics,
+        )
         return state
 
     def _train_phase3(self, tenant_id: str, state: PhaseState) -> PhaseState:
+        """Train Phase 3: Confidence-aware CatBoost + FT-Transformer."""
         try:
             X, y = self.dataset_builder.build_supervised_dataset(tenant_id)
         except ValueError as e:
             logger.warning("Phase3 dataset error: {}. Keeping existing model.", e)
             return state
+
         feature_names = list(X.columns)
-        model = SupervisedEnsemble(feature_names=feature_names)
-        model.fit(
-            X.values, y.values,
-            tune_hyperparams=True,
-            n_optuna_trials=20,
+        X_values = X.values
+        y_values = y.values
+
+        # Split: 60% CatBoost train, 20% FT-Transformer train, 20% meta-fusion cal
+        from sklearn.model_selection import train_test_split
+
+        X_trainval, X_test, y_trainval, y_test = train_test_split(
+            X_values, y_values, test_size=0.2, random_state=42, stratify=y_values
         )
+        X_train, X_cal, y_train, y_cal = train_test_split(
+            X_trainval, y_trainval, test_size=0.25, random_state=42, stratify=y_trainval
+        )
+
+        # 1. Train CatBoost champion
+        champion = ChampionModel(
+            feature_names=feature_names,
+            enable_specialist=True,
+            confidence_threshold=0.92,
+            fusion_method="logistic_regression",
+        )
+        champion.fit(
+            X_train, y_train,
+            feature_names=feature_names,
+            calibration_method="isotonic",
+        )
+
+        # 2. Train FT-Transformer specialist
+        ft_transformer = FTTransformerPredictor(
+            n_features=X_train.shape[1],
+            feature_names=feature_names,
+            d_token=64,
+            n_heads=4,
+            n_layers=2,
+            dropout=0.1,
+            calibration_method="isotonic",
+        )
+
+        from sklearn.preprocessing import StandardScaler
+        scaler = StandardScaler()
+        X_cal_scaled = scaler.fit_transform(X_cal)
+
+        ft_transformer.scaler = scaler
+        ft_transformer.model.train()
+
+        import torch
+        from torch.utils.data import DataLoader, TensorDataset
+
+        X_train_scaled = scaler.transform(X_train)
+        X_train_t = torch.FloatTensor(X_train_scaled)
+        y_train_t = torch.FloatTensor(y_train)
+
+        dataset = TensorDataset(X_train_t, y_train_t)
+        loader = DataLoader(dataset, batch_size=256, shuffle=True)
+
+        optimizer = torch.optim.Adam(ft_transformer.model.parameters(), lr=1e-3)
+        criterion = torch.nn.BCELoss()
+
+        ft_transformer.model.train()
+        for epoch in range(30):
+            for batch_X, batch_y in loader:
+                optimizer.zero_grad()
+                output = ft_transformer.model(batch_X)
+                loss = criterion(output.squeeze(), batch_y)
+                loss.backward()
+                optimizer.step()
+
+        ft_transformer.model.eval()
+        ft_cal_probs = ft_transformer.predict_proba(X_cal)
+
+        # Fit FT-Transformer calibration
+        from scoring.calibration import ProbabilityCalibrator
+        ft_calibrator = ProbabilityCalibrator(method="isotonic")
+        ft_raw_probs = ft_transformer.model(
+            torch.FloatTensor(X_cal_scaled)
+        ).detach().numpy().ravel()
+        ft_calibrator.fit(ft_raw_probs, y_cal)
+        ft_transformer.calibrator = ft_calibrator
+
+        # 3. Train meta-fusion on calibration set
+        champion.fit_specialist(
+            X_cal=X_cal,
+            y_cal=y_cal,
+            ft_transformer=ft_transformer,
+        )
+
+        # 4. Evaluate on test set
+        cat_probs = champion.predict_proba(X_test)
+        from sklearn.metrics import average_precision_score
+        test_pr_auc = float(average_precision_score(y_test, cat_probs))
+
+        # Save all models
         save_path = MODEL_DIR / tenant_id / "phase3"
-        model.save(save_path)
-        state.metrics = {"pr_auc": model.pr_auc_, "f2_score": model.f2_score_}
-        state.current_model_version = f"phase3_{int(time.time())}"
-        logger.info("Phase 3 model saved → {} | metrics={}", save_path, state.metrics)
+        champion.save(save_path)
+        ft_path = save_path / "ft_transformer"
+        ft_transformer.save(ft_path)
+
+        state.metrics = {
+            "pr_auc": champion.pr_auc_,
+            "f2_score": champion.f2_score_,
+            "test_pr_auc": test_pr_auc,
+        }
+        state.current_model_version = champion.model_version
+        logger.info(
+            "Phase 3 models saved → {} | metrics={}",
+            save_path, state.metrics,
+        )
         return state
 
     def _get_experiment_id(self) -> str:

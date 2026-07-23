@@ -1,0 +1,83 @@
+# FraudTrap — Explainability Configuration
+# Production-grade feature attribution and counterfactual explanations
+
+explainability:
+  # Master switch
+  enabled: true
+  
+  # SHAP Explainer
+  shap:
+    top_features: 5
+    cache: true
+    # Background dataset size for SHAP initialization
+    background_samples: 500
+  
+  # Counterfactual Engine
+  counterfactual:
+    enabled: true
+    # Primary method: nearest_neighbor (production) or dice (analyst only)
+    method: nearest_neighbor
+    # ANN engine for nearest neighbor search
+    ann_engine: faiss  # faiss or hnsw
+    max_neighbors: 10
+    # Feature weights for weighted distance
+    weighted_distance: true
+    # Feature weights (behavioral features get higher weights)
+    feature_weights:
+      transaction_velocity: 4.0
+      device_age: 3.0
+      amount: 3.0
+      merchant_risk: 2.0
+      impossible_travel: 5.0
+      is_new_device: 4.0
+      is_new_merchant: 2.0
+      acct_v_1m_count: 1.5
+      acct_v_24h_count: 2.0
+    
+    # DiCE for analyst investigations only
+    analyst_dice:
+      enabled: true
+      max_counterfactuals: 3
+      proximity_weight: 0.5
+      diversity_weight: 1.0
+  
+  # Explanation Formatter
+  formatter:
+    analyst_friendly: true
+    max_drivers: 5
+  
+  # Cache
+  cache:
+    ttl_minutes: 30
+    max_size: 10000
+  
+  # Monitoring
+  monitoring:
+    enabled: true
+    window_size: 10000
+    # Latency thresholds (ms)
+    max_total_latency_ms: 40.0
+    max_shap_latency_ms: 20.0
+    min_cache_hit_rate: 0.3
+  
+  # Persistence
+  persistence:
+    enabled: true
+    base_dir: artifacts/explainability
+    versioned: true
+  
+  # Logging
+  logging:
+    # What to log (PII-safe)
+    log_prediction: true
+    log_confidence: true
+    log_top_shap_features: true
+    log_nearest_neighbor_id: true
+    log_counterfactual_distance: true
+    log_explanation: true
+    log_latency: true
+    log_tenant_id: true
+    log_model_version: true
+    # What NOT to log
+    log_sensitive_features: false
+    log_full_feature_vector: false
