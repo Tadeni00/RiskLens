@@ -5,6 +5,7 @@ Manages the full model lifecycle:
 Includes dataset construction with point-in-time correct feature joins,
 delayed label handling, and automated phase transition gating.
 """
+
 from __future__ import annotations
 import json
 import time
@@ -31,18 +32,20 @@ from models.supervised.meta_fusion import MetaFusionLayer
 settings = get_settings()
 
 MODEL_DIR = Path("./artifacts/models")
-DATA_DIR  = Path("./artifacts/data")
+DATA_DIR = Path("./artifacts/data")
 
 
 # ── Phase enum ────────────────────────────────────────────────────────────────
 
+
 class ModelPhase(str, Enum):
-    UNSUPERVISED   = "UNSUPERVISED"
+    UNSUPERVISED = "UNSUPERVISED"
     SEMI_SUPERVISED = "SEMI_SUPERVISED"
-    SUPERVISED     = "SUPERVISED"
+    SUPERVISED = "SUPERVISED"
 
 
 # ── Phase state (persisted between runs) ──────────────────────────────────────
+
 
 @dataclass
 class PhaseState:
@@ -78,6 +81,7 @@ class PhaseState:
 
 
 # ── Dataset builder ───────────────────────────────────────────────────────────
+
 
 class DatasetBuilder:
     """
@@ -115,11 +119,13 @@ class DatasetBuilder:
         Returns (X, y) with point-in-time correct features.
         Training window: T-{window}d to T-{lag}d (ensuring labels are complete).
         """
-        lag   = label_lag_days or settings.label_lag_days
+        lag = label_lag_days or settings.label_lag_days
         window = training_window_days or settings.training_window_days
         logger.info(
             "Building supervised dataset for tenant={}, window={}d, lag={}d",
-            tenant_id, window, lag,
+            tenant_id,
+            window,
+            lag,
         )
         df = self._load_features(tenant_id, window)
 
@@ -138,20 +144,30 @@ class DatasetBuilder:
         if "chargeback_reason_code" in df.columns:
             non_fraud_codes = {"4853", "4855", "4859"}  # Visa: item not received, etc.
             mask = ~(
-                (df["label"] == 1) &
-                (df["chargeback_reason_code"].isin(non_fraud_codes))
+                (df["label"] == 1)
+                & (df["chargeback_reason_code"].isin(non_fraud_codes))
             )
             df = df[mask]
 
-        feature_cols = [c for c in df.columns
-                        if c not in ("label", "transaction_id", "tenant_id",
-                                     "transaction_timestamp", "chargeback_reason_code")]
+        feature_cols = [
+            c
+            for c in df.columns
+            if c
+            not in (
+                "label",
+                "transaction_id",
+                "tenant_id",
+                "transaction_timestamp",
+                "chargeback_reason_code",
+            )
+        ]
         X = df[feature_cols].fillna(0.0)
         y = df["label"].astype(int)
 
         logger.info(
             "Supervised dataset: {} rows, {:.3f}% fraud",
-            len(y), 100 * y.mean(),
+            len(y),
+            100 * y.mean(),
         )
         return X, y
 
@@ -166,11 +182,14 @@ class DatasetBuilder:
             return df
 
         # Return synthetic data for testing when no real data available
-        logger.warning("No data found for tenant={}; generating synthetic data", tenant_id)
+        logger.warning(
+            "No data found for tenant={}; generating synthetic data", tenant_id
+        )
         return _generate_synthetic_data(n=10_000)
 
 
 # ── Phase transition evaluator ────────────────────────────────────────────────
+
 
 class PhaseTransitionEvaluator:
     """
@@ -180,22 +199,26 @@ class PhaseTransitionEvaluator:
 
     def should_transition_to_semi(self, state: PhaseState) -> tuple[bool, dict]:
         checks = {
-            "fraud_labels": state.confirmed_fraud_labels >= settings.phase1_min_fraud_labels,
-            "transactions":  state.total_transactions >= settings.phase1_min_transactions,
-            "weeks":         state.weeks_since_first_transaction() >= settings.phase1_min_weeks,
-            "pr_auc":        state.metrics.get("pr_auc", 0.0) >= settings.phase1_min_pr_auc,
+            "fraud_labels": state.confirmed_fraud_labels
+            >= settings.phase1_min_fraud_labels,
+            "transactions": state.total_transactions
+            >= settings.phase1_min_transactions,
+            "weeks": state.weeks_since_first_transaction() >= settings.phase1_min_weeks,
+            "pr_auc": state.metrics.get("pr_auc", 0.0) >= settings.phase1_min_pr_auc,
         }
         return all(checks.values()), checks
 
     def should_transition_to_supervised(self, state: PhaseState) -> tuple[bool, dict]:
         checks = {
-            "fraud_labels": state.confirmed_fraud_labels >= settings.phase2_min_fraud_labels,
-            "pr_auc":       state.metrics.get("pr_auc", 0.0) >= settings.phase2_min_pr_auc,
+            "fraud_labels": state.confirmed_fraud_labels
+            >= settings.phase2_min_fraud_labels,
+            "pr_auc": state.metrics.get("pr_auc", 0.0) >= settings.phase2_min_pr_auc,
         }
         return all(checks.values()), checks
 
 
 # ── Training orchestrator ─────────────────────────────────────────────────────
+
 
 class TrainingPipeline:
     """
@@ -217,24 +240,29 @@ class TrainingPipeline:
         """
         logger.info(
             "TrainingPipeline.run: tenant={}, phase={}",
-            tenant_id, state.current_phase,
+            tenant_id,
+            state.current_phase,
         )
 
         with mlflow.start_run(
             experiment_id=self._get_experiment_id(),
             run_name=f"{tenant_id}_{state.current_phase}_{datetime.now(timezone.utc).date()}",
         ):
-            mlflow.set_tags({
-                "tenant_id": tenant_id,
-                "phase": state.current_phase.value,
-            })
+            mlflow.set_tags(
+                {
+                    "tenant_id": tenant_id,
+                    "phase": state.current_phase.value,
+                }
+            )
 
             if state.current_phase == ModelPhase.UNSUPERVISED:
                 state = self._train_phase1(tenant_id, state)
                 ready, checks = self.evaluator.should_transition_to_semi(state)
                 logger.info("Phase1→2 transition check: {}", checks)
                 if ready:
-                    logger.info("✓ Transitioning tenant={} to SEMI_SUPERVISED", tenant_id)
+                    logger.info(
+                        "✓ Transitioning tenant={} to SEMI_SUPERVISED", tenant_id
+                    )
                     state.current_phase = ModelPhase.SEMI_SUPERVISED
 
             elif state.current_phase == ModelPhase.SEMI_SUPERVISED:
@@ -250,18 +278,23 @@ class TrainingPipeline:
 
             state.last_retrain_at = datetime.now(timezone.utc).isoformat()
             mlflow.log_metrics(state.metrics)
-            mlflow.log_params({
-                "phase": state.current_phase.value,
-                "tenant_id": tenant_id,
-                "fraud_labels": state.confirmed_fraud_labels,
-            })
+            mlflow.log_params(
+                {
+                    "phase": state.current_phase.value,
+                    "tenant_id": tenant_id,
+                    "fraud_labels": state.confirmed_fraud_labels,
+                }
+            )
 
         return state
 
     def _train_phase1(self, tenant_id: str, state: PhaseState) -> PhaseState:
         df = self.dataset_builder.build_unsupervised_dataset(tenant_id)
-        feature_cols = [c for c in df.columns
-                        if c not in ("transaction_id", "tenant_id", "transaction_timestamp")]
+        feature_cols = [
+            c
+            for c in df.columns
+            if c not in ("transaction_id", "tenant_id", "transaction_timestamp")
+        ]
         X = df[feature_cols].fillna(0.0).values
         model = ColdStartEnsemble(input_dim=X.shape[1], feature_names=feature_cols)
         model.fit(X, epochs=30)
@@ -269,8 +302,10 @@ class TrainingPipeline:
         model.save(save_path)
         # Evaluate on a held-out slice if labels available
         scores = model.score(X[:1000] if len(X) > 1000 else X)
-        state.metrics = {"anomaly_score_mean": float(scores.mean()),
-                         "anomaly_score_p95":  float(np.percentile(scores, 95))}
+        state.metrics = {
+            "anomaly_score_mean": float(scores.mean()),
+            "anomaly_score_p95": float(np.percentile(scores, 95)),
+        }
         state.current_model_version = f"phase1_{int(time.time())}"
         logger.info("Phase 1 model saved → {}", save_path)
         return state
@@ -338,7 +373,8 @@ class TrainingPipeline:
         state.pseudo_label_count = result.n_pseudo
         logger.info(
             "Phase 2 NetPFN saved → {} | metrics={}",
-            save_path, state.metrics,
+            save_path,
+            state.metrics,
         )
         return state
 
@@ -372,7 +408,8 @@ class TrainingPipeline:
             fusion_method="logistic_regression",
         )
         champion.fit(
-            X_train, y_train,
+            X_train,
+            y_train,
             feature_names=feature_names,
             calibration_method="isotonic",
         )
@@ -389,6 +426,7 @@ class TrainingPipeline:
         )
 
         from sklearn.preprocessing import StandardScaler
+
         scaler = StandardScaler()
         X_cal_scaled = scaler.fit_transform(X_cal)
 
@@ -422,10 +460,14 @@ class TrainingPipeline:
 
         # Fit FT-Transformer calibration
         from scoring.calibration import ProbabilityCalibrator
+
         ft_calibrator = ProbabilityCalibrator(method="isotonic")
-        ft_raw_probs = ft_transformer.model(
-            torch.FloatTensor(X_cal_scaled)
-        ).detach().numpy().ravel()
+        ft_raw_probs = (
+            ft_transformer.model(torch.FloatTensor(X_cal_scaled))
+            .detach()
+            .numpy()
+            .ravel()
+        )
         ft_calibrator.fit(ft_raw_probs, y_cal)
         ft_transformer.calibrator = ft_calibrator
 
@@ -439,6 +481,7 @@ class TrainingPipeline:
         # 4. Evaluate on test set
         cat_probs = champion.predict_proba(X_test)
         from sklearn.metrics import average_precision_score
+
         test_pr_auc = float(average_precision_score(y_test, cat_probs))
 
         # Save all models
@@ -455,7 +498,8 @@ class TrainingPipeline:
         state.current_model_version = champion.model_version
         logger.info(
             "Phase 3 models saved → {} | metrics={}",
-            save_path, state.metrics,
+            save_path,
+            state.metrics,
         )
         return state
 
@@ -471,7 +515,10 @@ class TrainingPipeline:
 
 # ── Synthetic data generator (for testing / demo) ────────────────────────────
 
-def _generate_synthetic_data(n: int = 10_000, fraud_rate: float = 0.015) -> pd.DataFrame:
+
+def _generate_synthetic_data(
+    n: int = 10_000, fraud_rate: float = 0.015
+) -> pd.DataFrame:
     """
     Generates realistic-looking transaction feature data for testing.
     Fraud rate defaults to ~1.5%.
@@ -482,41 +529,67 @@ def _generate_synthetic_data(n: int = 10_000, fraud_rate: float = 0.015) -> pd.D
 
     def make_block(size, is_fraud):
         return {
-            "amount":                rng.lognormal(9 if is_fraud else 8, 1.5, size),
-            "amount_log":            rng.normal(9 if is_fraud else 8, 1.5, size),
-            "amount_zscore":         rng.normal(3.0 if is_fraud else 0.0, 1.0, size),
-            "hour_sin":              rng.uniform(-1, 1, size),
-            "hour_cos":              rng.uniform(-1, 1, size),
-            "is_weekend":            rng.binomial(1, 0.35 if is_fraud else 0.28, size).astype(float),
-            "is_night":              rng.binomial(1, 0.45 if is_fraud else 0.15, size).astype(float),
-            "is_round_amount":       rng.binomial(1, 0.4 if is_fraud else 0.1, size).astype(float),
-            "is_new_merchant":       rng.binomial(1, 0.7 if is_fraud else 0.1, size).astype(float),
-            "is_new_device":         rng.binomial(1, 0.6 if is_fraud else 0.05, size).astype(float),
-            "device_shared_flag":    rng.binomial(1, 0.5 if is_fraud else 0.02, size).astype(float),
-            "device_account_count":  rng.integers(1, 20 if is_fraud else 3, size).astype(float),
-            "geo_speed_kmh":         rng.exponential(800 if is_fraud else 30, size),
-            "impossible_travel":     rng.binomial(1, 0.3 if is_fraud else 0.001, size).astype(float),
-            "cross_country_flag":    rng.binomial(1, 0.4 if is_fraud else 0.05, size).astype(float),
-            "acct_v_1m_count":       rng.poisson(5 if is_fraud else 1, size).astype(float),
-            "acct_v_1h_count":       rng.poisson(20 if is_fraud else 3, size).astype(float),
-            "acct_v_24h_count":      rng.poisson(50 if is_fraud else 10, size).astype(float),
-            "acct_v_24h_total_amt":  rng.lognormal(12 if is_fraud else 10, 1.0, size),
-            "typing_zscore":         rng.normal(2.5 if is_fraud else 0.0, 1.0, size),
-            "channel_enc":           rng.integers(0, 6, size).astype(float),
-            "txn_type_enc":          rng.integers(0, 6, size).astype(float),
-            "label":                 np.full(size, 1 if is_fraud else 0),
+            "amount": rng.lognormal(9 if is_fraud else 8, 1.5, size),
+            "amount_log": rng.normal(9 if is_fraud else 8, 1.5, size),
+            "amount_zscore": rng.normal(3.0 if is_fraud else 0.0, 1.0, size),
+            "hour_sin": rng.uniform(-1, 1, size),
+            "hour_cos": rng.uniform(-1, 1, size),
+            "is_weekend": rng.binomial(1, 0.35 if is_fraud else 0.28, size).astype(
+                float
+            ),
+            "is_night": rng.binomial(1, 0.45 if is_fraud else 0.15, size).astype(float),
+            "is_round_amount": rng.binomial(1, 0.4 if is_fraud else 0.1, size).astype(
+                float
+            ),
+            "is_new_merchant": rng.binomial(1, 0.7 if is_fraud else 0.1, size).astype(
+                float
+            ),
+            "is_new_device": rng.binomial(1, 0.6 if is_fraud else 0.05, size).astype(
+                float
+            ),
+            "device_shared_flag": rng.binomial(
+                1, 0.5 if is_fraud else 0.02, size
+            ).astype(float),
+            "device_account_count": rng.integers(1, 20 if is_fraud else 3, size).astype(
+                float
+            ),
+            "geo_speed_kmh": rng.exponential(800 if is_fraud else 30, size),
+            "impossible_travel": rng.binomial(
+                1, 0.3 if is_fraud else 0.001, size
+            ).astype(float),
+            "cross_country_flag": rng.binomial(
+                1, 0.4 if is_fraud else 0.05, size
+            ).astype(float),
+            "acct_v_1m_count": rng.poisson(5 if is_fraud else 1, size).astype(float),
+            "acct_v_1h_count": rng.poisson(20 if is_fraud else 3, size).astype(float),
+            "acct_v_24h_count": rng.poisson(50 if is_fraud else 10, size).astype(float),
+            "acct_v_24h_total_amt": rng.lognormal(12 if is_fraud else 10, 1.0, size),
+            "typing_zscore": rng.normal(2.5 if is_fraud else 0.0, 1.0, size),
+            "channel_enc": rng.integers(0, 6, size).astype(float),
+            "txn_type_enc": rng.integers(0, 6, size).astype(float),
+            "label": np.full(size, 1 if is_fraud else 0),
             "transaction_timestamp": [
-                (datetime.now(timezone.utc) - timedelta(days=int(rng.integers(1, 180)))).isoformat()
+                (
+                    datetime.now(timezone.utc)
+                    - timedelta(days=int(rng.integers(1, 180)))
+                ).isoformat()
                 for _ in range(size)
             ],
         }
 
     fraud_block = make_block(n_fraud, True)
-    legit_block  = make_block(n_legit, False)
+    legit_block = make_block(n_legit, False)
 
-    df = pd.concat([
-        pd.DataFrame(fraud_block),
-        pd.DataFrame(legit_block),
-    ], ignore_index=True).sample(frac=1, random_state=42).reset_index(drop=True)
+    df = (
+        pd.concat(
+            [
+                pd.DataFrame(fraud_block),
+                pd.DataFrame(legit_block),
+            ],
+            ignore_index=True,
+        )
+        .sample(frac=1, random_state=42)
+        .reset_index(drop=True)
+    )
 
     return df

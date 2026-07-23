@@ -9,15 +9,15 @@ class Typography:
     FONT_MONO = "'IBM Plex Mono', 'Fira Code', 'Consolas', monospace"
 
     # ── Size Scale ───────────────────────────────────────────────────────────
-    TEXT_XS = "0.6875rem"    # 11px
-    TEXT_SM = "0.75rem"      # 12px
-    TEXT_BASE = "0.875rem"   # 14px
-    TEXT_MD = "1rem"         # 16px
-    TEXT_LG = "1.125rem"     # 18px
-    TEXT_XL = "1.375rem"     # 22px
-    TEXT_2XL = "1.75rem"     # 28px
-    TEXT_3XL = "2rem"        # 32px
-    TEXT_4XL = "2.5rem"      # 40px
+    TEXT_XS = "0.6875rem"  # 11px
+    TEXT_SM = "0.75rem"  # 12px
+    TEXT_BASE = "0.875rem"  # 14px
+    TEXT_MD = "1rem"  # 16px
+    TEXT_LG = "1.125rem"  # 18px
+    TEXT_XL = "1.375rem"  # 22px
+    TEXT_2XL = "1.75rem"  # 28px
+    TEXT_3XL = "2rem"  # 32px
+    TEXT_4XL = "2.5rem"  # 40px
 
     # ── Weight Scale ─────────────────────────────────────────────────────────
     WEIGHT_NORMAL = "400"

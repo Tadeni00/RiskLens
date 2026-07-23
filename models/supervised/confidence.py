@@ -7,6 +7,7 @@ Design:
 - Initially computes confidence from calibrated probability distance to threshold
 - Extensible for advanced uncertainty estimation (MC dropout, conformal prediction)
 """
+
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
@@ -17,6 +18,7 @@ from loguru import logger
 @dataclass
 class ConfidenceEstimatorConfig:
     """Configuration for the confidence estimator."""
+
     threshold: float = 0.92
     uncertainty_margin: float = 0.05
     use_conformal: bool = False
@@ -26,14 +28,14 @@ class ConfidenceEstimatorConfig:
 class ConfidenceEstimator:
     """
     Estimates whether CatBoost is confident enough for a given prediction.
-    
+
     When the model is NOT confident, the transaction is routed to
     FT-Transformer for a second opinion.
-    
+
     Confidence is computed as:
     - Distance from the calibrated probability to the decision boundary
     - Optionally: conformal prediction uncertainty sets
-    
+
     The module is designed for extensibility — more advanced uncertainty
     estimation methods (MC dropout, ensemble disagreement) can be added
     without changing the interface.
@@ -47,7 +49,7 @@ class ConfidenceEstimator:
     def estimate(self, probability: float) -> float:
         """
         Estimate confidence for a single prediction.
-        
+
         Confidence is the minimum distance from the probability to either
         decision boundary (0 or 1), scaled to [0, 1].
         """
@@ -63,7 +65,7 @@ class ConfidenceEstimator:
     def is_confident(self, probability: float) -> bool:
         """
         Determine if CatBoost is confident enough for this prediction.
-        
+
         Returns True if the prediction should be returned directly
         without FT-Transformer consultation.
         """
@@ -88,7 +90,7 @@ class ConfidenceEstimator:
     ) -> None:
         """
         Fit conformal prediction threshold on a calibration set.
-        
+
         This provides distribution-free uncertainty quantification:
         with probability >= (1 - alpha), the true label is in the
         prediction set.
@@ -117,7 +119,7 @@ class ConfidenceEstimator:
         """
         Conformal prediction: returns True if the prediction set
         includes class 1 (fraud).
-        
+
         Only available after fit_conformal() has been called.
         """
         if self._conformal_threshold is None:

@@ -2,12 +2,13 @@ import os
 from clickhouse_driver import Client
 import time
 
+
 def init_db():
     host = os.getenv("CLICKHOUSE_HOST", "clickhouse")
     port = int(os.getenv("CLICKHOUSE_PORT", "9000"))
-    
+
     print(f"Connecting to ClickHouse at {host}:{port}...")
-    
+
     # Wait for ClickHouse to be ready
     for _ in range(30):
         try:
@@ -142,8 +143,9 @@ def init_db():
         is_fraud
     FROM fraudtrap.transactions_queue
     """)
-    
+
     print("ClickHouse schema initialized.")
+
 
 if __name__ == "__main__":
     init_db()

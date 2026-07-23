@@ -4,6 +4,7 @@ FraudTrap live traffic simulator.
 Continuously posts realistic transaction payloads to /v1/score and sends
 ground-truth labels for sampled simulated fraud cases.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -13,7 +14,6 @@ import uuid
 from datetime import datetime, timezone
 
 import httpx
-
 
 TENANTS = ["bank_ng_gtb", "bank_ke_equity", "fintech_za_yoco"]
 CURRENCIES = {"bank_ng_gtb": "NGN", "bank_ke_equity": "KES", "fintech_za_yoco": "ZAR"}
@@ -49,7 +49,9 @@ def build_transaction(fraud_rate: float) -> tuple[dict, bool]:
         "transaction_type": random.choice(TXN_TYPES),
         "channel": channel,
         "merchant_id": f"tok_merch_{random.randint(1, 400)}",
-        "merchant_category_code": random.choice(["5411", "5812", "6011", "5732", "7995"]),
+        "merchant_category_code": random.choice(
+            ["5411", "5812", "6011", "5732", "7995"]
+        ),
         "device_id": device_id,
         "country_code": country,
         "typing_cadence_ms": float(random.normalvariate(190 if is_fraud else 260, 45)),
@@ -63,7 +65,9 @@ def build_transaction(fraud_rate: float) -> tuple[dict, bool]:
     return payload, is_fraud
 
 
-def emit_label(client: httpx.Client, api_url: str, txn: dict, confidence: float) -> None:
+def emit_label(
+    client: httpx.Client, api_url: str, txn: dict, confidence: float
+) -> None:
     label = {
         "transaction_id": txn["transaction_id"],
         "tenant_id": txn["tenant_id"],
@@ -78,7 +82,9 @@ def emit_label(client: httpx.Client, api_url: str, txn: dict, confidence: float)
 def main() -> None:
     parser = argparse.ArgumentParser(description="Simulate live FraudTrap traffic")
     parser.add_argument("--api-url", default="http://localhost:8000")
-    parser.add_argument("--rate", type=float, default=1.0, help="Transactions per second")
+    parser.add_argument(
+        "--rate", type=float, default=1.0, help="Transactions per second"
+    )
     parser.add_argument("--fraud-rate", type=float, default=0.04)
     parser.add_argument("--label-sample-rate", type=float, default=0.75)
     parser.add_argument("--max-events", type=int, default=0, help="0 means run forever")
@@ -91,7 +97,9 @@ def main() -> None:
         while args.max_events <= 0 or sent < args.max_events:
             txn, is_fraud = build_transaction(args.fraud_rate)
             try:
-                response = client.post(f"{args.api_url}/v1/score", json=txn, timeout=10.0)
+                response = client.post(
+                    f"{args.api_url}/v1/score", json=txn, timeout=10.0
+                )
                 response.raise_for_status()
                 scored = response.json()
                 print(

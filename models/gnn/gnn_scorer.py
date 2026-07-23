@@ -5,6 +5,7 @@ Architecture: GraphSAGE with temporal edge features.
 Uses Lambda architecture: pre-computed embeddings for known entities (fast path)
 + real-time inference for new entities (slow path, ~50ms).
 """
+
 from __future__ import annotations
 import math
 import pickle
@@ -17,26 +18,27 @@ import torch.nn as nn
 import torch.nn.functional as F
 from loguru import logger
 
-
 # ── Lightweight GraphSAGE (no PyG dependency required for inference) ──────────
+
 
 class SAGEConv(nn.Module):
     """
     Simplified GraphSAGE convolution.
     Aggregates neighbour features via mean pooling, then concatenates with self.
     """
+
     def __init__(self, in_dim: int, out_dim: int):
         super().__init__()
-        self.lin_self   = nn.Linear(in_dim, out_dim, bias=False)
-        self.lin_neigh  = nn.Linear(in_dim, out_dim, bias=False)
-        self.bias       = nn.Parameter(torch.zeros(out_dim))
+        self.lin_self = nn.Linear(in_dim, out_dim, bias=False)
+        self.lin_neigh = nn.Linear(in_dim, out_dim, bias=False)
+        self.bias = nn.Parameter(torch.zeros(out_dim))
 
     def forward(self, x: torch.Tensor, adj_sparse: torch.Tensor) -> torch.Tensor:
         """
         x: (N, in_dim) node features
         adj_sparse: (N, N) sparse adjacency (normalised)
         """
-        agg = torch.sparse.mm(adj_sparse, x)          # mean neighbour aggregation
+        agg = torch.sparse.mm(adj_sparse, x)  # mean neighbour aggregation
         out = self.lin_self(x) + self.lin_neigh(agg) + self.bias
         return F.relu(out)
 
@@ -48,10 +50,13 @@ class FraudGNN(nn.Module):
     Output: per-node fraud probability.
     Supports Monte Carlo Dropout for uncertainty estimation.
     """
-    def __init__(self, in_dim: int, hidden_dim: int = 64, out_dim: int = 2, dropout: float = 0.3):
+
+    def __init__(
+        self, in_dim: int, hidden_dim: int = 64, out_dim: int = 2, dropout: float = 0.3
+    ):
         super().__init__()
-        self.conv1   = SAGEConv(in_dim, hidden_dim)
-        self.conv2   = SAGEConv(hidden_dim, hidden_dim // 2)
+        self.conv1 = SAGEConv(in_dim, hidden_dim)
+        self.conv2 = SAGEConv(hidden_dim, hidden_dim // 2)
         self.dropout = nn.Dropout(dropout)
         self.classifier = nn.Linear(hidden_dim // 2, out_dim)
         self._mc_dropout_enabled = False
@@ -72,7 +77,9 @@ class FraudGNN(nn.Module):
             logits = self.forward(x, adj)
             return F.softmax(logits, dim=-1)[:, 1]
 
-    def predict_proba_mc(self, x: torch.Tensor, adj: torch.Tensor, n_samples: int = 20) -> tuple[torch.Tensor, torch.Tensor]:
+    def predict_proba_mc(
+        self, x: torch.Tensor, adj: torch.Tensor, n_samples: int = 20
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Monte Carlo Dropout prediction for uncertainty estimation.
         Returns (mean_prob, std_prob) for each node.
@@ -87,6 +94,7 @@ class FraudGNN(nn.Module):
 
 
 # ── Entity graph builder ──────────────────────────────────────────────────────
+
 
 class EntityGraphBuilder:
     """
@@ -111,7 +119,9 @@ class EntityGraphBuilder:
         edges: list[tuple[str, str, float]] = []
         stats: dict[str, dict] = {}
 
-        def add_node(node_id: str, entity_type: str, txn: dict, neighbour: Optional[str] = None) -> None:
+        def add_node(
+            node_id: str, entity_type: str, txn: dict, neighbour: Optional[str] = None
+        ) -> None:
             node_set.add(node_id)
             amount = float(txn.get("amount", 0.0) or 0.0)
             is_fraud = float(txn.get("is_fraud", txn.get("label", 0.0)) or 0.0)
@@ -159,13 +169,25 @@ class EntityGraphBuilder:
                 ("merchant", get_value(txn, "merchant_id"), 0.6),
                 ("email", get_value(txn, "email_hash", "email_id"), 0.8),
                 ("phone", get_value(txn, "phone_hash", "phone_id"), 0.8),
-                ("address", get_value(txn, "address_hash", "shipping_address_hash"), 0.6),
+                (
+                    "address",
+                    get_value(txn, "address_hash", "shipping_address_hash"),
+                    0.6,
+                ),
                 ("bank", get_value(txn, "bank_id", "issuer_bank_id"), 0.4),
                 ("card", get_value(txn, "card_hash", "card_id"), 0.9),
                 ("cookie", get_value(txn, "cookie_hash", "cookie_id"), 0.7),
-                ("browser", get_value(txn, "user_agent_hash", "browser_fingerprint"), 0.7),
+                (
+                    "browser",
+                    get_value(txn, "user_agent_hash", "browser_fingerprint"),
+                    0.7,
+                ),
                 ("session", get_value(txn, "session_id"), 0.5),
-                ("recipient", get_value(txn, "counterparty_account_id", "recipient_id"), 0.9),
+                (
+                    "recipient",
+                    get_value(txn, "counterparty_account_id", "recipient_id"),
+                    0.9,
+                ),
                 ("wallet", get_value(txn, "wallet_id"), 0.9),
                 ("beneficiary", get_value(txn, "beneficiary_id"), 0.9),
             ]
@@ -179,7 +201,7 @@ class EntityGraphBuilder:
                 edges.append((acct_node, node, weight))
 
         node_ids = sorted(node_set)
-        node_idx  = {nid: i for i, nid in enumerate(node_ids)}
+        node_idx = {nid: i for i, nid in enumerate(node_ids)}
         N = len(node_ids)
 
         if N == 0:
@@ -196,7 +218,7 @@ class EntityGraphBuilder:
 
         if rows:
             indices = torch.tensor([rows, cols], dtype=torch.long)
-            values  = torch.tensor(vals, dtype=torch.float)
+            values = torch.tensor(vals, dtype=torch.float)
             adj_raw = torch.sparse_coo_tensor(indices, values, (N, N)).coalesce()
             # Row-normalise
             deg = torch.sparse.sum(adj_raw, dim=1).to_dense().clamp(min=1)
@@ -206,7 +228,9 @@ class EntityGraphBuilder:
             adj = torch.eye(N).to_sparse()
 
         x = torch.tensor(
-            self._build_node_features(node_ids, stats, node_feature_dim).astype(np.float32)
+            self._build_node_features(node_ids, stats, node_feature_dim).astype(
+                np.float32
+            )
         )
 
         return x, adj, node_ids
@@ -218,9 +242,21 @@ class EntityGraphBuilder:
         node_feature_dim: int,
     ) -> np.ndarray:
         type_names = [
-            "account", "device", "ip", "merchant", "email", "phone", "address",
-            "bank", "card", "cookie", "browser", "session", "recipient",
-            "wallet", "beneficiary",
+            "account",
+            "device",
+            "ip",
+            "merchant",
+            "email",
+            "phone",
+            "address",
+            "bank",
+            "card",
+            "cookie",
+            "browser",
+            "session",
+            "recipient",
+            "wallet",
+            "beneficiary",
         ]
         type_index = {name: i for i, name in enumerate(type_names)}
         features = np.zeros((len(node_ids), node_feature_dim), dtype=np.float32)
@@ -258,6 +294,7 @@ class EntityGraphBuilder:
 
 # ── GNN scorer wrapper ────────────────────────────────────────────────────────
 
+
 class GNNScorer:
     """
     Lambda-architecture GNN scorer.
@@ -267,7 +304,7 @@ class GNNScorer:
     Supports Monte Carlo Dropout for uncertainty estimation and temperature scaling for calibration.
     """
 
-    MIN_GRAPH_SIZE = 10       # don't run GNN on trivially small graphs
+    MIN_GRAPH_SIZE = 10  # don't run GNN on trivially small graphs
 
     def __init__(self, in_dim: int = 32, hidden_dim: int = 64):
         self.model = FraudGNN(in_dim, hidden_dim)
@@ -296,7 +333,9 @@ class GNNScorer:
 
         # Align labels to node order (account nodes only)
         y = torch.zeros(N, dtype=torch.long)
-        txn_map = {f"account:{t.get('account_id', '')}": i for i, t in enumerate(transactions)}
+        txn_map = {
+            f"account:{t.get('account_id', '')}": i for i, t in enumerate(transactions)
+        }
         for i, nid in enumerate(node_ids):
             if nid in txn_map and txn_map[nid] < len(labels):
                 y[i] = int(labels[txn_map[nid]])
@@ -317,27 +356,32 @@ class GNNScorer:
         criterion = nn.CrossEntropyLoss(weight=w)
 
         self.model.train()
-        best_val_loss = float('inf')
+        best_val_loss = float("inf")
         patience_counter = 0
-        
+
         for epoch in range(epochs):
             optimiser.zero_grad()
             logits = self.model(x[train_idx], adj[train_idx][:, train_idx])
-            loss   = criterion(logits, y[train_idx])
+            loss = criterion(logits, y[train_idx])
             loss.backward()
             nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
             optimiser.step()
-            
+
             # Validation
             self.model.eval()
             with torch.no_grad():
                 val_logits = self.model(x[val_idx], adj[val_idx][:, val_idx])
                 val_loss = criterion(val_logits, y[val_idx]).item()
-            
+
             if (epoch + 1) % 10 == 0:
-                logger.debug("GNN epoch {}/{} train_loss={:.4f} val_loss={:.4f}", 
-                             epoch + 1, epochs, loss.item(), val_loss)
-            
+                logger.debug(
+                    "GNN epoch {}/{} train_loss={:.4f} val_loss={:.4f}",
+                    epoch + 1,
+                    epochs,
+                    loss.item(),
+                    val_loss,
+                )
+
             # Early stopping
             if val_loss < best_val_loss - 1e-6:
                 best_val_loss = val_loss
@@ -347,11 +391,14 @@ class GNNScorer:
             else:
                 patience_counter += 1
                 if patience_counter >= early_stopping_patience:
-                    logger.info("Early stopping at epoch {} (best val_loss: {:.4f})", 
-                                epoch + 1, best_val_loss)
+                    logger.info(
+                        "Early stopping at epoch {} (best val_loss: {:.4f})",
+                        epoch + 1,
+                        best_val_loss,
+                    )
                     self.model.load_state_dict(best_state)
                     break
-            
+
             self.model.train()
 
         # Temperature scaling calibration on validation set
@@ -359,16 +406,18 @@ class GNNScorer:
         with torch.no_grad():
             val_logits = self.model(x[val_idx], adj[val_idx][:, val_idx])
             self.temperature = self._fit_temperature(val_logits, y[val_idx])
-        
+
         self.is_fitted = True
-        logger.info("GNNScorer training complete (temperature={:.4f})", self.temperature)
+        logger.info(
+            "GNNScorer training complete (temperature={:.4f})", self.temperature
+        )
         return self
 
     def _fit_temperature(self, logits: torch.Tensor, labels: torch.Tensor) -> float:
         """Fit temperature scaling parameter on validation set."""
         # Simple grid search for temperature
         best_temp = 1.0
-        best_nll = float('inf')
+        best_nll = float("inf")
         for temp in np.linspace(0.5, 3.0, 26):
             scaled_logits = logits / temp
             probs = F.softmax(scaled_logits, dim=-1)
@@ -390,9 +439,7 @@ class GNNScorer:
         if not self.is_fitted:
             return 0.5
 
-        x, adj, node_ids = self.graph_builder.build(
-            recent_transactions, self.in_dim
-        )
+        x, adj, node_ids = self.graph_builder.build(recent_transactions, self.in_dim)
         N = x.shape[0]
         if N < self.MIN_GRAPH_SIZE:
             return 0.5
@@ -419,14 +466,14 @@ class GNNScorer:
         if not self.is_fitted:
             return 0.5, 0.0
 
-        x, adj, node_ids = self.graph_builder.build(
-            recent_transactions, self.in_dim
-        )
+        x, adj, node_ids = self.graph_builder.build(recent_transactions, self.in_dim)
         N = x.shape[0]
         if N < self.MIN_GRAPH_SIZE:
             return 0.5, 0.0
 
-        mean_probs, std_probs = self.model.predict_proba_mc(x, adj, n_samples=mc_samples)
+        mean_probs, std_probs = self.model.predict_proba_mc(
+            x, adj, n_samples=mc_samples
+        )
 
         account_node = f"account:{account_id}"
         if account_node in node_ids:
@@ -438,7 +485,11 @@ class GNNScorer:
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
         torch.save(self.model.state_dict(), path / "gnn.pt")
-        meta = {"in_dim": self.in_dim, "is_fitted": self.is_fitted, "temperature": self.temperature}
+        meta = {
+            "in_dim": self.in_dim,
+            "is_fitted": self.is_fitted,
+            "temperature": self.temperature,
+        }
         with open(path / "gnn_meta.pkl", "wb") as f:
             pickle.dump(meta, f)
         logger.info("GNNScorer saved → {}", path)

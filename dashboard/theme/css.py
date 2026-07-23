@@ -2,6 +2,7 @@
 FraudTrap Design System — Global CSS
 Injects the complete enterprise design language into Streamlit.
 """
+
 import streamlit as st
 from dashboard.theme.colors import Colors
 from dashboard.theme.typography import Typography
@@ -9,7 +10,8 @@ from dashboard.theme.typography import Typography
 
 def inject_global_css():
     """Inject the complete design system CSS."""
-    st.markdown(f"""
+    st.markdown(
+        f"""
 <style>
 /* ═══════════════════════════════════════════════════════════════════════════
    FraudTrap Enterprise Design System
@@ -743,7 +745,9 @@ section[data-testid="stSidebar"] .stRadio > div > label > div {{
     animation: slideIn 0.2s ease-out;
 }}
 </style>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )
 
 
 def page_header(title: str, subtitle: str = "", icon: str = ""):
@@ -751,21 +755,28 @@ def page_header(title: str, subtitle: str = "", icon: str = ""):
     icon_html = ""
     if icon:
         from dashboard.theme.icons import Icons
+
         icon_html = Icons.html(icon, size=28, color=Colors.ACCENT)
         icon_html += "&nbsp;&nbsp;"
-    st.markdown(f"""
+    st.markdown(
+        f"""
 <div class="page-header">
     <h1>{icon_html}{title}</h1>
     {"<p>" + subtitle + "</p>" if subtitle else ""}
 </div>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )
 
 
 def section_header(title: str, subtitle: str = ""):
     """Render a section header."""
-    st.markdown(f"""
+    st.markdown(
+        f"""
 <div class="section-header">
     <h2>{title}</h2>
     {"<p>" + subtitle + "</p>" if subtitle else ""}
 </div>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )

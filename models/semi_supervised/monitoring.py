@@ -3,6 +3,7 @@ FraudTrap — Phase 2: Semi-Supervised Monitoring
 Tracks uncertainty distribution, pseudo-label acceptance rate,
 calibration drift, and prediction confidence for the NetPFN layer.
 """
+
 from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -15,6 +16,7 @@ from loguru import logger
 @dataclass
 class SemiSupervisedMetrics:
     """Snapshot of Phase 2 monitoring metrics."""
+
     timestamp: str = ""
     uncertainty_mean: float = 0.0
     uncertainty_p50: float = 0.0
@@ -46,7 +48,7 @@ class SemiSupervisedMetrics:
 class SemiSupervisedMonitor:
     """
     Monitoring for the Phase 2 NetPFN layer.
-    
+
     Tracks:
     - Uncertainty distribution (should remain stable or decrease over time)
     - Pseudo-label acceptance rate (should stabilize as model improves)
@@ -75,9 +77,9 @@ class SemiSupervisedMonitor:
 
         # Keep window
         if len(self._predictions) > self.window_size:
-            self._predictions = self._predictions[-self.window_size:]
-            self._confidences = self._confidences[-self.window_size:]
-            self._uncertainties = self._uncertainties[-self.window_size:]
+            self._predictions = self._predictions[-self.window_size :]
+            self._confidences = self._confidences[-self.window_size :]
+            self._uncertainties = self._uncertainties[-self.window_size :]
 
     def record_pseudo_label_batch(
         self,
@@ -88,15 +90,15 @@ class SemiSupervisedMonitor:
         rate = n_accepted / max(n_total, 1)
         self._pseudo_acceptance_history.append(rate)
         if len(self._pseudo_acceptance_history) > self.window_size:
-            self._pseudo_acceptance_history = (
-                self._pseudo_acceptance_history[-self.window_size:]
-            )
+            self._pseudo_acceptance_history = self._pseudo_acceptance_history[
+                -self.window_size :
+            ]
 
     def record_calibration_error(self, ece: float) -> None:
         """Record calibration error measurement."""
         self._calibration_errors.append(ece)
         if len(self._calibration_errors) > self.window_size:
-            self._calibration_errors = self._calibration_errors[-self.window_size:]
+            self._calibration_errors = self._calibration_errors[-self.window_size :]
 
     def get_metrics(self) -> SemiSupervisedMetrics:
         """Compute current monitoring metrics."""
@@ -138,12 +140,16 @@ class SemiSupervisedMonitor:
     ) -> Dict[str, Any]:
         """
         Detect if monitoring metrics indicate drift.
-        
+
         Returns:
             Dict with drift status and reasons.
         """
         if len(self._uncertainties) < 100:
-            return {"drifted": False, "reasons": [], "n_samples": len(self._uncertainties)}
+            return {
+                "drifted": False,
+                "reasons": [],
+                "n_samples": len(self._uncertainties),
+            }
 
         uncs = np.array(self._uncertainties[-200:])
         confs = np.array(self._confidences[-200:])

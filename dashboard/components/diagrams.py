@@ -2,6 +2,7 @@
 FraudTrap Dashboard — Architecture Diagram Components
 SVG-based architecture visualizations for the ML pipeline.
 """
+
 import streamlit as st
 from dashboard.theme.colors import Colors
 from dashboard.theme.typography import Typography
@@ -54,13 +55,16 @@ def pipeline_diagram(active_step: int = None, completed_steps: list = None):
         if i < len(steps) - 1:
             items_html += f'<div class="pipeline-arrow">→</div>'
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
 <div class="pipeline-container">
     <div style="display:flex;align-items:flex-start;overflow-x:auto;padding:8px 0">
         {items_html}
     </div>
 </div>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )
 
 
 def architecture_diagram():
@@ -235,10 +239,13 @@ def lifecycle_timeline(current_stage: int = 5):
     {connector}
 </div>"""
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
 <div style="background:{Colors.BG_CARD};border:1px solid {Colors.BORDER_DEFAULT};border-radius:12px;padding:24px;overflow-x:auto">
     <div style="display:flex;align-items:flex-start;min-width:max-content">
         {items_html}
     </div>
 </div>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )

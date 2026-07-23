@@ -3,6 +3,7 @@ FraudTrap — Model Router
 Routes tenants to appropriate models based on phase, availability, and experiments.
 Single Responsibility: Model selection and routing logic.
 """
+
 from __future__ import annotations
 import hashlib
 import logging
@@ -21,6 +22,7 @@ from scoring.simple_model import SimpleFraudModel
 @dataclass
 class RoutingDecision:
     """Result of model routing."""
+
     model: object
     model_type: str  # "simple", "cold_start", "semi_supervised", "supervised", "gnn"
     model_version: str
@@ -31,18 +33,18 @@ class RoutingDecision:
 class ModelRouter:
     """
     Routes tenants to appropriate models based on phase, availability, and experiments.
-    
+
     Single Responsibility: Model selection and traffic routing.
     """
-    
+
     def __init__(
-        self, 
+        self,
         registry_models: dict,
         experiment_config: Optional[dict] = None,
     ):
         """
         Initialize router.
-        
+
         Args:
             registry_models: Dict from ModelLoader with all loaded models
             experiment_config: Optional A/B test configuration
@@ -54,20 +56,22 @@ class ModelRouter:
         self.shared_cold_start = registry_models.get("cold_start")
         self.shared_semi_supervised = registry_models.get("semi_supervised")
         self.shared_champion = registry_models.get("champion")
-        
+
         self.active_phase = registry_models.get("active_phase", "UNSUPERVISED")
         self.model_version = registry_models.get("model_version", "unloaded")
         self.feature_names = registry_models.get("feature_names", [])
-        
+
         self.experiment_config = experiment_config or {}
         self._experiments = self.experiment_config.get("experiments", [])
-        
+
         self.logger = logger.bind(component="ModelRouter")
-    
-    def get_model(self, tenant_id: str, transaction_id: Optional[str] = None) -> RoutingDecision:
+
+    def get_model(
+        self, tenant_id: str, transaction_id: Optional[str] = None
+    ) -> RoutingDecision:
         """
         Get the appropriate model for a tenant.
-        
+
         Priority:
         1. Tenant-specific simple model (production)
         2. Tenant-specific champion model (CatBoost + specialist)
@@ -86,7 +90,7 @@ class ModelRouter:
                 model_version=self.simple_models[tenant_id].model_version,
                 tenant_phase="SUPERVISED",
             )
-        
+
         # 2. Tenant champion model
         if tenant_id in self.champion_models:
             variant = self._check_experiment(tenant_id, "supervised")
@@ -97,7 +101,7 @@ class ModelRouter:
                 experiment_variant=variant,
                 tenant_phase="SUPERVISED",
             )
-        
+
         # 3. Tenant semi-supervised (NetPFN)
         if tenant_id in self.semi_supervised_models:
             variant = self._check_experiment(tenant_id, "semi_supervised")
@@ -108,7 +112,7 @@ class ModelRouter:
                 experiment_variant=variant,
                 tenant_phase="SEMI_SUPERVISED",
             )
-        
+
         # 4. Tenant cold-start
         if tenant_id in self.cold_start_models:
             return RoutingDecision(
@@ -117,7 +121,7 @@ class ModelRouter:
                 model_version=self.cold_start_models[tenant_id].model_version,
                 tenant_phase="UNSUPERVISED",
             )
-        
+
         # 5. Shared champion
         if self.shared_champion:
             return RoutingDecision(
@@ -126,7 +130,7 @@ class ModelRouter:
                 model_version=self.model_version,
                 tenant_phase="SUPERVISED",
             )
-        
+
         # 6. Shared semi-supervised
         if self.shared_semi_supervised:
             return RoutingDecision(
@@ -135,7 +139,7 @@ class ModelRouter:
                 model_version=self.model_version,
                 tenant_phase="SEMI_SUPERVISED",
             )
-        
+
         # 7. Shared cold-start
         if self.shared_cold_start:
             return RoutingDecision(
@@ -144,37 +148,39 @@ class ModelRouter:
                 model_version=self.model_version,
                 tenant_phase="UNSUPERVISED",
             )
-        
+
         # 8. Fallback - no model available
-        self.logger.warning("No model available for tenant={}, using heuristic", tenant_id)
+        self.logger.warning(
+            "No model available for tenant={}, using heuristic", tenant_id
+        )
         return RoutingDecision(
             model=None,
             model_type="heuristic",
             model_version="heuristic",
             tenant_phase="UNSUPERVISED",
         )
-    
+
     def _check_experiment(self, tenant_id: str, model_type: str) -> str:
         """Check if tenant should be routed to experiment variant."""
         if not self._experiments:
             return "champion"
-        
+
         for exp in self._experiments:
             if exp.get("tenant") == tenant_id and exp.get("model_type") == model_type:
                 if not exp.get("active", False):
                     continue
-                
+
                 # Consistent hashing for stable assignment
                 hash_input = f"{transaction_id or tenant_id}:{exp['name']}"
                 hash_val = int(hashlib.sha256(hash_input.encode()).hexdigest(), 16)
                 pct = (hash_val % 100) + 1
-                
+
                 challenger_pct = exp.get("challenger_traffic_pct", 10)
                 if pct <= challenger_pct:
                     return "challenger"
-        
+
         return "champion"
-    
+
     def get_available_tenants(self) -> dict[str, list[str]]:
         """Get list of tenants with loaded models by type."""
         return {
@@ -183,7 +189,7 @@ class ModelRouter:
             "semi_supervised": sorted(self.semi_supervised_models.keys()),
             "cold_start": sorted(self.cold_start_models.keys()),
         }
-    
+
     def get_tenant_phase(self, tenant_id: str) -> str:
         """Get current phase for tenant."""
         if tenant_id in self.simple_models or tenant_id in self.champion_models:
@@ -193,22 +199,28 @@ class ModelRouter:
         if tenant_id in self.cold_start_models:
             return "UNSUPERVISED"
         return self.active_phase
-    
+
     def is_experiment_active(self, experiment_name: str) -> bool:
         """Check if an experiment is active."""
         for exp in self._experiments:
             if exp.get("name") == experiment_name:
                 return exp.get("active", False)
         return False
-    
-    def record_experiment_exposure(self, tenant_id: str, experiment_name: str, variant: str) -> None:
+
+    def record_experiment_exposure(
+        self, tenant_id: str, experiment_name: str, variant: str
+    ) -> None:
         """Record experiment exposure for analytics."""
         self.logger.info(
             "Experiment exposure: tenant={} exp={} variant={}",
-            tenant_id, experiment_name, variant
+            tenant_id,
+            experiment_name,
+            variant,
         )
 
 
-def create_router(registry_models: dict, experiment_config: Optional[dict] = None) -> ModelRouter:
+def create_router(
+    registry_models: dict, experiment_config: Optional[dict] = None
+) -> ModelRouter:
     """Factory function to create ModelRouter."""
     return ModelRouter(registry_models, experiment_config)

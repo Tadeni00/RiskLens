@@ -3,6 +3,7 @@ FraudTrap — Phase 2 & 3 Architecture Tests
 Covers: NetPFN, SemiSupervisedTrainer, ConfidenceEstimator, FTTransformer,
 MetaFusionLayer, ChampionModel confidence-aware routing.
 """
+
 from __future__ import annotations
 import asyncio
 import time
@@ -22,8 +23,8 @@ from models.semi_supervised.monitoring import SemiSupervisedMonitor
 from models.supervised.prediction import SupervisedPrediction
 from models.supervised.monitoring import SupervisedMonitor
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def synthetic_labeled_data():
@@ -56,6 +57,7 @@ def synthetic_unlabeled_data():
 def fitted_cold_start(synthetic_labeled_data):
     """Fit a cold-start model for testing."""
     from models.cold_start.ensemble import ColdStartEnsemble
+
     X, y = synthetic_labeled_data
     model = ColdStartEnsemble(input_dim=X.shape[1])
     model.fit(X, epochs=3)
@@ -66,6 +68,7 @@ def fitted_cold_start(synthetic_labeled_data):
 def fitted_netpfn(synthetic_labeled_data):
     """Fit a NetPFN model for testing."""
     from models.semi_supervised.netpfn import NetPFNWrapper
+
     X, y = synthetic_labeled_data
     model = NetPFNWrapper(input_dim=X.shape[1])
     model.scaler.fit(X)
@@ -77,11 +80,12 @@ def fitted_netpfn(synthetic_labeled_data):
 def fitted_confidence_estimator(synthetic_labeled_data):
     """Fit a confidence estimator for testing."""
     from models.supervised.confidence import ConfidenceEstimator
+
     X, y = synthetic_labeled_data
-    
+
     # Compute probabilities from data (simulate CatBoost output)
     probs = np.clip(np.mean(X, axis=1) * 0.5 + 0.5, 0.0, 1.0)
-    
+
     estimator = ConfidenceEstimator()
     estimator.fit_conformal(probs, y)
     return estimator, X, y
@@ -91,6 +95,7 @@ def fitted_confidence_estimator(synthetic_labeled_data):
 def fitted_ft_transformer(synthetic_labeled_data):
     """Fit an FT-Transformer model for testing."""
     from models.supervised.ft_transformer import FTTransformerPredictor
+
     X, y = synthetic_labeled_data
     model = FTTransformerPredictor(
         n_features=X.shape[1],
@@ -107,6 +112,7 @@ def fitted_ft_transformer(synthetic_labeled_data):
 def fitted_meta_fusion(synthetic_labeled_data):
     """Fit a meta-fusion layer for testing."""
     from models.supervised.meta_fusion import MetaFusionLayer
+
     X, y = synthetic_labeled_data
 
     catboost_probs = np.random.rand(len(y)) * 0.3 + 0.2 * y
@@ -124,6 +130,7 @@ def fitted_meta_fusion(synthetic_labeled_data):
 
 
 # ── SemiSupervisedPrediction tests ────────────────────────────────────────────
+
 
 class TestSemiSupervisedPrediction:
     def test_creation(self):
@@ -167,6 +174,7 @@ class TestSemiSupervisedPrediction:
 
 # ── PseudoLabelResult tests ───────────────────────────────────────────────────
 
+
 class TestPseudoLabelResult:
     def test_creation(self):
         X_pseudo = np.random.randn(10, 5)
@@ -193,6 +201,7 @@ class TestPseudoLabelResult:
 
 
 # ── NetPFN tests ──────────────────────────────────────────────────────────────
+
 
 class TestNetPFN:
     def test_fit_and_score(self, fitted_netpfn):
@@ -229,9 +238,11 @@ class TestNetPFN:
 
 # ── ConfidenceEstimator tests ─────────────────────────────────────────────────
 
+
 class TestConfidenceEstimator:
     def test_estimate(self):
         from models.supervised.confidence import ConfidenceEstimator
+
         estimator = ConfidenceEstimator()
         # Confidence at 0.5 should be 1.0 (maximum distance from boundaries)
         assert estimator.estimate(0.5) == pytest.approx(1.0)
@@ -241,6 +252,7 @@ class TestConfidenceEstimator:
 
     def test_is_confident(self):
         from models.supervised.confidence import ConfidenceEstimator
+
         estimator = ConfidenceEstimator()
         # 0.5 is very confident (center)
         assert estimator.is_confident(0.5)
@@ -255,6 +267,7 @@ class TestConfidenceEstimator:
 
 # ── FTTransformer tests ───────────────────────────────────────────────────────
 
+
 class TestFTTransformer:
     def test_fit_and_score(self, fitted_ft_transformer):
         model, X, _ = fitted_ft_transformer
@@ -265,6 +278,7 @@ class TestFTTransformer:
 
 
 # ── MetaFusionLayer tests ─────────────────────────────────────────────────────
+
 
 class TestMetaFusionLayer:
     def test_predict(self, fitted_meta_fusion):
@@ -289,6 +303,7 @@ class TestMetaFusionLayer:
 
     def test_fusion_weighted_average(self):
         from models.supervised.meta_fusion import MetaFusionLayer
+
         meta = MetaFusionLayer(method="logistic_regression")
         n = 100
         meta.fit(
@@ -303,6 +318,7 @@ class TestMetaFusionLayer:
 
 
 # ── SemiSupervisedMonitor tests ───────────────────────────────────────────────
+
 
 class TestSemiSupervisedMonitor:
     def test_log_prediction(self):
@@ -329,6 +345,7 @@ class TestSemiSupervisedMonitor:
 
 
 # ── SupervisedMonitor tests ───────────────────────────────────────────────────
+
 
 class TestSupervisedMonitor:
     def test_log_prediction(self):
@@ -358,9 +375,11 @@ class TestSupervisedMonitor:
 
 # ── Phase transition tests ────────────────────────────────────────────────────
 
+
 class TestPhaseTransitions:
     def test_phase_state_json_roundtrip(self):
         from training.pipeline import PhaseState, ModelPhase
+
         state = PhaseState(
             tenant_id="bank_test",
             current_phase=ModelPhase.SEMI_SUPERVISED,
@@ -375,6 +394,7 @@ class TestPhaseTransitions:
 
     def test_phase_transition_gate_phase1(self):
         from training.pipeline import PhaseState, ModelPhase, PhaseTransitionEvaluator
+
         state = PhaseState(
             tenant_id="t1",
             current_phase=ModelPhase.UNSUPERVISED,
@@ -389,6 +409,7 @@ class TestPhaseTransitions:
 
     def test_phase_transition_gate_fails_low_labels(self):
         from training.pipeline import PhaseState, ModelPhase, PhaseTransitionEvaluator
+
         state = PhaseState(
             tenant_id="t1",
             current_phase=ModelPhase.UNSUPERVISED,
@@ -404,6 +425,7 @@ class TestPhaseTransitions:
 
 
 # ── Latency budget tests ──────────────────────────────────────────────────────
+
 
 class TestLatencyBudget:
     def test_netpfn_scoring_under_50ms(self, fitted_netpfn):
@@ -433,11 +455,14 @@ class TestLatencyBudget:
 
 # ── Cold-start model tests (unchanged) ────────────────────────────────────────
 
+
 class TestColdStartEnsemble:
     def test_vae_forward_pass(self):
         from models.cold_start.ensemble import FraudVAE
+
         vae = FraudVAE(input_dim=10, latent_dim=4)
         import torch
+
         x = torch.randn(8, 10)
         x_hat, mu, log_var = vae(x)
         assert x_hat.shape == (8, 10)
@@ -464,6 +489,7 @@ class TestColdStartEnsemble:
         model, X, _ = fitted_cold_start
         model.save(tmp_path / "cs_model")
         from models.cold_start.ensemble import ColdStartEnsemble
+
         loaded = ColdStartEnsemble.load(tmp_path / "cs_model")
         assert loaded.is_fitted
         orig_scores = model.score(X[:10])

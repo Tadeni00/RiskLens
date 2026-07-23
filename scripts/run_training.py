@@ -8,6 +8,7 @@ Usage:
   python scripts/run_training.py --all-tenants
   python scripts/run_training.py --generate-sample-data
 """
+
 from __future__ import annotations
 import argparse
 import json
@@ -22,10 +23,15 @@ import redis
 from loguru import logger
 
 from config.settings import get_settings
-from training.pipeline import TrainingPipeline, PhaseState, ModelPhase, _generate_synthetic_data
+from training.pipeline import (
+    TrainingPipeline,
+    PhaseState,
+    ModelPhase,
+    _generate_synthetic_data,
+)
 
 settings = get_settings()
-DATA_DIR  = Path("./artifacts/data")
+DATA_DIR = Path("./artifacts/data")
 MODEL_DIR = Path("./artifacts/models")
 
 
@@ -75,18 +81,22 @@ def generate_sample_data(tenant_ids: list[str]) -> None:
         fraud_count = int(df["label"].sum())
         logger.info(
             "Generated {} transactions ({} fraud, {:.2f}%) → {}",
-            len(df), fraud_count, 100 * fraud_count / len(df),
+            len(df),
+            fraud_count,
+            100 * fraud_count / len(df),
             path / "features.parquet",
         )
 
 
 def run_training_for_tenant(tenant_id: str, r: redis.Redis | None) -> None:
     pipeline = TrainingPipeline()
-    state    = load_phase_state(tenant_id, r)
+    state = load_phase_state(tenant_id, r)
 
     logger.info(
         "Starting training: tenant={} phase={} fraud_labels={}",
-        tenant_id, state.current_phase.value, state.confirmed_fraud_labels,
+        tenant_id,
+        state.current_phase.value,
+        state.confirmed_fraud_labels,
     )
 
     updated_state = pipeline.run(tenant_id, state)
@@ -104,11 +114,20 @@ def run_training_for_tenant(tenant_id: str, r: redis.Redis | None) -> None:
 def main():
     parser = argparse.ArgumentParser(description="FraudTrap Training Runner")
     parser.add_argument("--tenant", type=str, help="Train a specific tenant")
-    parser.add_argument("--all-tenants", action="store_true", help="Train all known tenants")
-    parser.add_argument("--generate-sample-data", action="store_true",
-                        help="Generate synthetic training data for demo tenants")
-    parser.add_argument("--force-phase", type=str, choices=["UNSUPERVISED", "SEMI_SUPERVISED", "SUPERVISED"],
-                        help="Force a specific phase (for testing)")
+    parser.add_argument(
+        "--all-tenants", action="store_true", help="Train all known tenants"
+    )
+    parser.add_argument(
+        "--generate-sample-data",
+        action="store_true",
+        help="Generate synthetic training data for demo tenants",
+    )
+    parser.add_argument(
+        "--force-phase",
+        type=str,
+        choices=["UNSUPERVISED", "SEMI_SUPERVISED", "SUPERVISED"],
+        help="Force a specific phase (for testing)",
+    )
     args = parser.parse_args()
 
     demo_tenants = ["bank_ng_gtb", "bank_ke_equity", "fintech_za_yoco"]
@@ -133,7 +152,11 @@ def main():
                     break
                 req = json.loads(item)
                 tenants_queued.add(req["tenant_id"])
-                logger.info("Dequeued retrain for tenant={} trigger={}", req["tenant_id"], req["trigger"])
+                logger.info(
+                    "Dequeued retrain for tenant={} trigger={}",
+                    req["tenant_id"],
+                    req["trigger"],
+                )
             tenants = list(tenants_queued)
         else:
             tenants = demo_tenants
@@ -154,7 +177,9 @@ def main():
                 elif args.force_phase == "SUPERVISED":
                     state.confirmed_fraud_labels = settings.phase2_min_fraud_labels + 1
                 save_phase_state(state, r)
-                logger.info("Forced phase={} for tenant={}", args.force_phase, tenant_id)
+                logger.info(
+                    "Forced phase={} for tenant={}", args.force_phase, tenant_id
+                )
 
             run_training_for_tenant(tenant_id, r)
         except Exception as exc:

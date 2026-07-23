@@ -2,6 +2,7 @@
 FraudTrap — Phase 3: Supervised Prediction Types
 Strongly typed output for the confidence-aware CatBoost + FT-Transformer architecture.
 """
+
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any
@@ -11,7 +12,7 @@ from typing import Optional, Dict, Any
 class SupervisedPrediction:
     """
     Strongly typed output from the Phase 3 supervised layer.
-    
+
     Attributes:
         probability: Final calibrated fraud probability in [0, 1].
         confidence: CatBoost confidence in [0, 1].
@@ -22,6 +23,7 @@ class SupervisedPrediction:
         catboost_version: Version of CatBoost model.
         ft_transformer_version: Version of FT-Transformer if invoked.
     """
+
     probability: float
     confidence: float
     ft_invoked: bool = False
@@ -35,9 +37,7 @@ class SupervisedPrediction:
         for name in ("probability", "confidence"):
             val = getattr(self, name)
             if not 0.0 <= val <= 1.0:
-                raise ValueError(
-                    f"{name} must be in [0, 1], got {val}"
-                )
+                raise ValueError(f"{name} must be in [0, 1], got {val}")
 
     def to_dict(self) -> Dict[str, Any]:
         return {

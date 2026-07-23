@@ -2,6 +2,7 @@
 FraudTrap — Rules DSL Configuration
 Defines the YAML/JSON schema for declarative rule definitions.
 """
+
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional, Literal
@@ -46,6 +47,7 @@ class Operator(str, Enum):
 @dataclass
 class BlocklistConfig:
     """Configuration for blocklist rule."""
+
     entity: Literal["account", "device", "ip", "merchant", "country"]
     list_name: str  # Redis set name (e.g., "fraud_accounts")
 
@@ -53,6 +55,7 @@ class BlocklistConfig:
 @dataclass
 class ThresholdConfig:
     """Configuration for threshold rule."""
+
     feature: str
     operator: Operator
     threshold: float
@@ -61,12 +64,14 @@ class ThresholdConfig:
 @dataclass
 class ExpressionConfig:
     """Configuration for expression rule."""
+
     expression: str  # e.g., "acct_v_24h_count < 5 and amount_vs_mean_ratio > 10"
 
 
 @dataclass
 class VelocityConfig:
     """Configuration for velocity rule."""
+
     entity_type: Literal["account", "device", "ip"]
     window_seconds: int
     threshold: int
@@ -76,6 +81,7 @@ class VelocityConfig:
 @dataclass
 class GeoConfig:
     """Configuration for geo-based rule."""
+
     rule_type: Literal["impossible_travel", "cross_border", "sanctioned_country"]
     threshold_kmh: float = 900.0  # For impossible travel
 
@@ -84,32 +90,33 @@ class GeoConfig:
 class RuleDefinition:
     """
     Complete rule definition.
-    
+
     Can be loaded from YAML/JSON configuration.
     """
+
     id: str
     description: str
     type: RuleType
     action: RuleAction
     severity: RuleSeverity = RuleSeverity.HIGH
-    
+
     # Config by type (only one should be set)
     blocklist: Optional[BlocklistConfig] = None
     threshold: Optional[ThresholdConfig] = None
     expression: Optional[ExpressionConfig] = None
     velocity: Optional[VelocityConfig] = None
     geo: Optional[GeoConfig] = None
-    
+
     # Boost/override settings
     boost: float = 0.05
     max_boost: float = 0.20
     score_override: Optional[float] = None
-    
+
     # Metadata
     enabled: bool = True
     tags: list[str] = field(default_factory=list)
     metadata: dict = field(default_factory=dict)
-    
+
     def __post_init__(self):
         if isinstance(self.type, str):
             self.type = RuleType(self.type)
@@ -117,7 +124,7 @@ class RuleDefinition:
             self.action = RuleAction(self.action)
         if isinstance(self.severity, str):
             self.severity = RuleSeverity(self.severity)
-    
+
     def to_dict(self) -> dict:
         """Serialize to dictionary for YAML/JSON output."""
         result = {
@@ -132,10 +139,10 @@ class RuleDefinition:
             "tags": self.tags,
             "metadata": self.metadata,
         }
-        
+
         if self.score_override is not None:
             result["score_override"] = self.score_override
-        
+
         if self.blocklist:
             result["blocklist"] = {
                 "entity": self.blocklist.entity,
@@ -161,9 +168,9 @@ class RuleDefinition:
                 "rule_type": self.geo.rule_type,
                 "threshold_kmh": self.geo.threshold_kmh,
             }
-        
+
         return result
-    
+
     @classmethod
     def from_dict(cls, data: dict) -> "RuleDefinition":
         """Deserialize from dictionary."""
@@ -178,7 +185,7 @@ class RuleDefinition:
             data["velocity"] = VelocityConfig(**data["velocity"])
         if "geo" in data:
             data["geo"] = GeoConfig(**data["geo"])
-        
+
         return cls(**data)
 
 
@@ -336,24 +343,25 @@ def load_ruleset_from_file(path: str = None) -> list[RuleDefinition]:
     import yaml
     import json
     from pathlib import Path
-    
+
     path = Path(path or DEFAULT_RULES_PATH)
     if not path.exists():
         raise FileNotFoundError(f"Rules file not found: {path}")
-    
+
     with open(path) as f:
         if path.suffix in (".yaml", ".yml"):
             data = yaml.safe_load(f)
         elif path.suffix == ".json":
             import json
+
             data = json.load(f)
         else:
             raise ValueError(f"Unsupported file format: {path.suffix}")
-    
+
     rules = []
     for rule_data in data.get("rules", []):
         rules.append(RuleDefinition.from_dict(rule_data))
-    
+
     return rules
 
 
@@ -362,11 +370,11 @@ def save_ruleset_to_file(rules: list[RuleDefinition], path: str = None) -> None:
     import yaml
     import json
     from pathlib import Path
-    
+
     path = Path(path or DEFAULT_RULES_PATH)
     path.parent.mkdir(parents=True, exist_ok=True)
     data = {"rules": [r.to_dict() for r in rules]}
-    
+
     with open(path, "w") as f:
         if path.suffix in (".yaml", ".yml"):
             yaml.dump(data, f, default_flow_style=False, sort_keys=False)

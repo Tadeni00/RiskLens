@@ -17,6 +17,7 @@ class OnlineMeanVariance:
     Welford's online algorithm for mean and variance.
     Numerically stable single-pass algorithm.
     """
+
     count: int = 0
     mean: float = 0.0
     m2: float = 0.0  # Sum of squared differences from the mean
@@ -42,9 +43,13 @@ class OnlineMeanVariance:
         delta = other.mean - self.mean
         total_count = self.count + other.count
         self.mean = (self.count * self.mean + other.count * other.mean) / total_count
-        self.m2 = self.m2 + other.m2 + delta * delta * self.count * other.count / total_count
+        self.m2 = (
+            self.m2 + other.m2 + delta * delta * self.count * other.count / total_count
+        )
         self.count = total_count
-        self.m2 = self.m2 + other.m2 + delta * delta * self.count * other.count / total_count
+        self.m2 = (
+            self.m2 + other.m2 + delta * delta * self.count * other.count / total_count
+        )
 
     @property
     def variance(self) -> float:
@@ -71,6 +76,7 @@ class ExponentialMovingAverage:
     """
     Exponential Moving Average with configurable alpha.
     """
+
     alpha: float
     value: Optional[float] = None
 
@@ -90,6 +96,7 @@ class RollingWindow:
     """
     Fixed-size rolling window with efficient statistics.
     """
+
     max_size: int
     values: list = field(default_factory=list)
     _sum: float = 0.0
@@ -162,6 +169,7 @@ class CountMinSketch:
     Count-Min Sketch for frequency estimation with bounded memory.
     Useful for high-cardinality frequency estimation.
     """
+
     width: int
     depth: int
     _table: list = field(default_factory=list)
@@ -181,13 +189,17 @@ class CountMinSketch:
             self._table[i][idx] += count
 
     def estimate(self, item: str) -> int:
-        return min(self._table[i][self._hash(item, self._hash_seeds[i])] for i in range(self.depth))
+        return min(
+            self._table[i][self._hash(item, self._hash_seeds[i])]
+            for i in range(self.depth)
+        )
 
 
 class CircularBuffer:
     """
     Fixed-size circular buffer for time-series data.
     """
+
     def __init__(self, max_size: int):
         self.max_size = max_size
         self.data = [0.0] * max_size
@@ -204,13 +216,13 @@ class CircularBuffer:
 
     def get_values(self) -> list:
         if self.size < self.max_size:
-            return self.data[:self.size]
-        return self.data[self.head:] + self.data[:self.head]
+            return self.data[: self.size]
+        return self.data[self.head :] + self.data[: self.head]
 
     def get_timestamps(self) -> list:
         if self.size < self.max_size:
-            return self.timestamps[:self.size]
-        return self.timestamps[self.head:] + self.timestamps[:self.head]
+            return self.timestamps[: self.size]
+        return self.timestamps[self.head :] + self.timestamps[: self.head]
 
 
 def percentile(values: list, p: float) -> float:
@@ -244,5 +256,8 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
     delta_phi = math.radians(lat2 - lat1)
     delta_lambda = math.radians(lon2 - lon1)
-    a = math.sin(delta_phi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
+    a = (
+        math.sin(delta_phi / 2) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
+    )
     return 2 * R * math.asin(min(1.0, math.sqrt(a)))

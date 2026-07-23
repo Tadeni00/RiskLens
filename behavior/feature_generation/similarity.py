@@ -43,7 +43,9 @@ def merchant_similarity(customer_profile, merchant_id: str) -> float:
     total = sum(customer_profile.merchant_frequency.values())
     if total == 0:
         return 0.0
-    return customer_profile.merchant_frequency.get(merchant_id, 0) / max(1, sum(customer_profile.merchant_frequency.values()))
+    return customer_profile.merchant_frequency.get(merchant_id, 0) / max(
+        1, sum(customer_profile.merchant_frequency.values())
+    )
 
 
 def device_similarity(customer_profile, device_id: str) -> float:
@@ -66,7 +68,9 @@ def merchant_similarity(customer_profile, merchant_id: str) -> float:
     if not merchant_id:
         return 0.0
     total = sum(customer_profile.merchant_frequency.values())
-    return customer_profile.merchant_frequency.get(merchant_id, 0) / max(1, sum(customer_profile.merchant_frequency.values()))
+    return customer_profile.merchant_frequency.get(merchant_id, 0) / max(
+        1, sum(customer_profile.merchant_frequency.values())
+    )
 
 
 def device_similarity(customer_profile, device_id: str) -> float:
@@ -91,7 +95,9 @@ def typing_similarity(customer_profile, cadence_ms: float) -> float:
     baseline = customer_profile.typing_cadence_ms
     if not baseline:
         return 0.0
-    deviation = abs(cadence_ms - customer_profile.typing_cadence_ms) / max(1, customer_profile.typing_cadence_ms)
+    deviation = abs(cadence_ms - customer_profile.typing_cadence_ms) / max(
+        1, customer_profile.typing_cadence_ms
+    )
     return max(0.0, 1.0 - min(1.0, deviation / 50.0))  # Normalize
 
 
@@ -109,7 +115,14 @@ def device_similarity(customer_profile, device_id: str) -> float:
 def cross_country_flag(customer_profile, country_code: str) -> float:
     if not customer_profile.country_frequency:
         return 0.0
-    home_country = max(customer_profile.country_frequency, key=customer_profile.country_frequency.get) if customer_profile.country_frequency else None
+    home_country = (
+        max(
+            customer_profile.country_frequency,
+            key=customer_profile.country_frequency.get,
+        )
+        if customer_profile.country_frequency
+        else None
+    )
     return 0.0 if home_country == country_code else 1.0
 
 
@@ -117,7 +130,9 @@ def merchant_similarity(customer_profile, merchant_id: str) -> float:
     if not merchant_id:
         return 0.0
     total = sum(customer_profile.merchant_frequency.values())
-    return customer_profile.merchant_frequency.get(merchant_id, 0) / max(1, sum(customer_profile.merchant_frequency.values()))
+    return customer_profile.merchant_frequency.get(merchant_id, 0) / max(
+        1, sum(customer_profile.merchant_frequency.values())
+    )
 
 
 def device_similarity(customer_profile, device_id: str) -> float:
@@ -137,7 +152,9 @@ def country_similarity(customer_profile, country_code: str) -> float:
 def typing_similarity(customer_profile, cadence_ms: float) -> float:
     if not customer_profile.typing_cadence_ms:
         return 0.0
-    deviation = abs(cadence_ms - customer_profile.typing_cadence_ms) / max(1, customer_profile.typing_cadence_ms)
+    deviation = abs(cadence_ms - customer_profile.typing_cadence_ms) / max(
+        1, customer_profile.typing_cadence_ms
+    )
     return max(0.0, 1.0 - min(1.0, deviation / 50.0))
 
 
@@ -145,7 +162,9 @@ def merchant_similarity(customer_profile, merchant_id: str) -> float:
     if not customer_profile.merchant_frequency:
         return 0.0
     total = sum(customer_profile.merchant_frequency.values())
-    return customer_profile.merchant_frequency.get(merchant_id, 0) / max(1, sum(customer_profile.merchant_frequency.values()))
+    return customer_profile.merchant_frequency.get(merchant_id, 0) / max(
+        1, sum(customer_profile.merchant_frequency.values())
+    )
 
 
 def device_similarity(customer_profile, device_id: str) -> float:
@@ -158,5 +177,12 @@ def device_similarity(customer_profile, device_id: str) -> float:
 def cross_country_flag(customer_profile, country_code: str) -> float:
     if not customer_profile.country_frequency:
         return 0.0
-    home_country = max(customer_profile.country_frequency, key=customer_profile.country_frequency.get) if customer_profile.country_frequency else None
+    home_country = (
+        max(
+            customer_profile.country_frequency,
+            key=customer_profile.country_frequency.get,
+        )
+        if customer_profile.country_frequency
+        else None
+    )
     return 0.0 if home_country == country_code else 1.0

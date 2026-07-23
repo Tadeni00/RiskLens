@@ -2,6 +2,7 @@
 FraudTrap Dashboard — Behavior Intelligence Page
 Entity profiles and behavioral pattern analysis for fraud detection.
 """
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -26,8 +27,8 @@ from dashboard.theme.colors import Colors
 from dashboard.theme.icons import Icons
 from dashboard.theme.typography import Typography
 
-
 # ── Helpers ──────────────────────────────────────────────────────────────────
+
 
 def _section_heading(icon: str, title: str, color: str = Colors.ACCENT):
     st.markdown(
@@ -38,8 +39,13 @@ def _section_heading(icon: str, title: str, color: str = Colors.ACCENT):
     )
 
 
-def _profile_card(title: str, icon: str, metrics: dict, trust_score: float,
-                  bg_color: str = Colors.BG_CARD):
+def _profile_card(
+    title: str,
+    icon: str,
+    metrics: dict,
+    trust_score: float,
+    bg_color: str = Colors.BG_CARD,
+):
     metrics_html = ""
     for label, value in metrics.items():
         metrics_html += f"""
@@ -48,9 +54,14 @@ def _profile_card(title: str, icon: str, metrics: dict, trust_score: float,
     <span style="color:{Colors.TEXT_PRIMARY};font-size:{Typography.TEXT_SM};font-weight:{Typography.WEIGHT_MEDIUM}">{value}</span>
 </div>"""
 
-    trust_color = Colors.SUCCESS if trust_score >= 0.8 else Colors.WARNING if trust_score >= 0.6 else Colors.CRITICAL
+    trust_color = (
+        Colors.SUCCESS
+        if trust_score >= 0.8
+        else Colors.WARNING if trust_score >= 0.6 else Colors.CRITICAL
+    )
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
 <div style="background:{bg_color};border:1px solid {Colors.BORDER_DEFAULT};border-radius:10px;padding:20px;height:100%">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
         <div style="width:36px;height:36px;border-radius:8px;background:{Colors.rgba(Colors.ACCENT, 0.12)};display:flex;align-items:center;justify-content:center">
@@ -69,10 +80,13 @@ def _profile_card(title: str, icon: str, metrics: dict, trust_score: float,
         </div>
     </div>
 </div>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )
 
 
 # ── Main Render ──────────────────────────────────────────────────────────────
+
 
 def render(tenant_id: str):
     df = make_transactions(300)
@@ -85,38 +99,44 @@ def render(tenant_id: str):
     fraud_rate = df["is_fraud"].mean() * 100 if total_txn > 0 else 0.0
     avg_risk = float(df["risk_score"].mean()) if total_txn > 0 else 0.0
 
-    with page_container("Behavior Intelligence", "Entity profiles and behavioral pattern analysis", "ACTIVITY"):
+    with page_container(
+        "Behavior Intelligence",
+        "Entity profiles and behavioral pattern analysis",
+        "ACTIVITY",
+    ):
 
         # ── KPI Strip ─────────────────────────────────────────────────────────
-        kpi_row([
-            {
-                "label": "Transactions",
-                "value": f"{total_txn:,}",
-                "icon": "BAR_CHART",
-            },
-            {
-                "label": "Fraud Detected",
-                "value": f"{fraud_count:,}",
-                "icon": "ALERT_TRIANGLE",
-                "status": "warning",
-            },
-            {
-                "label": "Fraud Rate",
-                "value": f"{fraud_rate:.2f}%",
-                "status": "healthy" if fraud_rate < 2.0 else "warning",
-                "icon": "TARGET",
-            },
-            {
-                "label": "Avg Risk",
-                "value": f"{avg_risk:.4f}",
-                "icon": "SHIELD",
-            },
-            {
-                "label": "Channels",
-                "value": str(df["channel"].nunique()),
-                "icon": "LAYERS",
-            },
-        ])
+        kpi_row(
+            [
+                {
+                    "label": "Transactions",
+                    "value": f"{total_txn:,}",
+                    "icon": "BAR_CHART",
+                },
+                {
+                    "label": "Fraud Detected",
+                    "value": f"{fraud_count:,}",
+                    "icon": "ALERT_TRIANGLE",
+                    "status": "warning",
+                },
+                {
+                    "label": "Fraud Rate",
+                    "value": f"{fraud_rate:.2f}%",
+                    "status": "healthy" if fraud_rate < 2.0 else "warning",
+                    "icon": "TARGET",
+                },
+                {
+                    "label": "Avg Risk",
+                    "value": f"{avg_risk:.4f}",
+                    "icon": "SHIELD",
+                },
+                {
+                    "label": "Channels",
+                    "value": str(df["channel"].nunique()),
+                    "icon": "LAYERS",
+                },
+            ]
+        )
 
         section_divider()
 
@@ -135,7 +155,8 @@ def render(tenant_id: str):
 
         with col1:
             _profile_card(
-                "Customer Profile", "USER",
+                "Customer Profile",
+                "USER",
                 {
                     "Trust Score": f"{trust_customer:.1%}",
                     "Velocity (1h)": f"{int(rng.integers(2, 45))}",
@@ -147,7 +168,8 @@ def render(tenant_id: str):
 
         with col2:
             _profile_card(
-                "Merchant Profile", "BUILDING",
+                "Merchant Profile",
+                "BUILDING",
                 {
                     "Fraud Rate": f"{rng.uniform(0.5, 12.0):.1f}%",
                     "Customer Diversity": f"{int(rng.integers(20, 300))}",
@@ -159,7 +181,8 @@ def render(tenant_id: str):
 
         with col3:
             _profile_card(
-                "Device Profile", "CPU",
+                "Device Profile",
+                "CPU",
                 {
                     "Historical Customers": f"{int(rng.integers(1, 8))}",
                     "Risk Score": f"{trust_device:.4f}",
@@ -171,7 +194,8 @@ def render(tenant_id: str):
 
         with col4:
             _profile_card(
-                "Beneficiary Profile", "USERS",
+                "Beneficiary Profile",
+                "USERS",
                 {
                     "Sender Diversity": f"{int(rng.integers(2, 25))}",
                     "Mule Risk": f"{rng.uniform(0.01, 0.45):.1%}",
@@ -183,7 +207,8 @@ def render(tenant_id: str):
 
         with col5:
             _profile_card(
-                "Payment Instrument", "CREDIT_CARD",
+                "Payment Instrument",
+                "CREDIT_CARD",
                 {
                     "Fraud Count": f"{int(rng.integers(0, 5))}",
                     "Trust": f"{trust_instrument:.1%}",
@@ -225,11 +250,16 @@ def render(tenant_id: str):
             )
             fig_velocity.update_layout(
                 xaxis=dict(
-                    title=dict(text="Date", font=dict(size=12, color=Colors.TEXT_MUTED)),
+                    title=dict(
+                        text="Date", font=dict(size=12, color=Colors.TEXT_MUTED)
+                    ),
                     tickformat="%b %d",
                 ),
                 yaxis=dict(
-                    title=dict(text="Transaction Count", font=dict(size=12, color=Colors.TEXT_MUTED)),
+                    title=dict(
+                        text="Transaction Count",
+                        font=dict(size=12, color=Colors.TEXT_MUTED),
+                    ),
                 ),
             )
             st.plotly_chart(fig_velocity, use_container_width=True)
@@ -253,8 +283,17 @@ def render(tenant_id: str):
                 height=360,
             )
             fig_channel.update_layout(
-                xaxis=dict(title=dict(text="Channel", font=dict(size=12, color=Colors.TEXT_MUTED))),
-                yaxis=dict(title=dict(text="Transaction Count", font=dict(size=12, color=Colors.TEXT_MUTED))),
+                xaxis=dict(
+                    title=dict(
+                        text="Channel", font=dict(size=12, color=Colors.TEXT_MUTED)
+                    )
+                ),
+                yaxis=dict(
+                    title=dict(
+                        text="Transaction Count",
+                        font=dict(size=12, color=Colors.TEXT_MUTED),
+                    )
+                ),
                 bargap=0.25,
             )
             st.plotly_chart(fig_channel, use_container_width=True)
@@ -270,101 +309,152 @@ def render(tenant_id: str):
 
         with col_importance:
             features = [
-                "acct_v_1h_count", "amount_zscore", "is_new_device",
-                "impossible_travel", "geo_speed_kmh", "typing_zscore",
-                "acct_v_24h_total_amt", "device_account_count", "is_new_merchant",
+                "acct_v_1h_count",
+                "amount_zscore",
+                "is_new_device",
+                "impossible_travel",
+                "geo_speed_kmh",
+                "typing_zscore",
+                "acct_v_24h_total_amt",
+                "device_account_count",
+                "is_new_merchant",
                 "cross_country_flag",
             ]
-            importance = np.array([0.18, 0.15, 0.12, 0.10, 0.09, 0.08, 0.07, 0.06, 0.05, 0.04])
+            importance = np.array(
+                [0.18, 0.15, 0.12, 0.10, 0.09, 0.08, 0.07, 0.06, 0.05, 0.04]
+            )
 
             sorted_idx = np.argsort(importance)
             features_sorted = [features[i] for i in sorted_idx]
             importance_sorted = importance[sorted_idx]
 
             fig_importance = go.Figure()
-            fig_importance.add_trace(go.Bar(
-                y=features_sorted,
-                x=importance_sorted,
-                orientation="h",
-                marker=dict(
-                    color=Colors.CHART_PALETTE[:len(features_sorted)],
-                    cornerradius=4,
-                ),
-                text=[f"{v:.3f}" for v in importance_sorted],
-                textposition="outside",
-                textfont=dict(color=Colors.TEXT_SECONDARY, size=11),
-                hovertemplate="<b>%{y}</b><br>Importance: %{x:.4f}<extra></extra>",
-            ))
+            fig_importance.add_trace(
+                go.Bar(
+                    y=features_sorted,
+                    x=importance_sorted,
+                    orientation="h",
+                    marker=dict(
+                        color=Colors.CHART_PALETTE[: len(features_sorted)],
+                        cornerradius=4,
+                    ),
+                    text=[f"{v:.3f}" for v in importance_sorted],
+                    textposition="outside",
+                    textfont=dict(color=Colors.TEXT_SECONDARY, size=11),
+                    hovertemplate="<b>%{y}</b><br>Importance: %{x:.4f}<extra></extra>",
+                )
+            )
             fig_importance.update_layout(
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(family="'Inter', sans-serif", color=Colors.TEXT_SECONDARY, size=12),
+                font=dict(
+                    family="'Inter', sans-serif", color=Colors.TEXT_SECONDARY, size=12
+                ),
                 margin=dict(l=0, r=40, t=32, b=0),
                 height=380,
-                title=dict(text="Top 10 Behavioral Features", font=dict(size=14, color=Colors.TEXT_PRIMARY)),
+                title=dict(
+                    text="Top 10 Behavioral Features",
+                    font=dict(size=14, color=Colors.TEXT_PRIMARY),
+                ),
                 xaxis=dict(
-                    showgrid=True, gridcolor=Colors.BORDER_SUBTLE, gridwidth=1,
-                    showline=False, zeroline=False,
+                    showgrid=True,
+                    gridcolor=Colors.BORDER_SUBTLE,
+                    gridwidth=1,
+                    showline=False,
+                    zeroline=False,
                     tickfont=dict(color=Colors.TEXT_MUTED, size=11),
-                    title=dict(text="Importance", font=dict(size=12, color=Colors.TEXT_MUTED)),
+                    title=dict(
+                        text="Importance", font=dict(size=12, color=Colors.TEXT_MUTED)
+                    ),
                 ),
                 yaxis=dict(
-                    showgrid=False, showline=False,
+                    showgrid=False,
+                    showline=False,
                     tickfont=dict(color=Colors.TEXT_MUTED, size=11),
                 ),
                 hoverlabel=dict(
-                    bgcolor=Colors.BG_ELEVATED, bordercolor=Colors.BORDER_DEFAULT,
+                    bgcolor=Colors.BG_ELEVATED,
+                    bordercolor=Colors.BORDER_DEFAULT,
                     font=dict(color=Colors.TEXT_PRIMARY, size=12),
                 ),
             )
             st.plotly_chart(fig_importance, use_container_width=True)
 
         with col_distribution:
-            fraud_amounts = df[df["is_fraud"] == 1]["amount"].clip(upper=df["amount"].quantile(0.99))
-            legit_amounts = df[df["is_fraud"] == 0]["amount"].clip(upper=df["amount"].quantile(0.99))
+            fraud_amounts = df[df["is_fraud"] == 1]["amount"].clip(
+                upper=df["amount"].quantile(0.99)
+            )
+            legit_amounts = df[df["is_fraud"] == 0]["amount"].clip(
+                upper=df["amount"].quantile(0.99)
+            )
 
             fig_dist = go.Figure()
-            fig_dist.add_trace(go.Histogram(
-                x=legit_amounts,
-                name="Legitimate",
-                marker=dict(color=Colors.CHART_2, cornerradius=2),
-                opacity=0.7,
-                nbinsx=30,
-            ))
-            fig_dist.add_trace(go.Histogram(
-                x=fraud_amounts,
-                name="Fraud",
-                marker=dict(color=Colors.CHART_4, cornerradius=2),
-                opacity=0.7,
-                nbinsx=30,
-            ))
+            fig_dist.add_trace(
+                go.Histogram(
+                    x=legit_amounts,
+                    name="Legitimate",
+                    marker=dict(color=Colors.CHART_2, cornerradius=2),
+                    opacity=0.7,
+                    nbinsx=30,
+                )
+            )
+            fig_dist.add_trace(
+                go.Histogram(
+                    x=fraud_amounts,
+                    name="Fraud",
+                    marker=dict(color=Colors.CHART_4, cornerradius=2),
+                    opacity=0.7,
+                    nbinsx=30,
+                )
+            )
             fig_dist.update_layout(
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(family="'Inter', sans-serif", color=Colors.TEXT_SECONDARY, size=12),
+                font=dict(
+                    family="'Inter', sans-serif", color=Colors.TEXT_SECONDARY, size=12
+                ),
                 margin=dict(l=0, r=0, t=32, b=0),
                 height=380,
                 barmode="overlay",
-                title=dict(text="Feature Distribution by Class", font=dict(size=14, color=Colors.TEXT_PRIMARY)),
+                title=dict(
+                    text="Feature Distribution by Class",
+                    font=dict(size=14, color=Colors.TEXT_PRIMARY),
+                ),
                 xaxis=dict(
-                    showgrid=True, gridcolor=Colors.BORDER_SUBTLE, gridwidth=1,
-                    showline=False, zeroline=False,
+                    showgrid=True,
+                    gridcolor=Colors.BORDER_SUBTLE,
+                    gridwidth=1,
+                    showline=False,
+                    zeroline=False,
                     tickfont=dict(color=Colors.TEXT_MUTED, size=11),
-                    title=dict(text="Transaction Amount", font=dict(size=12, color=Colors.TEXT_MUTED)),
+                    title=dict(
+                        text="Transaction Amount",
+                        font=dict(size=12, color=Colors.TEXT_MUTED),
+                    ),
                 ),
                 yaxis=dict(
-                    showgrid=True, gridcolor=Colors.BORDER_SUBTLE, gridwidth=1,
-                    showline=False, zeroline=False,
+                    showgrid=True,
+                    gridcolor=Colors.BORDER_SUBTLE,
+                    gridwidth=1,
+                    showline=False,
+                    zeroline=False,
                     tickfont=dict(color=Colors.TEXT_MUTED, size=11),
-                    title=dict(text="Count", font=dict(size=12, color=Colors.TEXT_MUTED)),
+                    title=dict(
+                        text="Count", font=dict(size=12, color=Colors.TEXT_MUTED)
+                    ),
                 ),
                 legend=dict(
                     font=dict(color=Colors.TEXT_SECONDARY, size=11),
                     bgcolor="rgba(0,0,0,0)",
-                    orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1,
                 ),
                 hoverlabel=dict(
-                    bgcolor=Colors.BG_ELEVATED, bordercolor=Colors.BORDER_DEFAULT,
+                    bgcolor=Colors.BG_ELEVATED,
+                    bordercolor=Colors.BORDER_DEFAULT,
                     font=dict(color=Colors.TEXT_PRIMARY, size=12),
                 ),
             )
@@ -391,51 +481,79 @@ def render(tenant_id: str):
             ]
 
             fig_network = go.Figure()
-            fig_network.add_trace(go.Scatter(
-                x=entity_x,
-                y=entity_y,
-                mode="markers",
-                marker=dict(
-                    size=entity_size.tolist(),
-                    color=entity_risk.tolist(),
-                    colorscale=[[0, Colors.SUCCESS], [0.5, Colors.WARNING], [1, Colors.CRITICAL]],
-                    showscale=True,
-                    colorbar=dict(
-                        title=dict(text="Risk", font=dict(size=10, color=Colors.TEXT_MUTED)),
-                        tickfont=dict(size=9, color=Colors.TEXT_MUTED),
-                        thickness=12,
-                        len=0.6,
+            fig_network.add_trace(
+                go.Scatter(
+                    x=entity_x,
+                    y=entity_y,
+                    mode="markers",
+                    marker=dict(
+                        size=entity_size.tolist(),
+                        color=entity_risk.tolist(),
+                        colorscale=[
+                            [0, Colors.SUCCESS],
+                            [0.5, Colors.WARNING],
+                            [1, Colors.CRITICAL],
+                        ],
+                        showscale=True,
+                        colorbar=dict(
+                            title=dict(
+                                text="Risk", font=dict(size=10, color=Colors.TEXT_MUTED)
+                            ),
+                            tickfont=dict(size=9, color=Colors.TEXT_MUTED),
+                            thickness=12,
+                            len=0.6,
+                        ),
+                        opacity=0.8,
+                        line=dict(width=1, color=Colors.BG_CARD),
                     ),
-                    opacity=0.8,
-                    line=dict(width=1, color=Colors.BG_CARD),
-                ),
-                text=entity_labels,
-                hovertemplate="<b>%{text}</b><br>Risk: %{marker.color:.4f}<br>Position: (%{x:.1f}, %{y:.1f})<extra></extra>",
-            ))
+                    text=entity_labels,
+                    hovertemplate="<b>%{text}</b><br>Risk: %{marker.color:.4f}<br>Position: (%{x:.1f}, %{y:.1f})<extra></extra>",
+                )
+            )
 
             for i in range(min(20, n_entities)):
                 j = rng.integers(0, n_entities)
                 if i != j:
-                    fig_network.add_trace(go.Scatter(
-                        x=[entity_x[i], entity_x[j]],
-                        y=[entity_y[i], entity_y[j]],
-                        mode="lines",
-                        line=dict(color=Colors.rgba(Colors.BORDER_DEFAULT, 0.3), width=1),
-                        showlegend=False,
-                        hoverinfo="skip",
-                    ))
+                    fig_network.add_trace(
+                        go.Scatter(
+                            x=[entity_x[i], entity_x[j]],
+                            y=[entity_y[i], entity_y[j]],
+                            mode="lines",
+                            line=dict(
+                                color=Colors.rgba(Colors.BORDER_DEFAULT, 0.3), width=1
+                            ),
+                            showlegend=False,
+                            hoverinfo="skip",
+                        )
+                    )
 
             fig_network.update_layout(
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(family="'Inter', sans-serif", color=Colors.TEXT_SECONDARY, size=12),
+                font=dict(
+                    family="'Inter', sans-serif", color=Colors.TEXT_SECONDARY, size=12
+                ),
                 margin=dict(l=0, r=0, t=32, b=0),
                 height=380,
-                title=dict(text="Customer-Merchant Relationship Network", font=dict(size=14, color=Colors.TEXT_PRIMARY)),
-                xaxis=dict(showgrid=False, showline=False, zeroline=False, tickfont=dict(color=Colors.TEXT_MUTED, size=11)),
-                yaxis=dict(showgrid=False, showline=False, zeroline=False, tickfont=dict(color=Colors.TEXT_MUTED, size=11)),
+                title=dict(
+                    text="Customer-Merchant Relationship Network",
+                    font=dict(size=14, color=Colors.TEXT_PRIMARY),
+                ),
+                xaxis=dict(
+                    showgrid=False,
+                    showline=False,
+                    zeroline=False,
+                    tickfont=dict(color=Colors.TEXT_MUTED, size=11),
+                ),
+                yaxis=dict(
+                    showgrid=False,
+                    showline=False,
+                    zeroline=False,
+                    tickfont=dict(color=Colors.TEXT_MUTED, size=11),
+                ),
                 hoverlabel=dict(
-                    bgcolor=Colors.BG_ELEVATED, bordercolor=Colors.BORDER_DEFAULT,
+                    bgcolor=Colors.BG_ELEVATED,
+                    bordercolor=Colors.BORDER_DEFAULT,
                     font=dict(color=Colors.TEXT_PRIMARY, size=12),
                 ),
                 showlegend=False,
@@ -445,47 +563,68 @@ def render(tenant_id: str):
         with col_risk_amount:
             risk_x = df["risk_score"].values
             risk_y = df["amount"].values
-            risk_colors = df["is_fraud"].map({0: Colors.CHART_2, 1: Colors.CHART_4}).values
+            risk_colors = (
+                df["is_fraud"].map({0: Colors.CHART_2, 1: Colors.CHART_4}).values
+            )
             risk_text = [
                 f"Txn: {row['transaction_id']}<br>Channel: {row['channel']}<br>Fraud: {'Yes' if row['is_fraud'] else 'No'}"
                 for _, row in df.iterrows()
             ]
 
             fig_risk = go.Figure()
-            fig_risk.add_trace(go.Scatter(
-                x=risk_x,
-                y=risk_y,
-                mode="markers",
-                marker=dict(
-                    size=8,
-                    color=risk_colors.tolist(),
-                    opacity=0.6,
-                    line=dict(width=1, color=Colors.BG_CARD),
-                ),
-                text=risk_text,
-                hovertemplate="%{text}<br>Risk: %{x:.4f}<br>Amount: %{y:,.2f}<extra></extra>",
-            ))
+            fig_risk.add_trace(
+                go.Scatter(
+                    x=risk_x,
+                    y=risk_y,
+                    mode="markers",
+                    marker=dict(
+                        size=8,
+                        color=risk_colors.tolist(),
+                        opacity=0.6,
+                        line=dict(width=1, color=Colors.BG_CARD),
+                    ),
+                    text=risk_text,
+                    hovertemplate="%{text}<br>Risk: %{x:.4f}<br>Amount: %{y:,.2f}<extra></extra>",
+                )
+            )
             fig_risk.update_layout(
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(family="'Inter', sans-serif", color=Colors.TEXT_SECONDARY, size=12),
+                font=dict(
+                    family="'Inter', sans-serif", color=Colors.TEXT_SECONDARY, size=12
+                ),
                 margin=dict(l=0, r=0, t=32, b=0),
                 height=380,
-                title=dict(text="Risk Score vs Transaction Amount", font=dict(size=14, color=Colors.TEXT_PRIMARY)),
+                title=dict(
+                    text="Risk Score vs Transaction Amount",
+                    font=dict(size=14, color=Colors.TEXT_PRIMARY),
+                ),
                 xaxis=dict(
-                    showgrid=True, gridcolor=Colors.BORDER_SUBTLE, gridwidth=1,
-                    showline=False, zeroline=False,
+                    showgrid=True,
+                    gridcolor=Colors.BORDER_SUBTLE,
+                    gridwidth=1,
+                    showline=False,
+                    zeroline=False,
                     tickfont=dict(color=Colors.TEXT_MUTED, size=11),
-                    title=dict(text="Risk Score", font=dict(size=12, color=Colors.TEXT_MUTED)),
+                    title=dict(
+                        text="Risk Score", font=dict(size=12, color=Colors.TEXT_MUTED)
+                    ),
                 ),
                 yaxis=dict(
-                    showgrid=True, gridcolor=Colors.BORDER_SUBTLE, gridwidth=1,
-                    showline=False, zeroline=False,
+                    showgrid=True,
+                    gridcolor=Colors.BORDER_SUBTLE,
+                    gridwidth=1,
+                    showline=False,
+                    zeroline=False,
                     tickfont=dict(color=Colors.TEXT_MUTED, size=11),
-                    title=dict(text="Transaction Amount", font=dict(size=12, color=Colors.TEXT_MUTED)),
+                    title=dict(
+                        text="Transaction Amount",
+                        font=dict(size=12, color=Colors.TEXT_MUTED),
+                    ),
                 ),
                 hoverlabel=dict(
-                    bgcolor=Colors.BG_ELEVATED, bordercolor=Colors.BORDER_DEFAULT,
+                    bgcolor=Colors.BG_ELEVATED,
+                    bordercolor=Colors.BORDER_DEFAULT,
                     font=dict(color=Colors.TEXT_PRIMARY, size=12),
                 ),
             )
@@ -515,22 +654,28 @@ def render(tenant_id: str):
                 height=340,
             )
             fig_trust.add_hline(
-                y=0.7, line=dict(color=Colors.WARNING, width=1, dash="dash"),
+                y=0.7,
+                line=dict(color=Colors.WARNING, width=1, dash="dash"),
                 annotation_text="Warning Threshold",
                 annotation=dict(font=dict(size=10, color=Colors.WARNING)),
             )
             fig_trust.add_hline(
-                y=0.9, line=dict(color=Colors.SUCCESS, width=1, dash="dash"),
+                y=0.9,
+                line=dict(color=Colors.SUCCESS, width=1, dash="dash"),
                 annotation_text="High Trust",
                 annotation=dict(font=dict(size=10, color=Colors.SUCCESS)),
             )
             fig_trust.update_layout(
                 xaxis=dict(
-                    title=dict(text="Date", font=dict(size=12, color=Colors.TEXT_MUTED)),
+                    title=dict(
+                        text="Date", font=dict(size=12, color=Colors.TEXT_MUTED)
+                    ),
                     tickformat="%b %d",
                 ),
                 yaxis=dict(
-                    title=dict(text="Trust Score", font=dict(size=12, color=Colors.TEXT_MUTED)),
+                    title=dict(
+                        text="Trust Score", font=dict(size=12, color=Colors.TEXT_MUTED)
+                    ),
                     range=[0.45, 1.05],
                 ),
             )
@@ -538,11 +683,15 @@ def render(tenant_id: str):
 
         with col_velocity_history:
             n_hours = 72
-            hist_hours = pd.date_range(end=pd.Timestamp.now(), periods=n_hours, freq="h")
+            hist_hours = pd.date_range(
+                end=pd.Timestamp.now(), periods=n_hours, freq="h"
+            )
             base_velocity = 120
             velocity_wave = 30 * np.sin(np.linspace(0, 4 * np.pi, n_hours))
             velocity_noise = rng.poisson(15, n_hours)
-            velocity_values = np.clip(base_velocity + velocity_wave + velocity_noise, 0, None)
+            velocity_values = np.clip(
+                base_velocity + velocity_wave + velocity_noise, 0, None
+            )
 
             fig_velocity_hist = line_chart(
                 x=hist_hours,
@@ -553,12 +702,17 @@ def render(tenant_id: str):
             )
             fig_velocity_hist.update_layout(
                 xaxis=dict(
-                    title=dict(text="Hour", font=dict(size=12, color=Colors.TEXT_MUTED)),
+                    title=dict(
+                        text="Hour", font=dict(size=12, color=Colors.TEXT_MUTED)
+                    ),
                     tickformat="%b %d %H:%M",
                     dtick=12,
                 ),
                 yaxis=dict(
-                    title=dict(text="Transactions / Hour", font=dict(size=12, color=Colors.TEXT_MUTED)),
+                    title=dict(
+                        text="Transactions / Hour",
+                        font=dict(size=12, color=Colors.TEXT_MUTED),
+                    ),
                 ),
             )
             st.plotly_chart(fig_velocity_hist, use_container_width=True)
@@ -570,22 +724,91 @@ def render(tenant_id: str):
         # ══════════════════════════════════════════════════════════════════════
         _section_heading("1F4CA", "Behavior Summary")
 
-        metric_row([
-            {"label": "Avg Trust Score", "value": f"{np.mean([trust_customer, trust_merchant, trust_device, trust_beneficiary, trust_instrument]):.1%}", "color": Colors.ACCENT, "icon": "STAR"},
-            {"label": "High Risk Entities", "value": f"{int(rng.integers(3, 18))}", "color": Colors.CRITICAL, "icon": "ALERT_TRIANGLE"},
-            {"label": "Velocity Peak", "value": f"{int(velocity_values.max())}/hr", "color": Colors.WARNING, "icon": "TRENDING_UP"},
-            {"label": "Feature Coverage", "value": f"{len(features)} features", "color": Colors.SUCCESS, "icon": "LAYERS"},
-        ])
+        metric_row(
+            [
+                {
+                    "label": "Avg Trust Score",
+                    "value": f"{np.mean([trust_customer, trust_merchant, trust_device, trust_beneficiary, trust_instrument]):.1%}",
+                    "color": Colors.ACCENT,
+                    "icon": "STAR",
+                },
+                {
+                    "label": "High Risk Entities",
+                    "value": f"{int(rng.integers(3, 18))}",
+                    "color": Colors.CRITICAL,
+                    "icon": "ALERT_TRIANGLE",
+                },
+                {
+                    "label": "Velocity Peak",
+                    "value": f"{int(velocity_values.max())}/hr",
+                    "color": Colors.WARNING,
+                    "icon": "TRENDING_UP",
+                },
+                {
+                    "label": "Feature Coverage",
+                    "value": f"{len(features)} features",
+                    "color": Colors.SUCCESS,
+                    "icon": "LAYERS",
+                },
+            ]
+        )
 
         st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
 
-        summary_df = pd.DataFrame([
-            {"Entity": "Customer", "Trust Score": f"{trust_customer:.1%}", "Risk Level": "Low" if trust_customer > 0.8 else "Medium" if trust_customer > 0.6 else "High", "Status": "Active"},
-            {"Entity": "Merchant", "Trust Score": f"{trust_merchant:.1%}", "Risk Level": "Low" if trust_merchant > 0.8 else "Medium" if trust_merchant > 0.6 else "High", "Status": "Active"},
-            {"Entity": "Device", "Trust Score": f"{trust_device:.1%}", "Risk Level": "Low" if trust_device > 0.8 else "Medium" if trust_device > 0.6 else "High", "Status": "Active"},
-            {"Entity": "Beneficiary", "Trust Score": f"{trust_beneficiary:.1%}", "Risk Level": "Low" if trust_beneficiary > 0.8 else "Medium" if trust_beneficiary > 0.6 else "High", "Status": "Active"},
-            {"Entity": "Payment Instrument", "Trust Score": f"{trust_instrument:.1%}", "Risk Level": "Low" if trust_instrument > 0.8 else "Medium" if trust_instrument > 0.6 else "High", "Status": "Active"},
-        ])
+        summary_df = pd.DataFrame(
+            [
+                {
+                    "Entity": "Customer",
+                    "Trust Score": f"{trust_customer:.1%}",
+                    "Risk Level": (
+                        "Low"
+                        if trust_customer > 0.8
+                        else "Medium" if trust_customer > 0.6 else "High"
+                    ),
+                    "Status": "Active",
+                },
+                {
+                    "Entity": "Merchant",
+                    "Trust Score": f"{trust_merchant:.1%}",
+                    "Risk Level": (
+                        "Low"
+                        if trust_merchant > 0.8
+                        else "Medium" if trust_merchant > 0.6 else "High"
+                    ),
+                    "Status": "Active",
+                },
+                {
+                    "Entity": "Device",
+                    "Trust Score": f"{trust_device:.1%}",
+                    "Risk Level": (
+                        "Low"
+                        if trust_device > 0.8
+                        else "Medium" if trust_device > 0.6 else "High"
+                    ),
+                    "Status": "Active",
+                },
+                {
+                    "Entity": "Beneficiary",
+                    "Trust Score": f"{trust_beneficiary:.1%}",
+                    "Risk Level": (
+                        "Low"
+                        if trust_beneficiary > 0.8
+                        else "Medium" if trust_beneficiary > 0.6 else "High"
+                    ),
+                    "Status": "Active",
+                },
+                {
+                    "Entity": "Payment Instrument",
+                    "Trust Score": f"{trust_instrument:.1%}",
+                    "Risk Level": (
+                        "Low"
+                        if trust_instrument > 0.8
+                        else "Medium" if trust_instrument > 0.6 else "High"
+                    ),
+                    "Status": "Active",
+                },
+            ]
+        )
 
         data_table(
             df=summary_df,

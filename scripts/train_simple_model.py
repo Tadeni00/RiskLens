@@ -9,7 +9,6 @@ import pandas as pd
 
 from scoring.simple_model import SimpleFraudModel
 
-
 FEATURES = [
     "amount",
     "amount_log",
@@ -40,7 +39,9 @@ def sigmoid(z: np.ndarray) -> np.ndarray:
     return 1.0 / (1.0 + np.exp(-np.clip(z, -30, 30)))
 
 
-def train_logistic(X: np.ndarray, y: np.ndarray, epochs: int, lr: float) -> tuple[np.ndarray, float]:
+def train_logistic(
+    X: np.ndarray, y: np.ndarray, epochs: int, lr: float
+) -> tuple[np.ndarray, float]:
     weights = np.zeros(X.shape[1], dtype=np.float32)
     bias = 0.0
     pos_weight = max(float((y == 0).sum()) / max(float((y == 1).sum()), 1.0), 1.0)
@@ -62,11 +63,15 @@ def build_calibration(raw_scores: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     for i in range(1, len(raw)):
         if raw[i] <= raw[i - 1]:
             raw[i] = np.nextafter(raw[i - 1], np.float32(np.inf))
-    calibrated = np.array([0.01, 0.08, 0.18, 0.35, 0.50, 0.68, 0.85, 0.93, 0.99], dtype=np.float32)
+    calibrated = np.array(
+        [0.01, 0.08, 0.18, 0.35, 0.50, 0.68, 0.85, 0.93, 0.99], dtype=np.float32
+    )
     return raw, calibrated
 
 
-def train_tenant(tenant: str, data_dir: Path, model_dir: Path, epochs: int, lr: float) -> Path:
+def train_tenant(
+    tenant: str, data_dir: Path, model_dir: Path, epochs: int, lr: float
+) -> Path:
     data_path = data_dir / tenant / "features.parquet"
     if not data_path.exists():
         raise FileNotFoundError(f"Missing training data: {data_path}")
@@ -116,7 +121,9 @@ def train_tenant(tenant: str, data_dir: Path, model_dir: Path, epochs: int, lr: 
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train lightweight FraudTrap serving models")
+    parser = argparse.ArgumentParser(
+        description="Train lightweight FraudTrap serving models"
+    )
     parser.add_argument("--tenant", action="append", help="Tenant to train; repeatable")
     parser.add_argument("--all-tenants", action="store_true")
     parser.add_argument("--data-dir", default="artifacts/data")
@@ -130,7 +137,9 @@ def main() -> None:
         tenants = ["bank_ng_gtb", "bank_ke_equity", "fintech_za_yoco"]
 
     for tenant in tenants:
-        train_tenant(tenant, Path(args.data_dir), Path(args.model_dir), args.epochs, args.lr)
+        train_tenant(
+            tenant, Path(args.data_dir), Path(args.model_dir), args.epochs, args.lr
+        )
 
 
 if __name__ == "__main__":

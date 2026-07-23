@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class BehavioralIntelligenceIntegration:
     """
     Integration layer between Behavioral Intelligence Layer and existing FraudTrap components.
-    
+
     This module handles the integration points between the Behavioral Intelligence Layer
     and the existing FraudTrap components:
     - Cold Start (Phase 1)
@@ -35,21 +35,24 @@ class BehavioralIntelligenceIntegration:
     - Rules Engine
     - Scoring Orchestrator
     """
-    
+
     def __init__(self):
         self._behavior_engine = None
         self._initialized = False
-    
+
     def initialize(self, feature_store=None):
         """Initialize the behavioral intelligence integration."""
-        from behavior.services.behavior_engine import BehaviorEngine, BehaviorEngineConfig
+        from behavior.services.behavior_engine import (
+            BehaviorEngine,
+            BehaviorEngineConfig,
+        )
         from behavior.storage.redis_store import get_feature_store
-        
+
         if self._initialized:
             return
-        
+
         feature_store = get_feature_store()
-        
+
         config = BehaviorEngineConfig(
             feature_store=get_feature_store(),
             enable_behavioral_features=True,
@@ -58,33 +61,39 @@ class BehavioralIntelligenceIntegration:
             enable_novelty_detection=True,
             enable_similarity_features=True,
         )
-        
-        from behavior.services.behavior_engine import BehaviorEngine, BehaviorEngineConfig
-        self._behavior_engine = BehaviorEngine(BehaviorEngineConfig(
-            feature_store=None,  # Will use get_feature_store()
-            enable_behavioral_features=True,
-            enable_velocity_features=True,
-            enable_trust_scoring=True,
-            enable_novelty_detection=True,
-            enable_similarity_features=True,
-        ))
+
+        from behavior.services.behavior_engine import (
+            BehaviorEngine,
+            BehaviorEngineConfig,
+        )
+
+        self._behavior_engine = BehaviorEngine(
+            BehaviorEngineConfig(
+                feature_store=None,  # Will use get_feature_store()
+                enable_behavioral_features=True,
+                enable_velocity_features=True,
+                enable_trust_scoring=True,
+                enable_novelty_detection=True,
+                enable_similarity_features=True,
+            )
+        )
         self._initialized = True
-    
+
     def enhance_cold_start_features(self, transaction, features: dict) -> dict:
         """
         Enhance Phase 1 (Cold Start) features with behavioral features.
-        
+
         The VAE, Isolation Forest, and Tail Detector now receive:
         - Original engineered features
         + Behavioral features (velocity, trust scores, similarity, novelty)
         """
         from behavior.feature_generation.generator import generate_behavioral_features
         from behavior.storage.redis_store import get_feature_store
-        
+
         feature_store = get_feature_store()
         if feature_store is None:
             return {}
-        
+
         try:
             # This would need the transaction object and profiles
             # For now, return empty dict as placeholder
@@ -92,49 +101,51 @@ class BehavioralIntelligenceIntegration:
         except Exception as e:
             logger.warning("Cold-start behavioral feature enhancement failed: %s", e)
             return {}
-    
+
     def enhance_semi_supervised_features(self, transaction, features: dict) -> dict:
         """
         Enhance Phase 2 (Semi-Supervised) features with behavioral features.
-        
+
         Uses pseudo-labels from Cold Start + behavioral features to train
         the XGBoost model in the SemiSupervisedBridge.
         """
         # Generate behavioral features
         behavioral_features = self._generate_behavioral_features_for_transaction({})
-        
+
         # Merge with existing features
         return {**features, **behavioral_features}
-    
+
     def enhance_supervised_features(self, transaction, features: dict) -> dict:
         """
         Enhance Phase 3 (Supervised) features with behavioral features.
-        
+
         The supervised model learns interactions like:
         - High amount + New device + High velocity + New beneficiary = Very high fraud probability
         """
         # Generate behavioral features
         behavioral_features = {}
-        
+
         # Merge with supervised features
         return {**features, **behavioral_features}
-    
+
     def _generate_behavioral_features(self, transaction):
         """Generate behavioral features for a transaction."""
         # Placeholder - actual implementation would use feature store
         return {}
-    
+
     def get_behavioral_features_for_scoring(self, transaction, feature_store):
         """
         Generate behavioral features for a transaction during scoring.
-        
+
         This is called from the scoring orchestrator to enhance features
         with behavioral intelligence before model scoring.
         """
         try:
-            from behavior.feature_generation.generator import generate_behavioral_features
+            from behavior.feature_generation.generator import (
+                generate_behavioral_features,
+            )
             from behavior.storage.redis_store import get_feature_store
-            
+
             feature_store = get_feature_store()
             return generate_behavioral_features(
                 transaction=transaction,

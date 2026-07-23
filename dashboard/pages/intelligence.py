@@ -2,6 +2,7 @@
 FraudTrap Dashboard — Risk Intelligence Page
 Fraud pattern analysis, geographic risk mapping, and entity-level risk leaderboards.
 """
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -25,11 +26,16 @@ from dashboard.components.data_loader import make_transactions, currency_fmt
 from dashboard.theme.colors import Colors
 from dashboard.theme.typography import Typography
 
-
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 RISK_BUCKETS = ["Very Low", "Low", "Medium", "High", "Very High"]
-RISK_COLORS = [Colors.SUCCESS, Colors.CHART_7, Colors.WARNING, Colors.CHART_8, Colors.CRITICAL]
+RISK_COLORS = [
+    Colors.SUCCESS,
+    Colors.CHART_7,
+    Colors.WARNING,
+    Colors.CHART_8,
+    Colors.CRITICAL,
+]
 
 COUNTRY_COORDS = {
     "NG": {"lat": 9.08, "lon": 8.67, "name": "Nigeria", "currency": "NGN"},
@@ -63,6 +69,7 @@ def _section_heading(icon: str, title: str, color: str = Colors.ACCENT):
 
 # ── Main Render ──────────────────────────────────────────────────────────────
 
+
 def render(tenant_id: str):
     df = make_transactions(500)
     if tenant_id != "all_tenants":
@@ -76,49 +83,53 @@ def render(tenant_id: str):
     blocked = int((df["decision"] == "BLOCK").sum())
     reviewed = int((df["decision"] == "REVIEW").sum())
 
-    with page_container("Risk Intelligence", "Fraud pattern analysis and risk assessment", "SHIELD"):
+    with page_container(
+        "Risk Intelligence", "Fraud pattern analysis and risk assessment", "SHIELD"
+    ):
 
         # ── KPI Strip ─────────────────────────────────────────────────────────
-        kpi_row([
-            {
-                "label": "Total Transactions",
-                "value": f"{total_txn:,}",
-                "trend": None,
-                "icon": "BAR_CHART",
-            },
-            {
-                "label": "Fraud Detected",
-                "value": f"{fraud_count:,}",
-                "trend": None,
-                "icon": "ALERT_TRIANGLE",
-                "status": "warning",
-            },
-            {
-                "label": "Fraud Rate",
-                "value": f"{fraud_rate:.2f}%",
-                "trend": None,
-                "status": "healthy" if fraud_rate < 2.0 else "warning",
-                "icon": "TARGET",
-            },
-            {
-                "label": "Avg Risk Score",
-                "value": f"{avg_risk:.4f}",
-                "trend": None,
-                "icon": "SHIELD",
-            },
-            {
-                "label": "Blocked",
-                "value": f"{blocked:,}",
-                "trend": None,
-                "icon": "X",
-            },
-            {
-                "label": "Under Review",
-                "value": f"{reviewed:,}",
-                "trend": None,
-                "icon": "EYE",
-            },
-        ])
+        kpi_row(
+            [
+                {
+                    "label": "Total Transactions",
+                    "value": f"{total_txn:,}",
+                    "trend": None,
+                    "icon": "BAR_CHART",
+                },
+                {
+                    "label": "Fraud Detected",
+                    "value": f"{fraud_count:,}",
+                    "trend": None,
+                    "icon": "ALERT_TRIANGLE",
+                    "status": "warning",
+                },
+                {
+                    "label": "Fraud Rate",
+                    "value": f"{fraud_rate:.2f}%",
+                    "trend": None,
+                    "status": "healthy" if fraud_rate < 2.0 else "warning",
+                    "icon": "TARGET",
+                },
+                {
+                    "label": "Avg Risk Score",
+                    "value": f"{avg_risk:.4f}",
+                    "trend": None,
+                    "icon": "SHIELD",
+                },
+                {
+                    "label": "Blocked",
+                    "value": f"{blocked:,}",
+                    "trend": None,
+                    "icon": "X",
+                },
+                {
+                    "label": "Under Review",
+                    "value": f"{reviewed:,}",
+                    "trend": None,
+                    "icon": "EYE",
+                },
+            ]
+        )
 
         section_divider()
 
@@ -131,37 +142,56 @@ def render(tenant_id: str):
 
         with col_hist:
             df["risk_bucket"] = df["risk_score"].apply(_bucket_risk)
-            bucket_counts = df["risk_bucket"].value_counts().reindex(RISK_BUCKETS, fill_value=0)
+            bucket_counts = (
+                df["risk_bucket"].value_counts().reindex(RISK_BUCKETS, fill_value=0)
+            )
 
-            fig_hist = go.Figure(go.Bar(
-                x=bucket_counts.index.tolist(),
-                y=bucket_counts.values.tolist(),
-                marker=dict(
-                    color=RISK_COLORS,
-                    cornerradius=4,
-                    line=dict(width=0),
-                ),
-                text=bucket_counts.values.tolist(),
-                textposition="outside",
-                textfont=dict(color=Colors.TEXT_SECONDARY, size=11),
-                hovertemplate="<b>%{x}</b><br>Count: %{y}<extra></extra>",
-            ))
+            fig_hist = go.Figure(
+                go.Bar(
+                    x=bucket_counts.index.tolist(),
+                    y=bucket_counts.values.tolist(),
+                    marker=dict(
+                        color=RISK_COLORS,
+                        cornerradius=4,
+                        line=dict(width=0),
+                    ),
+                    text=bucket_counts.values.tolist(),
+                    textposition="outside",
+                    textfont=dict(color=Colors.TEXT_SECONDARY, size=11),
+                    hovertemplate="<b>%{x}</b><br>Count: %{y}<extra></extra>",
+                )
+            )
             fig_hist.update_layout(
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(family="'Inter', sans-serif", color=Colors.TEXT_SECONDARY, size=12),
+                font=dict(
+                    family="'Inter', sans-serif", color=Colors.TEXT_SECONDARY, size=12
+                ),
                 margin=dict(l=0, r=0, t=32, b=0),
                 height=320,
-                xaxis=dict(showgrid=False, showline=False, tickfont=dict(color=Colors.TEXT_MUTED, size=11)),
-                yaxis=dict(
-                    showgrid=True, gridcolor=Colors.BORDER_SUBTLE, gridwidth=1,
-                    showline=False, zeroline=False,
+                xaxis=dict(
+                    showgrid=False,
+                    showline=False,
                     tickfont=dict(color=Colors.TEXT_MUTED, size=11),
-                    title=dict(text="Count", font=dict(size=12, color=Colors.TEXT_MUTED)),
                 ),
-                title=dict(text="Fraud Risk Distribution", font=dict(size=14, color=Colors.TEXT_PRIMARY)),
+                yaxis=dict(
+                    showgrid=True,
+                    gridcolor=Colors.BORDER_SUBTLE,
+                    gridwidth=1,
+                    showline=False,
+                    zeroline=False,
+                    tickfont=dict(color=Colors.TEXT_MUTED, size=11),
+                    title=dict(
+                        text="Count", font=dict(size=12, color=Colors.TEXT_MUTED)
+                    ),
+                ),
+                title=dict(
+                    text="Fraud Risk Distribution",
+                    font=dict(size=14, color=Colors.TEXT_PRIMARY),
+                ),
                 hoverlabel=dict(
-                    bgcolor=Colors.BG_ELEVATED, bordercolor=Colors.BORDER_DEFAULT,
+                    bgcolor=Colors.BG_ELEVATED,
+                    bordercolor=Colors.BORDER_DEFAULT,
                     font=dict(color=Colors.TEXT_PRIMARY, size=12),
                 ),
             )
@@ -173,53 +203,86 @@ def render(tenant_id: str):
                 country_txns = df[df["country_code"] == code]
                 if len(country_txns) == 0:
                     continue
-                geo_data.append({
-                    "country": info["name"],
-                    "lat": info["lat"],
-                    "lon": info["lon"],
-                    "fraud_count": int(country_txns["is_fraud"].sum()),
-                    "total": len(country_txns),
-                    "fraud_rate": round(country_txns["is_fraud"].mean() * 100, 2),
-                    "total_amount": float(country_txns["amount"].sum()),
-                    "currency": info.get("currency", "USD"),
-                })
+                geo_data.append(
+                    {
+                        "country": info["name"],
+                        "lat": info["lat"],
+                        "lon": info["lon"],
+                        "fraud_count": int(country_txns["is_fraud"].sum()),
+                        "total": len(country_txns),
+                        "fraud_rate": round(country_txns["is_fraud"].mean() * 100, 2),
+                        "total_amount": float(country_txns["amount"].sum()),
+                        "currency": info.get("currency", "USD"),
+                    }
+                )
 
-            geo_df = pd.DataFrame(geo_data) if geo_data else pd.DataFrame(columns=["country", "lat", "lon", "fraud_count", "total", "fraud_rate", "total_amount"])
+            geo_df = (
+                pd.DataFrame(geo_data)
+                if geo_data
+                else pd.DataFrame(
+                    columns=[
+                        "country",
+                        "lat",
+                        "lon",
+                        "fraud_count",
+                        "total",
+                        "fraud_rate",
+                        "total_amount",
+                    ]
+                )
+            )
 
             if not geo_df.empty:
-                fig_geo = go.Figure(go.Scattergeo(
-                    lon=geo_df["lon"],
-                    lat=geo_df["lat"],
-                    text=geo_df.apply(
-                        lambda r: (
-                            f"<b>{r['country']}</b><br>"
-                            f"Fraud: {r['fraud_count']:,} / {r['total']:,}<br>"
-                            f"Rate: {r['fraud_rate']:.2f}%<br>"
-                            f"Volume: {currency_fmt(r['total_amount'], r.get('currency', 'USD'))}"
-                        ), axis=1
-                    ),
-                    hoverinfo="text",
-                    marker=dict(
-                        size=geo_df["fraud_rate"].clip(lower=5).values.tolist(),
-                        color=geo_df["fraud_rate"].values.tolist(),
-                        colorscale=[[0, Colors.SUCCESS], [0.5, Colors.WARNING], [1, Colors.CRITICAL]],
-                        showscale=True,
-                        colorbar=dict(
-                            title=dict(text="Fraud %", font=dict(size=10, color=Colors.TEXT_MUTED)),
-                            tickfont=dict(size=9, color=Colors.TEXT_MUTED),
-                            thickness=12,
-                            len=0.6,
+                fig_geo = go.Figure(
+                    go.Scattergeo(
+                        lon=geo_df["lon"],
+                        lat=geo_df["lat"],
+                        text=geo_df.apply(
+                            lambda r: (
+                                f"<b>{r['country']}</b><br>"
+                                f"Fraud: {r['fraud_count']:,} / {r['total']:,}<br>"
+                                f"Rate: {r['fraud_rate']:.2f}%<br>"
+                                f"Volume: {currency_fmt(r['total_amount'], r.get('currency', 'USD'))}"
+                            ),
+                            axis=1,
                         ),
-                        line=dict(width=1, color=Colors.BORDER_DEFAULT),
-                        opacity=0.85,
-                    ),
-                ))
+                        hoverinfo="text",
+                        marker=dict(
+                            size=geo_df["fraud_rate"].clip(lower=5).values.tolist(),
+                            color=geo_df["fraud_rate"].values.tolist(),
+                            colorscale=[
+                                [0, Colors.SUCCESS],
+                                [0.5, Colors.WARNING],
+                                [1, Colors.CRITICAL],
+                            ],
+                            showscale=True,
+                            colorbar=dict(
+                                title=dict(
+                                    text="Fraud %",
+                                    font=dict(size=10, color=Colors.TEXT_MUTED),
+                                ),
+                                tickfont=dict(size=9, color=Colors.TEXT_MUTED),
+                                thickness=12,
+                                len=0.6,
+                            ),
+                            line=dict(width=1, color=Colors.BORDER_DEFAULT),
+                            opacity=0.85,
+                        ),
+                    )
+                )
                 fig_geo.update_layout(
                     paper_bgcolor="rgba(0,0,0,0)",
-                    font=dict(family="'Inter', sans-serif", color=Colors.TEXT_SECONDARY, size=12),
+                    font=dict(
+                        family="'Inter', sans-serif",
+                        color=Colors.TEXT_SECONDARY,
+                        size=12,
+                    ),
                     margin=dict(l=0, r=0, t=32, b=0),
                     height=320,
-                    title=dict(text="Geographic Fraud Map", font=dict(size=14, color=Colors.TEXT_PRIMARY)),
+                    title=dict(
+                        text="Geographic Fraud Map",
+                        font=dict(size=14, color=Colors.TEXT_PRIMARY),
+                    ),
                     geo=dict(
                         projection_type="natural earth",
                         showland=True,
@@ -268,7 +331,9 @@ def render(tenant_id: str):
             )
             fig_hourly.update_layout(
                 xaxis=dict(
-                    title=dict(text="Hour of Day", font=dict(size=12, color=Colors.TEXT_MUTED)),
+                    title=dict(
+                        text="Hour of Day", font=dict(size=12, color=Colors.TEXT_MUTED)
+                    ),
                     dtick=3,
                 ),
                 bargap=0.2,
@@ -308,7 +373,13 @@ def render(tenant_id: str):
                 categories=country_fraud["country"].tolist(),
                 values=country_fraud["fraud_count"].tolist(),
                 title="Fraud by Country",
-                colors=[Colors.CHART_1, Colors.CHART_2, Colors.CHART_3, Colors.CHART_4, Colors.CHART_5],
+                colors=[
+                    Colors.CHART_1,
+                    Colors.CHART_2,
+                    Colors.CHART_3,
+                    Colors.CHART_4,
+                    Colors.CHART_5,
+                ],
                 height=320,
             )
             st.plotly_chart(fig_country, use_container_width=True)
@@ -329,19 +400,26 @@ def render(tenant_id: str):
             for m in merchants:
                 m_txns = df[df["transaction_id"].str.startswith(m[:5], na=False)]
                 if m_txns.empty:
-                    m_txns = df.sample(n=max(1, int(len(df) * rng.uniform(0.01, 0.08))), random_state=42)
+                    m_txns = df.sample(
+                        n=max(1, int(len(df) * rng.uniform(0.01, 0.08))),
+                        random_state=42,
+                    )
                 fraud_rate_val = m_txns["is_fraud"].mean() * 100
                 avg_amt = m_txns["amount"].mean()
-                merchant_stats.append({
-                    "rank": 0,
-                    "name": m,
-                    "value": f"{fraud_rate_val:.1f}% fraud rate",
-                    "trend": round(float(rng.uniform(-5, 15)), 1),
-                    "badge": "HIGH RISK" if fraud_rate_val > 10 else None,
-                    "badge_type": "critical" if fraud_rate_val > 10 else "info",
-                })
+                merchant_stats.append(
+                    {
+                        "rank": 0,
+                        "name": m,
+                        "value": f"{fraud_rate_val:.1f}% fraud rate",
+                        "trend": round(float(rng.uniform(-5, 15)), 1),
+                        "badge": "HIGH RISK" if fraud_rate_val > 10 else None,
+                        "badge_type": "critical" if fraud_rate_val > 10 else "info",
+                    }
+                )
 
-            merchant_stats.sort(key=lambda x: float(x["value"].split("%")[0]), reverse=True)
+            merchant_stats.sort(
+                key=lambda x: float(x["value"].split("%")[0]), reverse=True
+            )
             for i, entry in enumerate(merchant_stats[:5]):
                 entry["rank"] = i + 1
 
@@ -355,22 +433,31 @@ def render(tenant_id: str):
 
         with col_cust:
             rng_cust = np.random.default_rng(99)
-            customers = [f"CUST-{i:06d}" for i in rng_cust.integers(100000, 999999, size=20)]
+            customers = [
+                f"CUST-{i:06d}" for i in rng_cust.integers(100000, 999999, size=20)
+            ]
             customer_stats = []
             for c in customers:
-                c_txns = df.sample(n=max(1, int(len(df) * rng_cust.uniform(0.01, 0.06))), random_state=99)
+                c_txns = df.sample(
+                    n=max(1, int(len(df) * rng_cust.uniform(0.01, 0.06))),
+                    random_state=99,
+                )
                 avg_risk_val = c_txns["risk_score"].mean()
                 txn_count = len(c_txns)
-                customer_stats.append({
-                    "rank": 0,
-                    "name": c,
-                    "value": f"{avg_risk_val:.4f} risk score",
-                    "trend": round(float(rng_cust.uniform(-3, 10)), 1),
-                    "badge": "CRITICAL" if avg_risk_val > 0.6 else None,
-                    "badge_type": "critical" if avg_risk_val > 0.6 else "info",
-                })
+                customer_stats.append(
+                    {
+                        "rank": 0,
+                        "name": c,
+                        "value": f"{avg_risk_val:.4f} risk score",
+                        "trend": round(float(rng_cust.uniform(-3, 10)), 1),
+                        "badge": "CRITICAL" if avg_risk_val > 0.6 else None,
+                        "badge_type": "critical" if avg_risk_val > 0.6 else "info",
+                    }
+                )
 
-            customer_stats.sort(key=lambda x: float(x["value"].split(" risk")[0]), reverse=True)
+            customer_stats.sort(
+                key=lambda x: float(x["value"].split(" risk")[0]), reverse=True
+            )
             for i, entry in enumerate(customer_stats[:5]):
                 entry["rank"] = i + 1
 
@@ -408,7 +495,9 @@ def render(tenant_id: str):
                 labels.append(f"{row['transaction_type']}")
                 parents.append("All Fraud")
                 values.append(int(row["fraud_count"]))
-                colors_list.append(Colors.CHART_PALETTE[len(labels) % len(Colors.CHART_PALETTE)])
+                colors_list.append(
+                    Colors.CHART_PALETTE[len(labels) % len(Colors.CHART_PALETTE)]
+                )
 
             unique_types = category_data["transaction_type"].unique()
             for tt in unique_types:
@@ -417,7 +506,9 @@ def render(tenant_id: str):
                     labels.append(f"{row['channel']}")
                     parents.append(f"{row['transaction_type']}")
                     values.append(int(row["fraud_count"]))
-                    colors_list.append(Colors.CHART_PALETTE[len(labels) % len(Colors.CHART_PALETTE)])
+                    colors_list.append(
+                        Colors.CHART_PALETTE[len(labels) % len(Colors.CHART_PALETTE)]
+                    )
 
             fig_treemap = treemap_chart(
                 labels=labels,
@@ -436,42 +527,67 @@ def render(tenant_id: str):
                 subset = df[df["decision"] == decision]["risk_score"]
                 if subset.empty:
                     continue
-                fig_box.add_trace(go.Box(
-                    y=subset,
-                    name=decision,
-                    marker=dict(
-                        color=[Colors.SUCCESS, Colors.WARNING, Colors.CRITICAL][i],
-                        outliercolor=[Colors.SUCCESS, Colors.WARNING, Colors.CRITICAL][i],
-                        size=4,
-                    ),
-                    line=dict(color=[Colors.SUCCESS, Colors.WARNING, Colors.CRITICAL][i], width=1.5),
-                    boxpoints="outliers",
-                ))
+                fig_box.add_trace(
+                    go.Box(
+                        y=subset,
+                        name=decision,
+                        marker=dict(
+                            color=[Colors.SUCCESS, Colors.WARNING, Colors.CRITICAL][i],
+                            outliercolor=[
+                                Colors.SUCCESS,
+                                Colors.WARNING,
+                                Colors.CRITICAL,
+                            ][i],
+                            size=4,
+                        ),
+                        line=dict(
+                            color=[Colors.SUCCESS, Colors.WARNING, Colors.CRITICAL][i],
+                            width=1.5,
+                        ),
+                        boxpoints="outliers",
+                    )
+                )
 
             fig_box.update_layout(
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(family="'Inter', sans-serif", color=Colors.TEXT_SECONDARY, size=12),
+                font=dict(
+                    family="'Inter', sans-serif", color=Colors.TEXT_SECONDARY, size=12
+                ),
                 margin=dict(l=0, r=0, t=32, b=0),
                 height=380,
-                title=dict(text="Risk Score by Decision", font=dict(size=14, color=Colors.TEXT_PRIMARY)),
+                title=dict(
+                    text="Risk Score by Decision",
+                    font=dict(size=14, color=Colors.TEXT_PRIMARY),
+                ),
                 yaxis=dict(
-                    showgrid=True, gridcolor=Colors.BORDER_SUBTLE, gridwidth=1,
-                    showline=False, zeroline=False,
+                    showgrid=True,
+                    gridcolor=Colors.BORDER_SUBTLE,
+                    gridwidth=1,
+                    showline=False,
+                    zeroline=False,
                     tickfont=dict(color=Colors.TEXT_MUTED, size=11),
-                    title=dict(text="Risk Score", font=dict(size=12, color=Colors.TEXT_MUTED)),
+                    title=dict(
+                        text="Risk Score", font=dict(size=12, color=Colors.TEXT_MUTED)
+                    ),
                 ),
                 xaxis=dict(
-                    showgrid=False, showline=False,
+                    showgrid=False,
+                    showline=False,
                     tickfont=dict(color=Colors.TEXT_MUTED, size=11),
                 ),
                 legend=dict(
                     font=dict(color=Colors.TEXT_SECONDARY, size=11),
                     bgcolor="rgba(0,0,0,0)",
-                    orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1,
                 ),
                 hoverlabel=dict(
-                    bgcolor=Colors.BG_ELEVATED, bordercolor=Colors.BORDER_DEFAULT,
+                    bgcolor=Colors.BG_ELEVATED,
+                    bordercolor=Colors.BORDER_DEFAULT,
                     font=dict(color=Colors.TEXT_PRIMARY, size=12),
                 ),
                 boxmode="group",
@@ -485,23 +601,46 @@ def render(tenant_id: str):
         # ══════════════════════════════════════════════════════════════════════
         _section_heading("1F4CB", "Transaction Explorer")
 
-        metric_row([
-            {"label": "Total", "value": f"{total_txn:,}", "icon": "BAR_CHART"},
-            {"label": "Fraud", "value": f"{fraud_count:,}", "color": Colors.CRITICAL, "icon": "ALERT_TRIANGLE"},
-            {"label": "Clean", "value": f"{total_txn - fraud_count:,}", "color": Colors.SUCCESS, "icon": "CHECK"},
-        ])
+        metric_row(
+            [
+                {"label": "Total", "value": f"{total_txn:,}", "icon": "BAR_CHART"},
+                {
+                    "label": "Fraud",
+                    "value": f"{fraud_count:,}",
+                    "color": Colors.CRITICAL,
+                    "icon": "ALERT_TRIANGLE",
+                },
+                {
+                    "label": "Clean",
+                    "value": f"{total_txn - fraud_count:,}",
+                    "color": Colors.SUCCESS,
+                    "icon": "CHECK",
+                },
+            ]
+        )
 
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
         table_df = df.sort_values("risk_score", ascending=False).copy()
         table_df["time_str"] = table_df["timestamp"].dt.strftime("%Y-%m-%d %H:%M")
-        table_df["amount_str"] = table_df.apply(lambda r: currency_fmt(r["amount"], r.get("currency", "NGN")), axis=1)
+        table_df["amount_str"] = table_df.apply(
+            lambda r: currency_fmt(r["amount"], r.get("currency", "NGN")), axis=1
+        )
         table_df["score_str"] = table_df["risk_score"].apply(lambda x: f"{x:.4f}")
         table_df["fraud_label"] = table_df["is_fraud"].map({0: "Legit", 1: "Fraud"})
         table_df["latency_str"] = table_df["latency_ms"].apply(lambda x: f"{x:.0f}ms")
 
-        display_cols = ["transaction_id", "time_str", "amount_str", "channel", "country_code",
-                        "fraud_label", "score_str", "decision", "latency_str"]
+        display_cols = [
+            "transaction_id",
+            "time_str",
+            "amount_str",
+            "channel",
+            "country_code",
+            "fraud_label",
+            "score_str",
+            "decision",
+            "latency_str",
+        ]
 
         data_table(
             df=table_df[display_cols],

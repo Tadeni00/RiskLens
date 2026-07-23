@@ -30,7 +30,9 @@ class SimpleFraudModel:
             calibration_raw.astype(np.float32) if calibration_raw is not None else None
         )
         self.calibration_score = (
-            calibration_score.astype(np.float32) if calibration_score is not None else None
+            calibration_score.astype(np.float32)
+            if calibration_score is not None
+            else None
         )
         self.is_fitted = True
 
@@ -43,7 +45,9 @@ class SimpleFraudModel:
         raw = 1.0 / (1.0 + np.exp(-np.clip(logits, -30, 30)))
         if self.calibration_raw is None or self.calibration_score is None:
             return raw
-        return np.interp(raw, self.calibration_raw, self.calibration_score).astype(np.float32)
+        return np.interp(raw, self.calibration_raw, self.calibration_score).astype(
+            np.float32
+        )
 
     def save(self, path: Path) -> None:
         path = Path(path)

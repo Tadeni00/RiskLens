@@ -3,6 +3,7 @@ FraudTrap — Model Registry for Champion-Challenger Architecture
 Manages model registration, versioning, promotion, rollback, and archival.
 Supports the Champion-Challenger supervised learning architecture.
 """
+
 from __future__ import annotations
 import json
 import pickle
@@ -17,6 +18,7 @@ from loguru import logger
 
 class ModelStatus(str, Enum):
     """Model lifecycle status."""
+
     CHAMPION = "champion"
     CHALLENGER = "challenger"
     ARCHIVED = "archived"
@@ -26,6 +28,7 @@ class ModelStatus(str, Enum):
 
 class PromotionStatus(str, Enum):
     """Promotion request status."""
+
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
@@ -36,39 +39,40 @@ class PromotionStatus(str, Enum):
 @dataclass
 class ModelMetadata:
     """Model metadata for registry."""
+
     model_id: str
     version: str
     algorithm: str
     training_date: str
     dataset_version: str
     feature_version: str
-    
+
     # Performance metrics
     pr_auc: float = 0.0
     roc_auc: float = 0.0
     f2_score: float = 0.0
     fpr: float = 0.0
     calibration_error: float = 0.0
-    
+
     # Status
     status: ModelStatus = ModelStatus.CHALLENGER
     is_active: bool = False
-    
+
     # Metadata
     hyperparameters: Dict[str, Any] = field(default_factory=dict)
     calibration_method: str = "isotonic"
     description: str = ""
     created_by: str = "system"
-    
+
     # Timestamps
     created_at: str = ""
     promoted_at: Optional[str] = None
     archived_at: Optional[str] = None
-    
+
     def __post_init__(self):
         if not self.created_at:
             self.created_at = datetime.now(timezone.utc).isoformat()
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
         return {
@@ -98,24 +102,25 @@ class ModelMetadata:
 @dataclass
 class PromotionRequest:
     """Promotion request for challenger → champion."""
+
     request_id: str
     challenger_id: str
     champion_id: str
     challenger_metrics: Dict[str, float]
     champion_metrics: Dict[str, float]
-    
+
     # Comparison results
     pr_auc_improvement: float = 0.0
     calibration_met: bool = False
     fpr_met: bool = False
-    
+
     # Status
     status: PromotionStatus = PromotionStatus.PENDING
     reviewer: str = ""
     review_notes: str = ""
     created_at: str = ""
     reviewed_at: Optional[str] = None
-    
+
     def __post_init__(self):
         if not self.created_at:
             self.created_at = datetime.now(timezone.utc).isoformat()
@@ -124,7 +129,7 @@ class PromotionRequest:
 class ModelRegistry:
     """
     Model Registry for Champion-Challenger architecture.
-    
+
     Manages:
     - Model registration and versioning
     - Champion/Challenger status tracking
@@ -132,24 +137,28 @@ class ModelRegistry:
     - Model archival and rollback
     - Feature/dataset version pinning
     """
-    
+
     def __init__(self, registry_dir: Path = None):
         """
         Initialize model registry.
-        
+
         Args:
             registry_dir: Directory to store registry data
         """
-        self.registry_dir = Path(registry_dir) if registry_dir else Path("models/supervised/registry_data")
+        self.registry_dir = (
+            Path(registry_dir)
+            if registry_dir
+            else Path("models/supervised/registry_data")
+        )
         self.registry_dir.mkdir(parents=True, exist_ok=True)
-        
+
         self._models: Dict[str, ModelMetadata] = {}
         self._promotion_requests: List[PromotionRequest] = []
         self._champion_id: Optional[str] = None
-        
+
         # Load existing registry
         self._load_registry()
-    
+
     def register(
         self,
         model_id: str,
@@ -166,7 +175,7 @@ class ModelRegistry:
     ) -> ModelMetadata:
         """
         Register a new model in the registry.
-        
+
         Args:
             model_id: Unique model identifier
             version: Model version string
@@ -179,7 +188,7 @@ class ModelRegistry:
             calibration_method: Calibration method used
             description: Model description
             created_by: Who created this model
-        
+
         Returns:
             ModelMetadata object
         """
@@ -201,21 +210,24 @@ class ModelRegistry:
             description=description,
             created_by=created_by,
         )
-        
+
         self._models[model_id] = metadata
         self._save_registry()
-        
+
         logger.info(
             "Model registered: {} (version={}, algorithm={}, pr_auc={:.4f})",
-            model_id, version, algorithm, metadata.pr_auc
+            model_id,
+            version,
+            algorithm,
+            metadata.pr_auc,
         )
-        
+
         return metadata
-    
+
     def get_model(self, model_id: str) -> Optional[ModelMetadata]:
         """Get model metadata by ID."""
         return self._models.get(model_id)
-    
+
     def list_models(
         self,
         status: Optional[ModelStatus] = None,
@@ -224,28 +236,28 @@ class ModelRegistry:
     ) -> List[ModelMetadata]:
         """
         List models with optional filtering.
-        
+
         Args:
             status: Filter by status
             algorithm: Filter by algorithm
             limit: Maximum number of results
-        
+
         Returns:
             List of ModelMetadata objects
         """
         models = list(self._models.values())
-        
+
         if status:
             models = [m for m in models if m.status == status]
-        
+
         if algorithm:
             models = [m for m in models if m.algorithm.lower() == algorithm.lower()]
-        
+
         # Sort by creation date (newest first)
         models.sort(key=lambda x: x.created_at, reverse=True)
-        
+
         return models[:limit]
-    
+
     def promote(
         self,
         model_id: str,
@@ -255,13 +267,13 @@ class ModelRegistry:
     ) -> Optional[PromotionRequest]:
         """
         Request promotion of a challenger to champion.
-        
+
         Args:
             model_id: Challenger model ID
             champion_id: Current champion ID (if None, uses current champion)
             reviewer: Who approved the promotion
             notes: Review notes
-        
+
         Returns:
             PromotionRequest object
         """
@@ -269,12 +281,12 @@ class ModelRegistry:
         if not challenger:
             logger.warning("Challenger model not found: {}", model_id)
             return None
-        
+
         if champion_id:
             champion = self._models.get(champion_id)
         else:
             champion = self.get_champion()
-        
+
         if not champion:
             # No current champion — auto-promote as first champion
             logger.info("No current champion, promoting {} as first champion", model_id)
@@ -282,7 +294,7 @@ class ModelRegistry:
             challenger.is_active = True
             challenger.promoted_at = datetime.now(timezone.utc).isoformat()
             self._champion_id = model_id
-            
+
             request = PromotionRequest(
                 request_id=f"promo_{model_id}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
                 challenger_id=model_id,
@@ -307,19 +319,15 @@ class ModelRegistry:
             self._save_registry()
             logger.info("First champion promoted: {}", model_id)
             return request
-        
+
         # Compare metrics
         pr_auc_improvement = challenger.pr_auc - champion.pr_auc
         calibration_met = challenger.calibration_error <= champion.calibration_error
         fpr_met = challenger.fpr <= champion.fpr
-        
+
         # Determine if promotion should be recommended
-        should_promote = (
-            pr_auc_improvement > 0 and
-            calibration_met and
-            fpr_met
-        )
-        
+        should_promote = pr_auc_improvement > 0 and calibration_met and fpr_met
+
         request = PromotionRequest(
             request_id=f"promo_{model_id}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
             challenger_id=model_id,
@@ -341,62 +349,69 @@ class ModelRegistry:
             pr_auc_improvement=pr_auc_improvement,
             calibration_met=calibration_met,
             fpr_met=fpr_met,
-            status=PromotionStatus.APPROVED if should_promote else PromotionStatus.PENDING,
+            status=(
+                PromotionStatus.APPROVED if should_promote else PromotionStatus.PENDING
+            ),
             reviewer=reviewer,
             review_notes=notes,
         )
-        
+
         self._promotion_requests.append(request)
-        
+
         # Auto-approve if metrics meet criteria
         if should_promote:
             self._execute_promotion(model_id, request)
-        
+
         self._save_registry()
-        
+
         logger.info(
             "Promotion request created: {} (pr_auc_improvement={:.4f}, approved={})",
-            request.request_id, pr_auc_improvement, should_promote
+            request.request_id,
+            pr_auc_improvement,
+            should_promote,
         )
-        
+
         return request
-    
+
     def _execute_promotion(self, challenger_id: str, request: PromotionRequest) -> None:
         """Execute the promotion (challenger becomes champion)."""
         challenger = self._models.get(challenger_id)
         if not challenger:
             return
-        
+
         # Demote current champion
         old_champion = self.get_champion()
         if old_champion:
             old_champion.status = ModelStatus.CHALLENGER
             old_champion.is_active = False
             logger.info("Old champion demoted: {}", old_champion.model_id)
-        
+
         # Promote challenger
         challenger.status = ModelStatus.CHAMPION
         challenger.is_active = True
         challenger.promoted_at = datetime.now(timezone.utc).isoformat()
         self._champion_id = challenger_id
-        
+
         request.status = PromotionStatus.COMPLETED
         request.reviewed_at = datetime.now(timezone.utc).isoformat()
-        
+
         logger.info(
             "Model promoted to champion: {} (version={})",
-            challenger_id, challenger.version
+            challenger_id,
+            challenger.version,
         )
-    
-    def rollback(self, champion_id: str = None, reviewer: str = "system", notes: str = "") -> bool:
+
+    def rollback(
+        self, champion_id: str = None, reviewer: str = "system", notes: str = ""
+    ) -> bool:
         """
         Rollback champion to previous version.
-        
+
         Args:
             champion_id: Champion ID to rollback (if None, uses current)
             reviewer: Who approved the rollback
             notes: Rollback reason
-        
+
         Returns:
             True if rollback successful
         """
@@ -404,51 +419,53 @@ class ModelRegistry:
             current_champion = self._models.get(champion_id)
         else:
             current_champion = self.get_champion()
-        
+
         if not current_champion:
             logger.warning("No champion to rollback")
             return False
-        
+
         # Find previous champion (most recent promoted champion)
         previous_champions = [
-            m for m in self._models.values()
+            m
+            for m in self._models.values()
             if m.status == ModelStatus.CHALLENGER and m.promoted_at is not None
         ]
-        
+
         if not previous_champions:
             logger.warning("No previous champion to rollback to")
             return False
-        
+
         # Sort by promoted_at (most recent first)
         previous_champions.sort(key=lambda x: x.promoted_at, reverse=True)
         previous_champion = previous_champions[0]
-        
+
         # Demote current champion
         current_champion.status = ModelStatus.ARCHIVED
         current_champion.is_active = False
         current_champion.archived_at = datetime.now(timezone.utc).isoformat()
-        
+
         # Restore previous champion
         previous_champion.status = ModelStatus.CHAMPION
         previous_champion.is_active = True
         self._champion_id = previous_champion.model_id
-        
+
         logger.info(
             "Champion rolled back: {} → {}",
-            current_champion.model_id, previous_champion.model_id
+            current_champion.model_id,
+            previous_champion.model_id,
         )
-        
+
         self._save_registry()
         return True
-    
+
     def archive(self, model_id: str, notes: str = "") -> bool:
         """
         Archive a model.
-        
+
         Args:
             model_id: Model ID to archive
             notes: Archive reason
-        
+
         Returns:
             True if successful
         """
@@ -456,26 +473,28 @@ class ModelRegistry:
         if not model:
             logger.warning("Model not found: {}", model_id)
             return False
-        
+
         if model.status == ModelStatus.CHAMPION:
-            logger.warning("Cannot archive champion model. Promote another model first.")
+            logger.warning(
+                "Cannot archive champion model. Promote another model first."
+            )
             return False
-        
+
         model.status = ModelStatus.ARCHIVED
         model.archived_at = datetime.now(timezone.utc).isoformat()
-        
+
         logger.info("Model archived: {} ({})", model_id, notes)
         self._save_registry()
         return True
-    
+
     def retire(self, model_id: str, notes: str = "") -> bool:
         """
         Retire a model (permanent archival).
-        
+
         Args:
             model_id: Model ID to retire
             notes: Retirement reason
-        
+
         Returns:
             True if successful
         """
@@ -483,43 +502,41 @@ class ModelRegistry:
         if not model:
             logger.warning("Model not found: {}", model_id)
             return False
-        
+
         if model.status == ModelStatus.CHAMPION:
             logger.warning("Cannot retire champion model. Promote another model first.")
             return False
-        
+
         model.status = ModelStatus.RETIRED
         model.archived_at = datetime.now(timezone.utc).isoformat()
-        
+
         logger.info("Model retired: {} ({})", model_id, notes)
         self._save_registry()
         return True
-    
+
     def get_champion(self) -> Optional[ModelMetadata]:
         """Get current champion model."""
         if self._champion_id:
             return self._models.get(self._champion_id)
-        
+
         # Find champion by status
         for model in self._models.values():
             if model.status == ModelStatus.CHAMPION:
                 self._champion_id = model.model_id
                 return model
-        
+
         return None
-    
+
     def get_challengers(self, algorithm: Optional[str] = None) -> List[ModelMetadata]:
         """Get all challenger models."""
         return self.list_models(status=ModelStatus.CHALLENGER, algorithm=algorithm)
-    
+
     def get_promotion_history(self, limit: int = 50) -> List[PromotionRequest]:
         """Get promotion request history."""
         return sorted(
-            self._promotion_requests,
-            key=lambda x: x.created_at,
-            reverse=True
+            self._promotion_requests, key=lambda x: x.created_at, reverse=True
         )[:limit]
-    
+
     def compare_models(
         self,
         model_id_1: str,
@@ -527,20 +544,20 @@ class ModelRegistry:
     ) -> Dict[str, Any]:
         """
         Compare two models side-by-side.
-        
+
         Args:
             model_id_1: First model ID
             model_id_2: Second model ID
-        
+
         Returns:
             Comparison dictionary
         """
         model1 = self._models.get(model_id_1)
         model2 = self._models.get(model_id_2)
-        
+
         if not model1 or not model2:
             return {"error": "One or both models not found"}
-        
+
         return {
             "model_1": {
                 "model_id": model1.model_id,
@@ -569,14 +586,15 @@ class ModelRegistry:
                 "roc_auc_diff": model1.roc_auc - model2.roc_auc,
                 "f2_diff": model1.f2_score - model2.f2_score,
                 "fpr_diff": model1.fpr - model2.fpr,
-                "calibration_error_diff": model1.calibration_error - model2.calibration_error,
+                "calibration_error_diff": model1.calibration_error
+                - model2.calibration_error,
             },
         }
-    
+
     def _save_registry(self) -> None:
         """Save registry to disk."""
         registry_file = self.registry_dir / "registry.json"
-        
+
         data = {
             "champion_id": self._champion_id,
             "models": {k: v.to_dict() for k, v in self._models.items()},
@@ -593,26 +611,26 @@ class ModelRegistry:
             ],
             "saved_at": datetime.now(timezone.utc).isoformat(),
         }
-        
+
         with open(registry_file, "w") as f:
             json.dump(data, f, indent=2)
-        
+
         logger.debug("Registry saved to {}", registry_file)
-    
+
     def _load_registry(self) -> None:
         """Load registry from disk."""
         registry_file = self.registry_dir / "registry.json"
-        
+
         if not registry_file.exists():
             logger.info("No existing registry found, starting fresh")
             return
-        
+
         try:
             with open(registry_file, "r") as f:
                 data = json.load(f)
-            
+
             self._champion_id = data.get("champion_id")
-            
+
             # Load models
             for model_id, model_data in data.get("models", {}).items():
                 metadata = ModelMetadata(
@@ -638,7 +656,7 @@ class ModelRegistry:
                     archived_at=model_data.get("archived_at"),
                 )
                 self._models[model_id] = metadata
-            
+
             # Load promotion requests
             for req_data in data.get("promotion_requests", []):
                 request = PromotionRequest(
@@ -650,29 +668,36 @@ class ModelRegistry:
                     reviewed_at=req_data.get("reviewed_at"),
                 )
                 self._promotion_requests.append(request)
-            
+
             logger.info(
                 "Registry loaded: {} models, champion={}",
-                len(self._models), self._champion_id
+                len(self._models),
+                self._champion_id,
             )
-        
+
         except Exception as exc:
             logger.error("Failed to load registry: {}", exc)
-    
+
     def get_stats(self) -> Dict[str, Any]:
         """Get registry statistics."""
-        champions = [m for m in self._models.values() if m.status == ModelStatus.CHAMPION]
-        challengers = [m for m in self._models.values() if m.status == ModelStatus.CHALLENGER]
-        archived = [m for m in self._models.values() if m.status == ModelStatus.ARCHIVED]
+        champions = [
+            m for m in self._models.values() if m.status == ModelStatus.CHAMPION
+        ]
+        challengers = [
+            m for m in self._models.values() if m.status == ModelStatus.CHALLENGER
+        ]
+        archived = [
+            m for m in self._models.values() if m.status == ModelStatus.ARCHIVED
+        ]
         retired = [m for m in self._models.values() if m.status == ModelStatus.RETIRED]
-        
+
         algorithms = {}
         for model in self._models.values():
             alg = model.algorithm.lower()
             if alg not in algorithms:
                 algorithms[alg] = 0
             algorithms[alg] += 1
-        
+
         return {
             "total_models": len(self._models),
             "champions": len(champions),

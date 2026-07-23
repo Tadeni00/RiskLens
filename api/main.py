@@ -6,6 +6,7 @@ Enforces 90ms scoring SLA. Emits audit events to Kafka.
 Run locally:
     uvicorn api.main:app --reload --port 8000
 """
+
 from __future__ import annotations
 import uuid
 from contextlib import asynccontextmanager
@@ -29,16 +30,14 @@ settings = get_settings()
 
 # ── Prometheus metrics ─────────────────────────────────────────────────────────
 REQUEST_COUNT = Counter(
-    "fraudtrap_requests_total", "Total scoring requests",
-    ["tenant_id", "decision"]
+    "fraudtrap_requests_total", "Total scoring requests", ["tenant_id", "decision"]
 )
 LATENCY_HIST = Histogram(
-    "fraudtrap_latency_ms", "Scoring latency (ms)",
-    buckets=[10, 25, 50, 75, 90, 100, 150, 200]
+    "fraudtrap_latency_ms",
+    "Scoring latency (ms)",
+    buckets=[10, 25, 50, 75, 90, 100, 150, 200],
 )
-LABEL_COUNT = Counter(
-    "fraudtrap_labels_received_total", "Labels received", ["source"]
-)
+LABEL_COUNT = Counter("fraudtrap_labels_received_total", "Labels received", ["source"])
 
 # ── Global singleton ──────────────────────────────────────────────────────────
 _orchestrator: Optional[ScoringOrchestrator] = None
@@ -50,7 +49,7 @@ async def lifespan(app: FastAPI):
     logger.info("FraudTrap API starting up …")
     _orchestrator = ScoringOrchestrator()
     _orchestrator.registry.load_from_disk(Path(settings.model_dir))
-    _orchestrator._get_redis()          # warm up Redis connection
+    _orchestrator._get_redis()  # warm up Redis connection
     logger.info("ScoringOrchestrator ready")
     yield
     logger.info("FraudTrap API shutting down …")
@@ -115,9 +114,7 @@ async def score_transaction(txn: TransactionRequest) -> ScoringResponse:
     try:
         response = _orchestrator.score(txn)
 
-        REQUEST_COUNT.labels(
-            tenant_id=txn.tenant_id, decision=response.decision
-        ).inc()
+        REQUEST_COUNT.labels(tenant_id=txn.tenant_id, decision=response.decision).inc()
         LATENCY_HIST.observe(response.latency_ms)
 
         return response
@@ -152,6 +149,7 @@ async def ingest_label(label: LabelPayload):
 
     try:
         from ingestion.kafka_client import FraudTrapProducer
+
         producer = FraudTrapProducer()
         producer.connect()
         producer.emit(
@@ -165,7 +163,10 @@ async def ingest_label(label: LabelPayload):
 
     logger.info(
         "Label received: txn={} tenant={} label={} source={}",
-        label.transaction_id, label.tenant_id, label.label, label.label_source,
+        label.transaction_id,
+        label.tenant_id,
+        label.label,
+        label.label_source,
     )
     return {"status": "accepted", "transaction_id": label.transaction_id}
 
@@ -186,14 +187,17 @@ async def get_phase_status(tenant_id: str):
         tenant_phase = "SUPERVISED"
 
     return {
-        "tenant_id":     tenant_id,
+        "tenant_id": tenant_id,
         "current_phase": tenant_phase,
         "model_version": registry.get_model_version(tenant_id),
         "loaded_models": {
-            "cold_start":     tenant_id in registry.cold_start_models or registry.cold_start is not None,
-            "semi_supervised": tenant_id in registry.semi_supervised_models or registry.semi_supervised is not None,
-            "supervised":     tenant_id in registry.supervised_models or registry.supervised is not None,
-            "simple_model":   tenant_id in registry.simple_models,
+            "cold_start": tenant_id in registry.cold_start_models
+            or registry.cold_start is not None,
+            "semi_supervised": tenant_id in registry.semi_supervised_models
+            or registry.semi_supervised is not None,
+            "supervised": tenant_id in registry.supervised_models
+            or registry.supervised is not None,
+            "simple_model": tenant_id in registry.simple_models,
         },
         "available_model_tenants": {
             "cold_start": sorted(registry.cold_start_models),
@@ -221,17 +225,17 @@ async def get_explanation(trace_id: str):
                     "explanation": explanation,
                     "transaction_id": score.get("transaction_id"),
                     "risk_score": score.get("risk_score"),
-                    "decision": score.get("decision")
+                    "decision": score.get("decision"),
                 }
             else:
                 return {
                     "trace_id": trace_id,
-                    "message": "Transaction found, but no explanation was stored."
+                    "message": "Transaction found, but no explanation was stored.",
                 }
-                
+
     return {
         "trace_id": trace_id,
-        "message": "Trace ID not found in recent scores cache."
+        "message": "Trace ID not found in recent scores cache.",
     }
 
 
@@ -239,74 +243,86 @@ async def get_explanation(trace_id: str):
 @app.get("/v1/drift/{tenant_id}", tags=["ops"])
 async def get_drift(tenant_id: str):
     """
-    Returns real-time drift metrics (PSI) by comparing the oldest half of 
+    Returns real-time drift metrics (PSI) by comparing the oldest half of
     recent scores (baseline) against the newest half (current).
     """
     import numpy as np
 
     all_scores = _orchestrator.recent_scores(limit=5000)
-    
+
     if tenant_id and tenant_id != "all_tenants":
         scores = [s for s in all_scores if s.get("tenant_id") == tenant_id]
     else:
         scores = all_scores
 
     if len(scores) < 100:
-        return {"status": "insufficient_data", "message": "Need at least 100 transactions to compute drift"}
+        return {
+            "status": "insufficient_data",
+            "message": "Need at least 100 transactions to compute drift",
+        }
 
     # Sort scores by time (oldest first)
     # The cache might be reverse chronological, so let's parse timestamp and sort
     def parse_ts(s):
         ts = s.get("scored_at", s.get("timestamp"))
-        if not ts: return ""
+        if not ts:
+            return ""
         return str(ts)
-        
+
     scores = sorted(scores, key=parse_ts)
-    
+
     midpoint = len(scores) // 2
     baseline = scores[:midpoint]
     current = scores[midpoint:]
 
     features_to_monitor = [
-        "amount", "acct_v_1h_count", "acct_v_24h_total_amt", 
-        "geo_speed_kmh", "typing_zscore", "device_account_count"
+        "amount",
+        "acct_v_1h_count",
+        "acct_v_24h_total_amt",
+        "geo_speed_kmh",
+        "typing_zscore",
+        "device_account_count",
     ]
-    
+
     drift_data = {}
-    
+
     for feat in features_to_monitor:
-        base_vals = [float(s.get(feat, 0.0)) for s in baseline if s.get(feat) is not None]
-        curr_vals = [float(s.get(feat, 0.0)) for s in current if s.get(feat) is not None]
-        
+        base_vals = [
+            float(s.get(feat, 0.0)) for s in baseline if s.get(feat) is not None
+        ]
+        curr_vals = [
+            float(s.get(feat, 0.0)) for s in current if s.get(feat) is not None
+        ]
+
         if not base_vals or not curr_vals:
             continue
-            
+
         base_mean = float(np.mean(base_vals))
         curr_mean = float(np.mean(curr_vals))
-        
+
         # Simple PSI approximation
         # 1. Create decile bins based on baseline
         try:
             bins = np.percentile(base_vals, np.linspace(0, 100, 11))
             bins[0] -= 0.001  # avoid out of bounds
             bins[-1] += 0.001
-            
+
             base_counts, _ = np.histogram(base_vals, bins=bins)
             curr_counts, _ = np.histogram(curr_vals, bins=bins)
-            
+
             base_pct = base_counts / len(base_vals)
             curr_pct = curr_counts / len(curr_vals)
-            
+
             # Avoid division by zero and log(0)
             base_pct = np.clip(base_pct, 0.001, 1.0)
             curr_pct = np.clip(curr_pct, 0.001, 1.0)
-            
+
             psi = np.sum((curr_pct - base_pct) * np.log(curr_pct / base_pct))
-            
+
             drift_data[feat] = {
                 "psi": float(psi),
                 "baseline_mean": base_mean,
-                "current_mean": curr_mean
+                "current_mean": curr_mean,
             }
         except Exception:
             pass
@@ -315,7 +331,7 @@ async def get_drift(tenant_id: str):
         "tenant_id": tenant_id,
         "n_baseline": len(baseline),
         "n_current": len(current),
-        "metrics": drift_data
+        "metrics": drift_data,
     }
 
 
@@ -376,7 +392,11 @@ async def get_lifecycle(tenant_id: str):
             # Trapezoidal AUC
             pr_auc = 0.0
             for i in range(1, len(recalls)):
-                pr_auc += (recalls[i] - recalls[i - 1]) * (precisions[i] + precisions[i - 1]) / 2
+                pr_auc += (
+                    (recalls[i] - recalls[i - 1])
+                    * (precisions[i] + precisions[i - 1])
+                    / 2
+                )
             pr_auc = max(0.0, min(1.0, pr_auc))
         except Exception:
             pr_auc = 0.0
@@ -387,13 +407,18 @@ async def get_lifecycle(tenant_id: str):
     p95_latency = float(np.percentile(latencies, 95)) if latencies else 0.0
 
     # Determine current phase
-    has_simple = tenant_id in registry.simple_models if tenant_id != "all_tenants" else bool(registry.simple_models)
+    has_simple = (
+        tenant_id in registry.simple_models
+        if tenant_id != "all_tenants"
+        else bool(registry.simple_models)
+    )
     current_phase = "SUPERVISED" if has_simple else registry.active_phase
 
     # Scoring history — compute from time buckets in the stream
     scoring_history = []
     if scores:
         from collections import defaultdict
+
         buckets = defaultdict(lambda: {"count": 0, "fraud": 0, "total_score": 0.0})
         for s in scores:
             ts = s.get("scored_at", s.get("timestamp", ""))
@@ -407,24 +432,36 @@ async def get_lifecycle(tenant_id: str):
 
         for day in sorted(buckets.keys()):
             b = buckets[day]
-            scoring_history.append({
-                "date": day,
-                "transactions": b["count"],
-                "fraud_labels": b["fraud"],
-                "avg_score": round(b["total_score"] / b["count"], 4) if b["count"] else 0.0,
-            })
+            scoring_history.append(
+                {
+                    "date": day,
+                    "transactions": b["count"],
+                    "fraud_labels": b["fraud"],
+                    "avg_score": (
+                        round(b["total_score"] / b["count"], 4) if b["count"] else 0.0
+                    ),
+                }
+            )
 
     # Transition readiness gates
     phase2_label_target = settings.phase2_min_fraud_labels  # 5000
-    phase2_pr_auc_target = settings.phase2_min_pr_auc       # 0.78
-    label_pct = min(fraud_labels / phase2_label_target * 100, 100) if phase2_label_target else 0
-    pr_auc_pct = min(pr_auc / phase2_pr_auc_target * 100, 100) if phase2_pr_auc_target else 0
+    phase2_pr_auc_target = settings.phase2_min_pr_auc  # 0.78
+    label_pct = (
+        min(fraud_labels / phase2_label_target * 100, 100) if phase2_label_target else 0
+    )
+    pr_auc_pct = (
+        min(pr_auc / phase2_pr_auc_target * 100, 100) if phase2_pr_auc_target else 0
+    )
     champion_pct = 100.0 if current_phase == "SUPERVISED" and has_simple else 0.0
 
     return {
         "tenant_id": tenant_id,
         "current_phase": current_phase,
-        "model_version": registry.get_model_version(tenant_id) if tenant_id != "all_tenants" else registry.model_version,
+        "model_version": (
+            registry.get_model_version(tenant_id)
+            if tenant_id != "all_tenants"
+            else registry.model_version
+        ),
         "total_scored": total_scored,
         "fraud_labels": fraud_labels,
         "legit_labels": legit_labels,

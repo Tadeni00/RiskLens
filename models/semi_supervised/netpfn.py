@@ -15,6 +15,7 @@ Architecture:
   Class Prototypes → Distance-based Classification →
   Calibrated Fraud Probability + Uncertainty Estimate
 """
+
 from __future__ import annotations
 import hashlib
 import json
@@ -34,14 +35,14 @@ from loguru import logger
 from scoring.calibration import ProbabilityCalibrator
 from models.semi_supervised.prediction import SemiSupervisedPrediction
 
-
 # ── Encoder Network ──────────────────────────────────────────────────────────
+
 
 class PrototypeEncoder(nn.Module):
     """
     Feature encoder that maps raw transaction features into a learned
     embedding space where class prototypes are computed.
-    
+
     Architecture: Linear → LayerNorm → ReLU → Linear → LayerNorm → ReLU → Linear
     """
 
@@ -62,12 +63,14 @@ class PrototypeEncoder(nn.Module):
         layers: list[nn.Module] = []
         prev_dim = input_dim
         for h_dim in hidden_dims:
-            layers.extend([
-                nn.Linear(prev_dim, h_dim),
-                nn.LayerNorm(h_dim),
-                nn.ReLU(),
-                nn.Dropout(dropout),
-            ])
+            layers.extend(
+                [
+                    nn.Linear(prev_dim, h_dim),
+                    nn.LayerNorm(h_dim),
+                    nn.ReLU(),
+                    nn.Dropout(dropout),
+                ]
+            )
             prev_dim = h_dim
         layers.append(nn.Linear(prev_dim, embedding_dim))
         layers.append(nn.LayerNorm(embedding_dim))
@@ -80,16 +83,17 @@ class PrototypeEncoder(nn.Module):
 
 # ── NetPFN Model ─────────────────────────────────────────────────────────────
 
+
 class NetPFNModel(nn.Module):
     """
     Neural Prototypical Few-shot Network for semi-supervised fraud detection.
-    
+
     Key properties:
     - Learns class prototypes from limited labelled data
     - Supports weak labels via weighted prototype updates
     - Produces calibrated probabilities + uncertainty estimates
     - Uncertainty = distance to nearest prototype relative to class spread
-    
+
     Training modes:
     - Full supervision: use confirmed labels
     - Semi-supervised: combine confirmed + pseudo labels
@@ -163,7 +167,9 @@ class NetPFNModel(nn.Module):
                 )
 
                 # Update class spread (mean intra-class distance)
-                dists = torch.cdist(class_embeddings, self.prototypes[c].unsqueeze(0)).squeeze()
+                dists = torch.cdist(
+                    class_embeddings, self.prototypes[c].unsqueeze(0)
+                ).squeeze()
                 self.class_spread[c] = 0.9 * self.class_spread[c] + 0.1 * dists.mean()
 
                 self.prototype_counts[c] += int(mask.sum())
@@ -177,7 +183,7 @@ class NetPFNModel(nn.Module):
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Forward pass.
-        
+
         Returns:
             probabilities: Fraud probabilities in [0, 1]
             confidence: Prediction confidence in [0, 1]
@@ -189,12 +195,12 @@ class NetPFNModel(nn.Module):
             self._compute_prototypes(embeddings, labels, weights)
 
         # Compute distances to prototypes
-        dist_to_legit = torch.cdist(
-            embeddings, self.prototypes[0:1]
-        ).squeeze(-1)  # (batch,)
-        dist_to_fraud = torch.cdist(
-            embeddings, self.prototypes[1:2]
-        ).squeeze(-1)  # (batch,)
+        dist_to_legit = torch.cdist(embeddings, self.prototypes[0:1]).squeeze(
+            -1
+        )  # (batch,)
+        dist_to_fraud = torch.cdist(embeddings, self.prototypes[1:2]).squeeze(
+            -1
+        )  # (batch,)
 
         # Convert distances to probabilities via softmax with temperature
         neg_dists = torch.stack([-dist_to_legit, -dist_to_fraud], dim=1)
@@ -213,7 +219,9 @@ class NetPFNModel(nn.Module):
         # Distance ratio: how close is the sample to the decision boundary
         total_dist = dist_to_legit + dist_to_fraud + 1e-8
         distance_uncertainty = torch.abs(dist_to_legit - dist_to_fraud) / total_dist
-        distance_uncertainty = 1.0 - distance_uncertainty  # closer to boundary = more uncertain
+        distance_uncertainty = (
+            1.0 - distance_uncertainty
+        )  # closer to boundary = more uncertain
 
         # Combined uncertainty
         uncertainty = 0.6 * entropy_uncertainty + 0.4 * distance_uncertainty
@@ -240,12 +248,8 @@ class NetPFNModel(nn.Module):
         self.eval()
         with torch.no_grad():
             embeddings = self.encoder(x)
-            dist_legit = torch.cdist(
-                embeddings, self.prototypes[0:1]
-            ).squeeze(-1)
-            dist_fraud = torch.cdist(
-                embeddings, self.prototypes[1:2]
-            ).squeeze(-1)
+            dist_legit = torch.cdist(embeddings, self.prototypes[0:1]).squeeze(-1)
+            dist_fraud = torch.cdist(embeddings, self.prototypes[1:2]).squeeze(-1)
             return {
                 "dist_legit": dist_legit,
                 "dist_fraud": dist_fraud,
@@ -253,6 +257,7 @@ class NetPFNModel(nn.Module):
 
 
 # ── Loss Function ────────────────────────────────────────────────────────────
+
 
 class NetPFNLoss(nn.Module):
     """
@@ -306,10 +311,11 @@ class NetPFNLoss(nn.Module):
 
 # ── Wrapper with Scaler + Calibration ────────────────────────────────────────
 
+
 class NetPFNWrapper:
     """
     Production wrapper around NetPFNModel.
-    
+
     Handles:
     - Feature scaling (StandardScaler)
     - PyTorch ↔ NumPy interface
@@ -360,7 +366,9 @@ class NetPFNWrapper:
         self.roc_auc_: float = 0.0
 
     def _compute_hashes(self, X: np.ndarray, y: np.ndarray) -> Dict[str, str]:
-        feature_str = "|".join(self.feature_names) if self.feature_names else str(X.shape[1])
+        feature_str = (
+            "|".join(self.feature_names) if self.feature_names else str(X.shape[1])
+        )
         feature_hash = hashlib.sha256(feature_str.encode()).hexdigest()[:16]
 
         if len(X) > 10000:
@@ -368,11 +376,13 @@ class NetPFNWrapper:
             X_sample, y_sample = X[idx], y[idx]
         else:
             X_sample, y_sample = X, y
-        data_stats = np.concatenate([
-            X_sample.mean(axis=0),
-            X_sample.std(axis=0),
-            [y_sample.mean(), len(y_sample)],
-        ])
+        data_stats = np.concatenate(
+            [
+                X_sample.mean(axis=0),
+                X_sample.std(axis=0),
+                [y_sample.mean(), len(y_sample)],
+            ]
+        )
         dataset_hash = hashlib.sha256(data_stats.tobytes()).hexdigest()[:16]
 
         return {"feature_hash": feature_hash, "dataset_hash": dataset_hash}
@@ -392,9 +402,7 @@ class NetPFNWrapper:
             return self.calibrator.transform(raw_probs)
         return raw_probs
 
-    def predict_with_uncertainty(
-        self, X: np.ndarray
-    ) -> List[SemiSupervisedPrediction]:
+    def predict_with_uncertainty(self, X: np.ndarray) -> List[SemiSupervisedPrediction]:
         """Return fully typed predictions with uncertainty estimates."""
         if not self.is_fitted:
             raise RuntimeError("NetPFNWrapper must be fitted before scoring")
@@ -422,9 +430,7 @@ class NetPFNWrapper:
         """Return calibrated fraud probabilities (alias for predict_proba)."""
         return self.predict_proba(X)
 
-    def explain(
-        self, X: np.ndarray, top_n: int = 8
-    ) -> List[Dict[str, Any]]:
+    def explain(self, X: np.ndarray, top_n: int = 8) -> List[Dict[str, Any]]:
         """
         Feature attribution via prototype distance decomposition.
         For each sample, compute contribution of each feature to
@@ -442,9 +448,7 @@ class NetPFNWrapper:
             dist_fraud = float(distances["dist_fraud"][i])
             total = dist_legit + dist_fraud + 1e-8
 
-            fraud_prob = float(
-                self.model.predict(X_tensor[i:i+1])[0][0]
-            )
+            fraud_prob = float(self.model.predict(X_tensor[i : i + 1])[0][0])
 
             # Feature contribution: per-feature deviation from prototype
             feature_names = (
@@ -477,17 +481,19 @@ class NetPFNWrapper:
                 for name, val, contrib in feat_contributions[:top_n]
             ]
 
-            explanations.append({
-                "model_type": "netpfn",
-                "base_value": 0.5,
-                "prediction_value": fraud_prob,
-                "top_features": top_features,
-                "components": {
-                    "dist_legit": dist_legit,
-                    "dist_fraud": dist_fraud,
-                    "prototype_counts": self.model.prototype_counts.tolist(),
-                },
-            })
+            explanations.append(
+                {
+                    "model_type": "netpfn",
+                    "base_value": 0.5,
+                    "prediction_value": fraud_prob,
+                    "top_features": top_features,
+                    "components": {
+                        "dist_legit": dist_legit,
+                        "dist_fraud": dist_fraud,
+                        "prototype_counts": self.model.prototype_counts.tolist(),
+                    },
+                }
+            )
 
         return explanations
 
@@ -498,32 +504,35 @@ class NetPFNWrapper:
         torch.save(self.model.state_dict(), path / "netpfn_model.pt")
 
         with open(path / "netpfn_metadata.pkl", "wb") as f:
-            pickle.dump({
-                "input_dim": self.input_dim,
-                "feature_names": self.feature_names,
-                "calibration_method": self.calibration_method,
-                "model_version": self.model_version,
-                "scaler": self.scaler,
-                "calibrator": self.calibrator,
-                "is_fitted": self.is_fitted,
-                "training_hash": self.training_hash,
-                "feature_hash": self.feature_hash,
-                "dataset_hash": self.dataset_hash,
-                "trained_at": self.trained_at,
-                "confirmed_label_count": self.confirmed_label_count,
-                "pseudo_label_count": self.pseudo_label_count,
-                "training_iteration": self.training_iteration,
-                "pr_auc": self.pr_auc_,
-                "roc_auc": self.roc_auc_,
-                "model_config": {
-                    "embedding_dim": self.model.embedding_dim,
-                    "temperature": self.model.temperature,
-                    "prototype_momentum": self.model.prototype_momentum,
+            pickle.dump(
+                {
+                    "input_dim": self.input_dim,
+                    "feature_names": self.feature_names,
+                    "calibration_method": self.calibration_method,
+                    "model_version": self.model_version,
+                    "scaler": self.scaler,
+                    "calibrator": self.calibrator,
+                    "is_fitted": self.is_fitted,
+                    "training_hash": self.training_hash,
+                    "feature_hash": self.feature_hash,
+                    "dataset_hash": self.dataset_hash,
+                    "trained_at": self.trained_at,
+                    "confirmed_label_count": self.confirmed_label_count,
+                    "pseudo_label_count": self.pseudo_label_count,
+                    "training_iteration": self.training_iteration,
+                    "pr_auc": self.pr_auc_,
+                    "roc_auc": self.roc_auc_,
+                    "model_config": {
+                        "embedding_dim": self.model.embedding_dim,
+                        "temperature": self.model.temperature,
+                        "prototype_momentum": self.model.prototype_momentum,
+                    },
+                    "prototypes": self.model.prototypes,
+                    "prototype_counts": self.model.prototype_counts,
+                    "class_spread": self.model.class_spread,
                 },
-                "prototypes": self.model.prototypes,
-                "prototype_counts": self.model.prototype_counts,
-                "class_spread": self.model.class_spread,
-            }, f)
+                f,
+            )
 
         logger.info("NetPFNWrapper saved to {}", path)
 
@@ -558,9 +567,9 @@ class NetPFNWrapper:
         obj.roc_auc_ = payload.get("roc_auc", 0.0)
 
         # Restore model state
-        obj.model.load_state_dict(torch.load(
-            path / "netpfn_model.pt", map_location="cpu"
-        ))
+        obj.model.load_state_dict(
+            torch.load(path / "netpfn_model.pt", map_location="cpu")
+        )
         obj.model.eval()
 
         # Restore buffers
@@ -573,6 +582,7 @@ class NetPFNWrapper:
 
         logger.info(
             "NetPFNWrapper loaded from {} (version={})",
-            path, obj.model_version,
+            path,
+            obj.model_version,
         )
         return obj

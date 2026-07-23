@@ -48,6 +48,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class BehaviorEngineConfig:
     """Configuration for the Behavior Engine."""
+
     feature_store: FeatureStoreClient
     enable_behavioral_features: bool = True
     enable_velocity_features: bool = True
@@ -60,18 +61,19 @@ class BehaviorEngineConfig:
 @dataclass
 class BehavioralFeatures:
     """Container for all generated behavioral features."""
+
     # Amount features
     customer_amount_zscore: float = 0.0
     merchant_amount_zscore: float = 0.0
     tenant_amount_percentile: float = 0.5
-    
+
     # Velocity features
     velocity_score: float = 0.0
     acct_v_1m_count: float = 0.0
     acct_v_1h_count: float = 0.0
     acct_v_24h_count: float = 0.0
     acct_v_24h_total_amt: float = 0.0
-    
+
     # Novelty features
     new_device_flag: float = 0.0
     new_ip_flag: float = 0.0
@@ -79,37 +81,37 @@ class BehavioralFeatures:
     new_merchant_flag: float = 0.0
     new_device_flag: float = 0.0
     new_merchant_flag: float = 0.0
-    
+
     # Similarity features
     merchant_similarity: float = 0.0
     device_similarity: float = 0.0
     country_similarity: float = 0.0
     typing_similarity: float = 0.0
-    
+
     # Trust scores
     device_trust_score: float = 0.5
     merchant_trust_score: float = 0.5
     beneficiary_trust_score: float = 0.5
     customer_reputation: float = 0.5
-    
+
     # Risk scores
     customer_risk_score: float = 0.0
     merchant_risk_score: float = 0.0
     device_risk_score: float = 0.0
-    
+
     # Trust scores
     device_trust_score: float = 0.5
     merchant_trust_score: float = 0.5
     beneficiary_trust_score: float = 0.5
     customer_reputation: float = 0.5
-    
+
     # Historical rates
     historical_chargeback_rate: float = 0.0
     historical_fraud_rate: float = 0.0
     customer_risk_score: float = 0.0
     merchant_risk_score: float = 0.0
     device_risk_score: float = 0.0
-    
+
     # Device/Geo features
     new_device_flag: float = 0.0
     new_ip_flag: float = 0.0
@@ -119,37 +121,37 @@ class BehavioralFeatures:
     new_merchant_flag: float = 0.0
     impossible_travel: float = 0.0
     cross_country_flag: float = 0.0
-    
+
     # Velocity
     velocity_score: float = 0.0
     acct_v_1m_count: float = 0.0
     acct_v_1h_count: float = 0.0
     acct_v_24h_count: float = 0.0
     acct_v_24h_total_amt: float = 0.0
-    
+
     # Behavioural
     hour_deviation: float = 0.0
     weekday_deviation: float = 0.0
     is_night: float = 0.0
     is_weekend: float = 0.0
-    
+
     # Device/Geo
     device_trust_score: float = 0.5
     merchant_trust_score: float = 0.5
     beneficiary_trust_score: float = 0.5
     customer_reputation: float = 0.5
-    
+
     # Historical rates
     historical_chargeback_rate: float = 0.0
     historical_fraud_rate: float = 0.0
     customer_risk_score: float = 0.0
     merchant_risk_score: float = 0.0
     device_risk_score: float = 0.0
-    
+
     # Risk scores
     merchant_risk_score: float = 0.0
     device_risk_score: float = 0.0
-    
+
     def to_dict(self) -> dict:
         """Convert to flat dictionary for model input."""
         return {
@@ -211,9 +213,7 @@ class BehavioralFeatures:
 
     def to_dict(self) -> dict:
         """Convert to flat dictionary for model input."""
-        return {
-            k: getattr(self, k) for k in self.__dataclass_fields__.keys()
-        }
+        return {k: getattr(self, k) for k in self.__dataclass_fields__.keys()}
 
 
 class BehaviorEngine:
@@ -221,12 +221,12 @@ class BehaviorEngine:
     Main behavioral intelligence engine.
     Orchestrates profile retrieval, feature generation, and profile updates.
     """
-    
+
     def __init__(self, config: BehaviorEngineConfig):
         self.config = config
         self.feature_store = config.feature_store
         self.logger = logging.getLogger(__name__)
-    
+
     def process_transaction(
         self,
         transaction,
@@ -239,7 +239,7 @@ class BehaviorEngine:
     ) -> dict:
         """
         Main entry point for behavioral feature generation.
-        
+
         Args:
             transaction: Transaction object
             tenant_id: Tenant identifier
@@ -248,26 +248,29 @@ class BehaviorEngine:
             device_profile: Device profile (optional)
             beneficiary_profile: Beneficiary profile (optional)
             instrument_profile: Payment instrument profile (optional)
-            
+
         Returns:
             BehavioralFeatures object with all computed features
         """
         features = BehavioralFeatures()
-        
+
         if not self.config.enable_behavioral_features:
             return BehavioralFeatures()  # Return empty features
-        
+
         # Get profiles from feature store if not provided
         if self.config.enable_behavioral_features:
             features = self._generate_all_features(
-                transaction, tenant_id,
-                customer_profile, merchant_profile,
-                device_profile, beneficiary_profile,
-                instrument_profile
+                transaction,
+                tenant_id,
+                customer_profile,
+                merchant_profile,
+                device_profile,
+                beneficiary_profile,
+                instrument_profile,
             )
-        
+
         return features
-    
+
     def _generate_all_features(
         self,
         transaction,
@@ -280,19 +283,27 @@ class BehaviorEngine:
     ):
         """Generate all behavioral features."""
         features = BehavioralFeatures()
-        
+
         if self.config.enable_velocity_features:
-            features = compute_velocity_features(
-                transaction, tenant_id
-            )
-        
+            features = compute_velocity_features(transaction, tenant_id)
+
         # Get profiles from feature store
-        customer_profile = self._get_customer_profile(transaction.tenant_id, transaction.account_id)
-        merchant_profile = self._get_merchant_profile(transaction.tenant_id, transaction.merchant_id)
-        device_profile = self._get_device_profile(transaction.tenant_id, transaction.device_id)
-        beneficiary_profile = self._get_beneficiary_profile(transaction.tenant_id, transaction.counterparty_id)
-        instrument_profile = self._get_instrument_profile(transaction.tenant_id, transaction.payment_instrument_id)
-        
+        customer_profile = self._get_customer_profile(
+            transaction.tenant_id, transaction.account_id
+        )
+        merchant_profile = self._get_merchant_profile(
+            transaction.tenant_id, transaction.merchant_id
+        )
+        device_profile = self._get_device_profile(
+            transaction.tenant_id, transaction.device_id
+        )
+        beneficiary_profile = self._get_beneficiary_profile(
+            transaction.tenant_id, transaction.counterparty_id
+        )
+        instrument_profile = self._get_instrument_profile(
+            transaction.tenant_id, transaction.payment_instrument_id
+        )
+
         # Generate all features
         features = generate_behavioral_features(
             transaction,
@@ -302,9 +313,9 @@ class BehaviorEngine:
             beneficiary_profile=beneficiary_profile,
             instrument_profile=instrument_profile,
         )
-        
+
         return features
-    
+
     def _get_customer_profile(self, tenant_id: str, customer_id: str):
         if not self.feature_store:
             return None
@@ -313,7 +324,7 @@ class BehaviorEngine:
         except Exception as e:
             logger.warning(f"Failed to get customer profile: {e}")
             return None
-    
+
     def _get_merchant_profile(self, tenant_id: str, merchant_id: str):
         if not self.feature_store:
             return None
@@ -321,25 +332,25 @@ class BehaviorEngine:
             return self.feature_store.get_merchant_profile(merchant_id, tenant_id)
         except Exception:
             return None
-    
+
     def _get_device_profile(self, tenant_id: str, device_id: str):
         try:
             return self.feature_store.get_device_profile(tenant_id, device_id)
         except Exception:
             return None
-    
+
     def _get_beneficiary_profile(self, tenant_id: str, beneficiary_id: str):
         try:
             return self.feature_store.get_beneficiary_profile(beneficiary_id)
         except Exception:
             return None
-    
+
     def _get_instrument_profile(self, tenant_id: str, instrument_id: str):
         try:
             return self.feature_store.get_payment_instrument_profile(instrument_id)
         except Exception:
             return None
-    
+
     def update_profiles(self, transaction, risk_score: float, decision: str) -> None:
         """
         Update behavioral profiles with transaction outcome.
@@ -348,18 +359,20 @@ class BehaviorEngine:
         try:
             # Update customer profile
             if self.feature_store:
-                profile = self.feature_store.get_customer_profile(transaction.tenant_id, transaction.account_id)
+                profile = self.feature_store.get_customer_profile(
+                    transaction.tenant_id, transaction.account_id
+                )
                 if profile:
                     # Update profile with transaction
                     # In a real implementation, this would call profile.update(transaction)
                     pass
-            
-# Update merchant profile
+
+            # Update merchant profile
             # ... similar pattern for other profiles
             pass
         except Exception:
             logger.warning("Failed to update profiles")
-    
+
     def get_feature_importance(self) -> Dict[str, float]:
         """Get feature importance rankings for monitoring."""
         return {

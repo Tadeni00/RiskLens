@@ -1,6 +1,7 @@
 """FraudTrap Dashboard — Explainability Page
 SHAP attributions, counterfactual analysis, and decision explanations.
 """
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -21,7 +22,6 @@ from dashboard.components import (
 from dashboard.components.data_loader import currency_fmt, make_shap_values
 from dashboard.theme.colors import Colors
 from dashboard.theme.icons import Icons
-
 
 # ── Synthetic Transaction Data ────────────────────────────────────────────────
 
@@ -69,7 +69,9 @@ def _synthetic_shap_values(risk: float, n_features: int = 8) -> list[tuple[str, 
     return list(zip(features, shap_vals))
 
 
-def _counterfactual_steps(shap_vals: list[tuple[str, float]], risk: float) -> list[dict]:
+def _counterfactual_steps(
+    shap_vals: list[tuple[str, float]], risk: float
+) -> list[dict]:
     """Generate counterfactual steps sorted by impact (largest negative first)."""
     sorted_vals = sorted(shap_vals, key=lambda x: x[1])
     steps = []
@@ -90,12 +92,14 @@ def _counterfactual_steps(shap_vals: list[tuple[str, float]], risk: float) -> li
             reduction = max(reduction, 0.01)
             current_prob = max(current_prob - reduction, 0.01)
             action, category = label_map.get(feat, (f"Adjust {feat}", "other"))
-            steps.append({
-                "action": action,
-                "category": category,
-                "impact": -reduction,
-                "new_prob": current_prob,
-            })
+            steps.append(
+                {
+                    "action": action,
+                    "category": category,
+                    "impact": -reduction,
+                    "new_prob": current_prob,
+                }
+            )
     return steps
 
 
@@ -111,25 +115,32 @@ def _nearest_transactions(
     for i in range(n):
         noise = rng.normal(0, 0.3, len(target_vector))
         feature_vals = np.abs(target_vector + noise)
-        risk = float(np.clip(rng.beta(8 if is_fraud else 1, 2 if is_fraud else 8), 0, 1))
+        risk = float(
+            np.clip(rng.beta(8 if is_fraud else 1, 2 if is_fraud else 8), 0, 1)
+        )
         decision = "BLOCK" if risk > 0.7 else "REVIEW" if risk > 0.4 else "APPROVE"
         raw_amt = float(rng.lognormal(10.0 if is_fraud else 8.5, 1.0))
         currency = rng.choice(_COUNTRY_OPTIONS)
         _cur_map = {"NG": "NGN", "KE": "KES", "ZA": "ZAR", "GB": "GBP", "US": "USD"}
-        rows.append({
-            "trace_id": f"sim_{'fraud' if is_fraud else 'legit'}_{i:04d}",
-            "amount": currency_fmt(raw_amt, _cur_map.get(currency, "USD")),
-            "channel": rng.choice(_CHANNEL_OPTIONS),
-            "risk_score": f"{risk:.4f}",
-            "decision": decision,
-            "similarity": f"{float(np.clip(1.0 - np.mean(np.abs(feature_vals)), 0.5, 0.99)):.2f}",
-        })
+        rows.append(
+            {
+                "trace_id": f"sim_{'fraud' if is_fraud else 'legit'}_{i:04d}",
+                "amount": currency_fmt(raw_amt, _cur_map.get(currency, "USD")),
+                "channel": rng.choice(_CHANNEL_OPTIONS),
+                "risk_score": f"{risk:.4f}",
+                "decision": decision,
+                "similarity": f"{float(np.clip(1.0 - np.mean(np.abs(feature_vals)), 0.5, 0.99)):.2f}",
+            }
+        )
     return pd.DataFrame(rows)
 
 
 # ── Section Renderers ─────────────────────────────────────────────────────────
 
-def _render_prediction_summary(trace_id: str, txn: dict, shap_vals: list[tuple[str, float]]):
+
+def _render_prediction_summary(
+    trace_id: str, txn: dict, shap_vals: list[tuple[str, float]]
+):
     """Section 1: Transaction details, fraud probability gauge, confidence, business impact."""
     risk = txn["risk_score"]
     decision = txn["decision"]
@@ -146,7 +157,8 @@ def _render_prediction_summary(trace_id: str, txn: dict, shap_vals: list[tuple[s
         unsafe_allow_html=True,
     )
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
 <div style="background:{Colors.BG_CARD};border:1px solid {Colors.BORDER_DEFAULT};border-radius:10px;padding:20px;margin-bottom:16px">
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
         <div>
@@ -170,27 +182,34 @@ def _render_prediction_summary(trace_id: str, txn: dict, shap_vals: list[tuple[s
         <div style="font-size:11px;color:{Colors.TEXT_MUTED};text-transform:uppercase;letter-spacing:0.08em">Decision</div>
         <div style="padding:4px 12px;border-radius:6px;background:{Colors.rgba(color, 0.15)};color:{color};font-weight:700;font-size:13px">{decision}</div>
     </div>
-</div>""", unsafe_allow_html=True)
+</div>""",
+        unsafe_allow_html=True,
+    )
 
     col_gauge, col_conf, col_impact = st.columns([2, 1, 1])
 
     with col_gauge:
-        fig_gauge = go.Figure(go.Indicator(
-            mode="gauge+number",
-            value=risk * 100,
-            number=dict(font=dict(size=32, color=Colors.TEXT_PRIMARY), suffix="%"),
-            gauge=dict(
-                axis=dict(range=[0, 100], tickcolor=Colors.TEXT_MUTED),
-                bar=dict(color=color),
-                bgcolor=Colors.BG_SECONDARY,
-                borderwidth=0,
-                steps=[
-                    {"range": [0, 40], "color": Colors.rgba(Colors.SUCCESS, 0.2)},
-                    {"range": [40, 70], "color": Colors.rgba(Colors.WARNING, 0.2)},
-                    {"range": [70, 100], "color": Colors.rgba(Colors.CRITICAL, 0.2)},
-                ],
-            ),
-        ))
+        fig_gauge = go.Figure(
+            go.Indicator(
+                mode="gauge+number",
+                value=risk * 100,
+                number=dict(font=dict(size=32, color=Colors.TEXT_PRIMARY), suffix="%"),
+                gauge=dict(
+                    axis=dict(range=[0, 100], tickcolor=Colors.TEXT_MUTED),
+                    bar=dict(color=color),
+                    bgcolor=Colors.BG_SECONDARY,
+                    borderwidth=0,
+                    steps=[
+                        {"range": [0, 40], "color": Colors.rgba(Colors.SUCCESS, 0.2)},
+                        {"range": [40, 70], "color": Colors.rgba(Colors.WARNING, 0.2)},
+                        {
+                            "range": [70, 100],
+                            "color": Colors.rgba(Colors.CRITICAL, 0.2),
+                        },
+                    ],
+                ),
+            )
+        )
         fig_gauge.update_layout(
             paper_bgcolor="rgba(0,0,0,0)",
             height=220,
@@ -206,14 +225,17 @@ def _render_prediction_summary(trace_id: str, txn: dict, shap_vals: list[tuple[s
         avg_txn_amount = 2_450.0
         blocked_count = int(142 * risk)
         revenue_impact = blocked_count * avg_txn_amount
-        st.markdown(f"""
+        st.markdown(
+            f"""
 <div style="background:{Colors.BG_CARD};border:1px solid {Colors.BORDER_DEFAULT};border-radius:8px;padding:16px;height:100%">
     <div style="font-size:11px;color:{Colors.TEXT_MUTED};text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">Business Impact Estimate</div>
     <div style="font-size:11px;color:{Colors.TEXT_MUTED};margin-bottom:4px">Potential fraud prevented</div>
     <div style="font-size:22px;font-weight:700;color:{Colors.SUCCESS};margin-bottom:12px">{currency_fmt(revenue_impact, txn.get('currency', 'NGN'))}</div>
     <div style="font-size:11px;color:{Colors.TEXT_MUTED};margin-bottom:4px">Similar blocked txns (30d)</div>
     <div style="font-size:16px;font-weight:600;color:{Colors.TEXT_PRIMARY}">{blocked_count}</div>
-</div>""", unsafe_allow_html=True)
+</div>""",
+            unsafe_allow_html=True,
+        )
 
 
 def _render_shap_explanation(shap_vals: list[tuple[str, float]], risk: float):
@@ -245,7 +267,9 @@ def _render_shap_explanation(shap_vals: list[tuple[str, float]], risk: float):
         height=340,
         color=Colors.CHART_5,
     )
-    fig_imp.update_traces(marker_color=[Colors.CRITICAL if v > 0 else Colors.SUCCESS for _, v in top_10])
+    fig_imp.update_traces(
+        marker_color=[Colors.CRITICAL if v > 0 else Colors.SUCCESS for _, v in top_10]
+    )
     st.plotly_chart(fig_imp, use_container_width=True)
 
     positive_shap = [(f, v) for f, v in sorted_shap if v > 0][:5]
@@ -304,10 +328,14 @@ def _render_counterfactual(txn: dict, shap_vals: list[tuple[str, float]]):
             title="Current Transaction State",
             items=[
                 {"label": "Trace ID", "value": txn["trace_id"]},
-                {"label": "Amount", "value": currency_fmt(txn['amount'], txn.get('currency', 'NGN'))},
+                {
+                    "label": "Amount",
+                    "value": currency_fmt(txn["amount"], txn.get("currency", "NGN")),
+                },
                 {"label": "Channel", "value": txn["channel"]},
                 {"label": "Decision", "value": txn["decision"]},
-            ] + risk_factors,
+            ]
+            + risk_factors,
             icon="ALERT_TRIANGLE",
         )
 
@@ -315,8 +343,15 @@ def _render_counterfactual(txn: dict, shap_vals: list[tuple[str, float]]):
         if steps:
             changes = []
             for s in steps[:4]:
-                changes.append({"label": s["action"], "value": f"{s['new_prob']:.0%} prob"})
-            changes.append({"label": "Final probability after all changes", "value": f"{final_prob:.0%}"})
+                changes.append(
+                    {"label": s["action"], "value": f"{s['new_prob']:.0%} prob"}
+                )
+            changes.append(
+                {
+                    "label": "Final probability after all changes",
+                    "value": f"{final_prob:.0%}",
+                }
+            )
             info_panel(
                 title="Suggested Minimal Changes",
                 items=changes,
@@ -351,7 +386,11 @@ def _render_counterfactual(txn: dict, shap_vals: list[tuple[str, float]]):
             <span style="font-size:16px;font-weight:700;color:{prob_color}">{step['new_prob']:.0%}</span>
         </div>"""
 
-    final_color = Colors.SUCCESS if final_prob < 0.3 else Colors.WARNING if final_prob < 0.6 else Colors.CRITICAL
+    final_color = (
+        Colors.SUCCESS
+        if final_prob < 0.3
+        else Colors.WARNING if final_prob < 0.6 else Colors.CRITICAL
+    )
     flow_html += f"""
         <div style="display:flex;flex-direction:column;align-items:center;padding:4px 0">
             <div style="width:2px;height:20px;background:{Colors.BORDER_DEFAULT}"></div>
@@ -365,12 +404,34 @@ def _render_counterfactual(txn: dict, shap_vals: list[tuple[str, float]]):
     st.markdown(flow_html, unsafe_allow_html=True)
 
     reduction_pct = (1 - final_prob / risk) * 100 if risk > 0 else 0
-    metric_row([
-        {"label": "Original Risk", "value": f"{risk:.0%}", "color": Colors.CRITICAL, "icon": "ALERT_TRIANGLE"},
-        {"label": "Post-Changes Risk", "value": f"{final_prob:.0%}", "color": final_color, "icon": "CHECK_CIRCLE"},
-        {"label": "Risk Reduction", "value": f"{reduction_pct:.0f}%", "color": Colors.SUCCESS, "icon": "TRENDING_DOWN"},
-        {"label": "Changes Required", "value": str(len(steps)), "color": Colors.ACCENT, "icon": "SLIDERS"},
-    ])
+    metric_row(
+        [
+            {
+                "label": "Original Risk",
+                "value": f"{risk:.0%}",
+                "color": Colors.CRITICAL,
+                "icon": "ALERT_TRIANGLE",
+            },
+            {
+                "label": "Post-Changes Risk",
+                "value": f"{final_prob:.0%}",
+                "color": final_color,
+                "icon": "CHECK_CIRCLE",
+            },
+            {
+                "label": "Risk Reduction",
+                "value": f"{reduction_pct:.0f}%",
+                "color": Colors.SUCCESS,
+                "icon": "TRENDING_DOWN",
+            },
+            {
+                "label": "Changes Required",
+                "value": str(len(steps)),
+                "color": Colors.ACCENT,
+                "icon": "SLIDERS",
+            },
+        ]
+    )
 
 
 def _render_similar_transactions(shap_vals: list[tuple[str, float]]):
@@ -430,6 +491,7 @@ def _render_similar_transactions(shap_vals: list[tuple[str, float]]):
 
 # ── Main Render ───────────────────────────────────────────────────────────────
 
+
 def render(tenant_id: str):
     with page_container(
         "Explainability",
@@ -458,35 +520,45 @@ def render(tenant_id: str):
         txn = _synthetic_transaction(trace_id)
         shap_vals = _synthetic_shap_values(txn["risk_score"])
 
-        kpi_row([
-            {
-                "label": "Risk Score",
-                "value": f"{txn['risk_score']:.2%}",
-                "icon": "TARGET",
-                "status": "critical" if txn["risk_score"] > 0.7 else "warning" if txn["risk_score"] > 0.4 else "healthy",
-            },
-            {
-                "label": "Decision",
-                "value": txn["decision"],
-                "icon": "SHIELD_CHECK",
-                "status": "critical" if txn["decision"] == "BLOCK" else "warning" if txn["decision"] == "REVIEW" else "healthy",
-            },
-            {
-                "label": "Amount",
-                "value": f"currency_fmt(txn['amount'], txn.get('currency', 'NGN'))",
-                "icon": "CREDIT_CARD",
-            },
-            {
-                "label": "Channel",
-                "value": txn["channel"],
-                "icon": "GLOBE",
-            },
-            {
-                "label": "Features Analyzed",
-                "value": str(len(shap_vals)),
-                "icon": "LAYERS",
-            },
-        ])
+        kpi_row(
+            [
+                {
+                    "label": "Risk Score",
+                    "value": f"{txn['risk_score']:.2%}",
+                    "icon": "TARGET",
+                    "status": (
+                        "critical"
+                        if txn["risk_score"] > 0.7
+                        else "warning" if txn["risk_score"] > 0.4 else "healthy"
+                    ),
+                },
+                {
+                    "label": "Decision",
+                    "value": txn["decision"],
+                    "icon": "SHIELD_CHECK",
+                    "status": (
+                        "critical"
+                        if txn["decision"] == "BLOCK"
+                        else "warning" if txn["decision"] == "REVIEW" else "healthy"
+                    ),
+                },
+                {
+                    "label": "Amount",
+                    "value": f"currency_fmt(txn['amount'], txn.get('currency', 'NGN'))",
+                    "icon": "CREDIT_CARD",
+                },
+                {
+                    "label": "Channel",
+                    "value": txn["channel"],
+                    "icon": "GLOBE",
+                },
+                {
+                    "label": "Features Analyzed",
+                    "value": str(len(shap_vals)),
+                    "icon": "LAYERS",
+                },
+            ]
+        )
 
         section_divider()
 

@@ -4,6 +4,7 @@ Computes all feature families from raw transaction payloads.
 Features are read from Redis (online) or computed on-the-fly.
 Results are written back to Redis for the scoring path.
 """
+
 from __future__ import annotations
 import hashlib
 import math
@@ -19,6 +20,7 @@ settings = get_settings()
 
 # ── Redis connection ──────────────────────────────────────────────────────────
 
+
 def get_redis() -> redis.Redis:
     return redis.Redis(
         host=settings.redis_host,
@@ -26,12 +28,13 @@ def get_redis() -> redis.Redis:
         password=settings.redis_password or None,
         db=settings.redis_db,
         decode_responses=True,
-        socket_timeout=0.050,          # 50ms hard timeout — must not blow the SLA
+        socket_timeout=0.050,  # 50ms hard timeout — must not blow the SLA
         socket_connect_timeout=1.0,
     )
 
 
 # ── Key helpers ───────────────────────────────────────────────────────────────
+
 
 def _key(tenant: str, entity_type: str, entity_id: str, feature: str) -> str:
     """
@@ -45,6 +48,7 @@ def _key(tenant: str, entity_type: str, entity_id: str, feature: str) -> str:
 
 # ── Velocity feature computation ──────────────────────────────────────────────
 
+
 def compute_velocity_features(
     txn: TransactionRequest,
     r: redis.Redis,
@@ -56,18 +60,18 @@ def compute_velocity_features(
     """
     now_ts = txn.timestamp.timestamp()
     windows = {
-        "1m":  60,
-        "5m":  300,
-        "1h":  3_600,
+        "1m": 60,
+        "5m": 300,
+        "1h": 3_600,
         "24h": 86_400,
-        "7d":  604_800,
+        "7d": 604_800,
     }
     features: dict[str, float] = {}
 
     for entity_type, entity_id in [
         ("acct", txn.account_id),
-        ("dev",  txn.device_id or "UNKNOWN"),
-        ("ip",   txn.ip_address_hash or "UNKNOWN"),
+        ("dev", txn.device_id or "UNKNOWN"),
+        ("ip", txn.ip_address_hash or "UNKNOWN"),
     ]:
         # Sorted set key for this entity's transactions
         ts_key = _key(txn.tenant_id, entity_type, entity_id, "txn_ts")
@@ -87,16 +91,14 @@ def compute_velocity_features(
             prefix = f"{entity_type}_v_{name}"
             features[f"{prefix}_count"] = float(count)
             features[f"{prefix}_total_amt"] = total_amt
-            features[f"{prefix}_mean_amt"] = (
-                total_amt / count if count > 0 else 0.0
-            )
+            features[f"{prefix}_mean_amt"] = total_amt / count if count > 0 else 0.0
 
     # Write new transaction to sorted sets (pipeline for atomicity + speed)
     pipe = r.pipeline(transaction=False)
     for entity_type, entity_id in [
         ("acct", txn.account_id),
-        ("dev",  txn.device_id or "UNKNOWN"),
-        ("ip",   txn.ip_address_hash or "UNKNOWN"),
+        ("dev", txn.device_id or "UNKNOWN"),
+        ("ip", txn.ip_address_hash or "UNKNOWN"),
     ]:
         ts_key = _key(txn.tenant_id, entity_type, entity_id, "txn_ts")
         amt_key = _key(txn.tenant_id, entity_type, entity_id, "txn_amt")
@@ -114,6 +116,7 @@ def compute_velocity_features(
 
 
 # ── Transaction features ──────────────────────────────────────────────────────
+
 
 def compute_transaction_features(
     txn: TransactionRequest,
@@ -156,8 +159,12 @@ def compute_transaction_features(
 
     # Transaction type encoding
     type_map = {
-        "PAYMENT": 0, "TRANSFER": 1, "WITHDRAWAL": 2,
-        "TOP_UP": 3, "REFUND": 4, "LOAN_DISBURSEMENT": 5
+        "PAYMENT": 0,
+        "TRANSFER": 1,
+        "WITHDRAWAL": 2,
+        "TOP_UP": 3,
+        "REFUND": 4,
+        "LOAN_DISBURSEMENT": 5,
     }
     features["txn_type_enc"] = float(type_map.get(txn.transaction_type, -1))
 
@@ -176,6 +183,7 @@ def compute_transaction_features(
 
 # ── Device & geo features ─────────────────────────────────────────────────────
 
+
 def compute_device_geo_features(
     txn: TransactionRequest,
     r: redis.Redis,
@@ -190,7 +198,7 @@ def compute_device_geo_features(
         r.sadd(dev_key, txn.device_id)
         r.expire(dev_key, 2_592_000)  # 30 days
     else:
-        features["is_new_device"] = 1.0   # unknown device = new
+        features["is_new_device"] = 1.0  # unknown device = new
 
     # Device sharing: how many accounts have used this device?
     if txn.device_id:
@@ -210,7 +218,7 @@ def compute_device_geo_features(
     if last_loc and txn.latitude and txn.longitude:
         prev_lat = float(last_loc.get("lat", txn.latitude))
         prev_lon = float(last_loc.get("lon", txn.longitude))
-        prev_ts  = float(last_loc.get("ts",  txn.timestamp.timestamp()))
+        prev_ts = float(last_loc.get("ts", txn.timestamp.timestamp()))
         distance_km = _haversine(prev_lat, prev_lon, txn.latitude, txn.longitude)
         time_hours = max((txn.timestamp.timestamp() - prev_ts) / 3_600, 0.001)
         speed_kmh = distance_km / time_hours
@@ -224,11 +232,14 @@ def compute_device_geo_features(
 
     # Update last location
     if txn.latitude and txn.longitude:
-        r.hset(last_loc_key, mapping={
-            "lat": txn.latitude,
-            "lon": txn.longitude,
-            "ts":  txn.timestamp.timestamp(),
-        })
+        r.hset(
+            last_loc_key,
+            mapping={
+                "lat": txn.latitude,
+                "lon": txn.longitude,
+                "ts": txn.timestamp.timestamp(),
+            },
+        )
         r.expire(last_loc_key, 604_800)
 
     # Cross-country flag
@@ -250,11 +261,12 @@ def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     φ1, φ2 = math.radians(lat1), math.radians(lat2)
     Δφ = math.radians(lat2 - lat1)
     Δλ = math.radians(lon2 - lon1)
-    a = math.sin(Δφ/2)**2 + math.cos(φ1) * math.cos(φ2) * math.sin(Δλ/2)**2
+    a = math.sin(Δφ / 2) ** 2 + math.cos(φ1) * math.cos(φ2) * math.sin(Δλ / 2) ** 2
     return 2 * R * math.asin(math.sqrt(a))
 
 
 # ── Behavioural biometrics ────────────────────────────────────────────────────
+
 
 def compute_behavioural_features(
     txn: TransactionRequest,
@@ -272,15 +284,20 @@ def compute_behavioural_features(
         baseline = r.hgetall(baseline_key)
         if baseline:
             b_mean = float(baseline.get("mean", txn.typing_cadence_ms))
-            b_std  = float(baseline.get("std", 50.0))
-            features["typing_zscore"] = (txn.typing_cadence_ms - b_mean) / max(b_std, 1.0)
+            b_std = float(baseline.get("std", 50.0))
+            features["typing_zscore"] = (txn.typing_cadence_ms - b_mean) / max(
+                b_std, 1.0
+            )
         else:
             features["typing_zscore"] = 0.0
-            r.hset(baseline_key, mapping={
-                "mean": txn.typing_cadence_ms,
-                "std":  50.0,
-                "n":    1,
-            })
+            r.hset(
+                baseline_key,
+                mapping={
+                    "mean": txn.typing_cadence_ms,
+                    "std": 50.0,
+                    "n": 1,
+                },
+            )
             r.expire(baseline_key, 2_592_000)
         features["typing_cadence_ms"] = txn.typing_cadence_ms
     else:
@@ -291,6 +308,7 @@ def compute_behavioural_features(
 
 
 # ── Master feature assembler ──────────────────────────────────────────────────
+
 
 def assemble_feature_vector(
     txn: TransactionRequest,
@@ -317,6 +335,7 @@ def assemble_feature_vector(
         except Exception as exc:
             # Degrade gracefully — score with zero features rather than fail
             from loguru import logger
+
             logger.warning("Feature computation partial failure: {}", exc)
 
     # Always-computable features (no Redis needed)
@@ -334,8 +353,12 @@ def assemble_feature_vector(
     features["is_very_round_amount"] = float(txn.amount % 1000 == 0)
     channel_map = {"WEB": 0, "MOBILE": 1, "API": 2, "POS": 3, "ATM": 4, "USSD": 5}
     type_map = {
-        "PAYMENT": 0, "TRANSFER": 1, "WITHDRAWAL": 2,
-        "TOP_UP": 3, "REFUND": 4, "LOAN_DISBURSEMENT": 5
+        "PAYMENT": 0,
+        "TRANSFER": 1,
+        "WITHDRAWAL": 2,
+        "TOP_UP": 3,
+        "REFUND": 4,
+        "LOAN_DISBURSEMENT": 5,
     }
     features["channel_enc"] = float(channel_map.get(txn.channel, -1))
     features["txn_type_enc"] = float(type_map.get(txn.transaction_type, -1))

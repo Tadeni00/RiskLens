@@ -15,6 +15,7 @@ Inputs:
 Output:
   - Final fraud probability
 """
+
 from __future__ import annotations
 import pickle
 from pathlib import Path
@@ -30,11 +31,11 @@ class MetaFusionLayer:
     """
     Trainable meta-fusion layer that combines CatBoost and FT-Transformer
     predictions into a single calibrated probability.
-    
+
     Two fusion strategies:
     1. Logistic Regression (default): fast, interpretable, calibrated
     2. Small GBDT: more flexible, captures non-linear interactions
-    
+
     The fusion model is trained on a held-out calibration set where both
     CatBoost and FT-Transformer predictions are available.
     """
@@ -64,12 +65,14 @@ class MetaFusionLayer:
         extra_features: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         """Build meta-features for the fusion model."""
-        meta = np.column_stack([
-            catboost_probs,
-            ft_probs,
-            catboost_confidences,
-            np.abs(catboost_probs - ft_probs),  # disagreement feature
-        ])
+        meta = np.column_stack(
+            [
+                catboost_probs,
+                ft_probs,
+                catboost_confidences,
+                np.abs(catboost_probs - ft_probs),  # disagreement feature
+            ]
+        )
 
         if self.use_meta_features and extra_features is not None:
             meta = np.column_stack([meta, extra_features])
@@ -86,7 +89,7 @@ class MetaFusionLayer:
     ) -> "MetaFusionLayer":
         """
         Train the meta-fusion model on a calibration set.
-        
+
         Args:
             catboost_probs: CatBoost predictions on calibration set
             ft_probs: FT-Transformer predictions on calibration set
@@ -100,11 +103,10 @@ class MetaFusionLayer:
         meta_X_scaled = self.scaler.fit_transform(meta_X)
 
         if self.method == "logistic_regression":
-            self.model = LogisticRegression(
-                C=1.0, max_iter=1000, random_state=42
-            )
+            self.model = LogisticRegression(C=1.0, max_iter=1000, random_state=42)
         elif self.method == "gradient_boosting":
             from sklearn.ensemble import GradientBoostingClassifier
+
             self.model = GradientBoostingClassifier(
                 n_estimators=50,
                 max_depth=3,
@@ -119,7 +121,8 @@ class MetaFusionLayer:
 
         logger.info(
             "MetaFusionLayer trained (method={}) on {} samples",
-            self.method, len(y_true),
+            self.method,
+            len(y_true),
         )
         return self
 
@@ -132,7 +135,7 @@ class MetaFusionLayer:
     ) -> float:
         """
         Fuse CatBoost and FT-Transformer predictions.
-        
+
         Returns final calibrated fraud probability.
         """
         if not self.is_fitted:
@@ -173,13 +176,16 @@ class MetaFusionLayer:
         path.mkdir(parents=True, exist_ok=True)
 
         with open(path / "meta_fusion.pkl", "wb") as f:
-            pickle.dump({
-                "method": self.method,
-                "use_meta_features": self.use_meta_features,
-                "model": self.model,
-                "scaler": self.scaler,
-                "is_fitted": self.is_fitted,
-            }, f)
+            pickle.dump(
+                {
+                    "method": self.method,
+                    "use_meta_features": self.use_meta_features,
+                    "model": self.model,
+                    "scaler": self.scaler,
+                    "is_fitted": self.is_fitted,
+                },
+                f,
+            )
 
         logger.info("MetaFusionLayer saved to {}", path)
 

@@ -2,6 +2,7 @@
 FraudTrap — Semi-Supervised Prediction Types
 Strongly typed output for Phase 2 NetPFN predictions.
 """
+
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
@@ -11,7 +12,7 @@ from typing import Optional, List, Dict, Any
 class SemiSupervisedPrediction:
     """
     Strongly typed output from the NetPFN semi-supervised model.
-    
+
     Attributes:
         probability: Calibrated fraud probability in [0, 1].
         confidence: Model confidence in the prediction in [0, 1].
@@ -21,6 +22,7 @@ class SemiSupervisedPrediction:
         latency_ms: Inference latency in milliseconds.
         model_version: Version string of the model used.
     """
+
     probability: float
     confidence: float
     uncertainty: float
@@ -33,9 +35,7 @@ class SemiSupervisedPrediction:
         for name in ("probability", "confidence", "uncertainty"):
             val = getattr(self, name)
             if not 0.0 <= val <= 1.0:
-                raise ValueError(
-                    f"{name} must be in [0, 1], got {val}"
-                )
+                raise ValueError(f"{name} must be in [0, 1], got {val}")
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -63,6 +63,7 @@ class PseudoLabelResult:
         pseudo_high_threshold: Threshold used for high-confidence.
         pseudo_low_threshold: Threshold used for low-confidence.
     """
+
     X_pseudo: Any  # np.ndarray
     y_pseudo: Any  # np.ndarray
     review_ids: List[Any] = field(default_factory=list)

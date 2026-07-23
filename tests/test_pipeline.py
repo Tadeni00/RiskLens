@@ -3,6 +3,7 @@ FraudTrap — Test Suite
 Covers: feature engineering, model scoring, API contract, rules engine,
 phase transitions, and latency budget validation.
 """
+
 from __future__ import annotations
 import asyncio
 import time
@@ -24,8 +25,8 @@ from features.engineering import (
 from models.cold_start.ensemble import ColdStartEnsemble, FraudVAE
 from training.pipeline import _generate_synthetic_data
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def sample_txn() -> TransactionRequest:
@@ -72,8 +73,11 @@ def synthetic_dataset():
 @pytest.fixture(scope="module")
 def fitted_cold_start(synthetic_dataset):
     df = synthetic_dataset
-    feature_cols = [c for c in df.columns
-                    if c not in ("label", "transaction_id", "tenant_id", "transaction_timestamp")]
+    feature_cols = [
+        c
+        for c in df.columns
+        if c not in ("label", "transaction_id", "tenant_id", "transaction_timestamp")
+    ]
     X = df[feature_cols].fillna(0.0).values
     model = ColdStartEnsemble(input_dim=X.shape[1])
     model.fit(X, epochs=5)  # Fast for testing
@@ -81,6 +85,7 @@ def fitted_cold_start(synthetic_dataset):
 
 
 # ── Schema tests ──────────────────────────────────────────────────────────────
+
 
 class TestSchema:
     def test_transaction_request_valid(self, sample_txn):
@@ -90,20 +95,26 @@ class TestSchema:
 
     def test_currency_uppercased(self):
         txn = TransactionRequest(
-            tenant_id="t1", account_id="a1",
-            amount=100.0, currency="usd",
+            tenant_id="t1",
+            account_id="a1",
+            amount=100.0,
+            currency="usd",
             timestamp=datetime.now(timezone.utc),
-            transaction_type="PAYMENT", channel="WEB",
+            transaction_type="PAYMENT",
+            channel="WEB",
         )
         assert txn.currency == "USD"
 
     def test_amount_must_be_positive(self):
         with pytest.raises(Exception):
             TransactionRequest(
-                tenant_id="t1", account_id="a1",
-                amount=-100.0, currency="NGN",
+                tenant_id="t1",
+                account_id="a1",
+                amount=-100.0,
+                currency="NGN",
                 timestamp=datetime.now(timezone.utc),
-                transaction_type="PAYMENT", channel="WEB",
+                transaction_type="PAYMENT",
+                channel="WEB",
             )
 
     def test_label_payload_fraud(self):
@@ -121,13 +132,14 @@ class TestSchema:
             LabelPayload(
                 transaction_id="txn_001",
                 tenant_id="bank_test",
-                label=2,   # must be 0 or 1
+                label=2,  # must be 0 or 1
                 label_source="MANUAL_REVIEW",
                 labelled_at=datetime.now(timezone.utc),
             )
 
 
 # ── Feature engineering tests ─────────────────────────────────────────────────
+
 
 class TestFeatureEngineering:
     def test_haversine_same_point(self):
@@ -147,15 +159,19 @@ class TestFeatureEngineering:
 
     def test_log_amount(self, sample_txn):
         import math
+
         features = assemble_feature_vector(sample_txn, r=None)
         assert features["amount_log"] == pytest.approx(math.log1p(45_000.0))
 
     def test_night_transaction(self):
         txn = TransactionRequest(
-            tenant_id="t1", account_id="a1",
-            amount=100.0, currency="NGN",
+            tenant_id="t1",
+            account_id="a1",
+            amount=100.0,
+            currency="NGN",
             timestamp=datetime(2025, 1, 1, 3, 0, tzinfo=timezone.utc),  # 3am
-            transaction_type="PAYMENT", channel="WEB",
+            transaction_type="PAYMENT",
+            channel="WEB",
         )
         features = assemble_feature_vector(txn, r=None)
         assert features["is_night"] == 1.0
@@ -163,10 +179,13 @@ class TestFeatureEngineering:
     def test_weekend_flag(self):
         # 2025-01-04 is a Saturday
         txn = TransactionRequest(
-            tenant_id="t1", account_id="a1",
-            amount=100.0, currency="NGN",
+            tenant_id="t1",
+            account_id="a1",
+            amount=100.0,
+            currency="NGN",
             timestamp=datetime(2025, 1, 4, 10, 0, tzinfo=timezone.utc),
-            transaction_type="PAYMENT", channel="WEB",
+            transaction_type="PAYMENT",
+            channel="WEB",
         )
         features = assemble_feature_vector(txn, r=None)
         assert features["is_weekend"] == 1.0
@@ -179,10 +198,12 @@ class TestFeatureEngineering:
 
 # ── Cold-start model tests ────────────────────────────────────────────────────
 
+
 class TestColdStartEnsemble:
     def test_vae_forward_pass(self):
         vae = FraudVAE(input_dim=10, latent_dim=4)
         import torch
+
         x = torch.randn(8, 10)
         x_hat, mu, log_var = vae(x)
         assert x_hat.shape == (8, 10)
@@ -204,25 +225,27 @@ class TestColdStartEnsemble:
             fraud_scores = model.score(X[fraud_idx]).mean()
             legit_scores = model.score(X[legit_idx]).mean()
             # Fraud scores should be higher on average
-            assert fraud_scores > legit_scores, (
-                f"Expected fraud_mean ({fraud_scores:.3f}) > legit_mean ({legit_scores:.3f})"
-            )
+            assert (
+                fraud_scores > legit_scores
+            ), f"Expected fraud_mean ({fraud_scores:.3f}) > legit_mean ({legit_scores:.3f})"
 
     def test_cold_start_save_load(self, fitted_cold_start, tmp_path):
         model, X, _ = fitted_cold_start
         model.save(tmp_path / "cs_model")
         loaded = ColdStartEnsemble.load(tmp_path / "cs_model")
         assert loaded.is_fitted
-        orig_scores   = model.score(X[:10])
+        orig_scores = model.score(X[:10])
         loaded_scores = loaded.score(X[:10])
         np.testing.assert_allclose(orig_scores, loaded_scores, rtol=1e-4)
 
 
 # ── Rules engine tests ────────────────────────────────────────────────────────
 
+
 class TestRulesEngine:
     def test_impossible_travel_rule(self, sample_txn):
         from scoring.rules_engine import RulesEngine
+
         engine = RulesEngine(r=None)
         features = {"impossible_travel": 1.0}
         result = engine.evaluate(sample_txn, features)
@@ -232,6 +255,7 @@ class TestRulesEngine:
 
     def test_no_rule_fires_clean_txn(self, sample_txn):
         from scoring.rules_engine import RulesEngine
+
         engine = RulesEngine(r=None)
         features = {"impossible_travel": 0.0, "is_very_round_amount": 0.0}
         result = engine.evaluate(sample_txn, features)
@@ -242,14 +266,20 @@ class TestRulesEngine:
 
     def test_high_round_amount_rule(self, sample_txn):
         from scoring.rules_engine import RulesEngine
+
         engine = RulesEngine(r=None)
         big_txn = sample_txn.model_copy(update={"amount": 1_500_000.0})
-        features = {"is_round_amount": 1.0, "acct_v_5m_count": 5.0, "impossible_travel": 0.0}
+        features = {
+            "is_round_amount": 1.0,
+            "acct_v_5m_count": 5.0,
+            "impossible_travel": 0.0,
+        }
         result = engine.evaluate(big_txn, features)
         assert result.triggered
 
 
 # ── Latency budget test ───────────────────────────────────────────────────────
+
 
 class TestLatency:
     def test_feature_assembly_under_10ms(self, sample_txn):
@@ -277,9 +307,11 @@ class TestLatency:
 
 # ── Phase state tests ─────────────────────────────────────────────────────────
 
+
 class TestPhaseState:
     def test_phase_state_json_roundtrip(self):
         from training.pipeline import PhaseState, ModelPhase
+
         state = PhaseState(
             tenant_id="bank_test",
             current_phase=ModelPhase.SEMI_SUPERVISED,
@@ -294,6 +326,7 @@ class TestPhaseState:
 
     def test_phase_transition_gate_phase1(self):
         from training.pipeline import PhaseState, ModelPhase, PhaseTransitionEvaluator
+
         state = PhaseState(
             tenant_id="t1",
             current_phase=ModelPhase.UNSUPERVISED,
@@ -308,10 +341,11 @@ class TestPhaseState:
 
     def test_phase_transition_gate_fails_low_labels(self):
         from training.pipeline import PhaseState, ModelPhase, PhaseTransitionEvaluator
+
         state = PhaseState(
             tenant_id="t1",
             current_phase=ModelPhase.UNSUPERVISED,
-            confirmed_fraud_labels=50,   # below threshold
+            confirmed_fraud_labels=50,  # below threshold
             total_transactions=600_000,
             metrics={"pr_auc": 0.68},
             first_transaction_at="2024-01-01T00:00:00+00:00",

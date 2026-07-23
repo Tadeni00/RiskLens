@@ -59,7 +59,16 @@ class Colors:
     CHART_7 = "#06B6D4"
     CHART_8 = "#F97316"
 
-    CHART_PALETTE = [CHART_1, CHART_2, CHART_3, CHART_4, CHART_5, CHART_6, CHART_7, CHART_8]
+    CHART_PALETTE = [
+        CHART_1,
+        CHART_2,
+        CHART_3,
+        CHART_4,
+        CHART_5,
+        CHART_6,
+        CHART_7,
+        CHART_8,
+    ]
 
     # ── Status ───────────────────────────────────────────────────────────────
     STATUS_HEALTHY = "#17A673"
@@ -81,7 +90,11 @@ class Colors:
     def rgba(cls, hex_color: str, alpha: float) -> str:
         """Convert hex color to rgba string."""
         hex_color = hex_color.lstrip("#")
-        r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+        r, g, b = (
+            int(hex_color[0:2], 16),
+            int(hex_color[2:4], 16),
+            int(hex_color[4:6], 16),
+        )
         return f"rgba({r}, {g}, {b}, {alpha})"
 
     @classmethod

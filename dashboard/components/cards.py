@@ -2,15 +2,23 @@
 FraudTrap Dashboard — Reusable Card Components
 Enterprise-grade card components for KPIs, status, and information display.
 """
+
 import streamlit as st
 from dashboard.theme.colors import Colors
 from dashboard.theme.typography import Typography
 from dashboard.theme.icons import Icons
 
 
-def kpi_card(label: str, value: str, trend: float = None, trend_label: str = "",
-             icon: str = None, status: str = None, sparkline_data: list = None,
-             delta_suffix: str = ""):
+def kpi_card(
+    label: str,
+    value: str,
+    trend: float = None,
+    trend_label: str = "",
+    icon: str = None,
+    status: str = None,
+    sparkline_data: list = None,
+    delta_suffix: str = "",
+):
     """
     Render a KPI card with value, trend, and optional sparkline.
 
@@ -38,7 +46,9 @@ def kpi_card(label: str, value: str, trend: float = None, trend_label: str = "",
             trend_class = "neutral"
             arrow = ""
             trend_text = f"0{delta_suffix}"
-        trend_html = f'<span class="kpi-trend {trend_class}">{arrow} {trend_text}</span>'
+        trend_html = (
+            f'<span class="kpi-trend {trend_class}">{arrow} {trend_text}</span>'
+        )
         if trend_label:
             trend_html += f' <span style="color:{Colors.TEXT_MUTED};font-size:{Typography.TEXT_XS};margin-left:4px">{trend_label}</span>'
 
@@ -50,13 +60,16 @@ def kpi_card(label: str, value: str, trend: float = None, trend_label: str = "",
     if status:
         status_html = f'<span class="status-dot {status} status-pulse"></span>'
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
 <div class="kpi-card">
     <div class="kpi-label">{status_html}{icon_html} {label}</div>
     <div class="kpi-value">{value}</div>
     {trend_html}
 </div>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )
 
 
 def kpi_row(kpis: list):
@@ -86,7 +99,9 @@ def kpi_row(kpis: list):
                 trend_class = "neutral"
                 arrow = ""
                 trend_text = f"0{delta_suffix}"
-            trend_html = f'<span class="kpi-trend {trend_class}">{arrow} {trend_text}</span>'
+            trend_html = (
+                f'<span class="kpi-trend {trend_class}">{arrow} {trend_text}</span>'
+            )
             if trend_label:
                 trend_html += f' <span style="color:{Colors.TEXT_MUTED};font-size:{Typography.TEXT_XS};margin-left:4px">{trend_label}</span>'
 
@@ -111,8 +126,9 @@ def kpi_row(kpis: list):
     st.markdown(f'<div class="{grid_class}">{cols_html}</div>', unsafe_allow_html=True)
 
 
-def status_card(title: str, status: str, details: str = "", icon: str = None,
-                metrics: dict = None):
+def status_card(
+    title: str, status: str, details: str = "", icon: str = None, metrics: dict = None
+):
     """
     Render a status/health card for infrastructure components.
 
@@ -127,7 +143,7 @@ def status_card(title: str, status: str, details: str = "", icon: str = None,
         "healthy": "Healthy",
         "warning": "Warning",
         "critical": "Critical",
-        "offline": "Offline"
+        "offline": "Offline",
     }
 
     icon_html = ""
@@ -139,7 +155,8 @@ def status_card(title: str, status: str, details: str = "", icon: str = None,
         for name, val in metrics.items():
             metrics_html += f'<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid {Colors.BORDER_SUBTLE}"><span style="color:{Colors.TEXT_MUTED};font-size:{Typography.TEXT_SM}">{name}</span><span style="color:{Colors.TEXT_SECONDARY};font-size:{Typography.TEXT_SM};font-weight:{Typography.WEIGHT_MEDIUM}">{val}</span></div>'
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
 <div class="ft-card" style="padding:16px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
         {icon_html}
@@ -149,11 +166,18 @@ def status_card(title: str, status: str, details: str = "", icon: str = None,
     {"<p style='color:" + Colors.TEXT_MUTED + ";font-size:" + Typography.TEXT_SM + ";margin:0'>" + details + "</p>" if details else ""}
     {metrics_html}
 </div>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )
 
 
-def info_card(title: str, content: str, icon: str = None, badge: str = None,
-              badge_type: str = "info"):
+def info_card(
+    title: str,
+    content: str,
+    icon: str = None,
+    badge: str = None,
+    badge_type: str = "info",
+):
     """Render an information card with optional icon and badge."""
     icon_html = ""
     if icon:
@@ -163,7 +187,8 @@ def info_card(title: str, content: str, icon: str = None, badge: str = None,
     if badge:
         badge_html = f'<span class="ft-badge {badge_type}">{badge}</span>'
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
 <div class="ft-card" style="padding:16px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
         {icon_html}
@@ -172,7 +197,9 @@ def info_card(title: str, content: str, icon: str = None, badge: str = None,
     </div>
     <div style="color:{Colors.TEXT_SECONDARY};font-size:{Typography.TEXT_BASE};line-height:1.6">{content}</div>
 </div>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )
 
 
 def metric_card_row(metrics: list):
@@ -186,9 +213,12 @@ def metric_card_row(metrics: list):
     for col, m in zip(cols, metrics):
         color = m.get("color", Colors.TEXT_PRIMARY)
         with col:
-            st.markdown(f"""
+            st.markdown(
+                f"""
 <div class="ft-card" style="padding:16px;text-align:center">
     <div style="font-size:{Typography.TEXT_SM};color:{Colors.TEXT_MUTED};margin-bottom:6px;text-transform:uppercase;letter-spacing:{Typography.TRACKING_WIDER}">{m['label']}</div>
     <div style="font-size:{Typography.TEXT_2XL};font-weight:{Typography.WEIGHT_BOLD};color:{color};font-family:{Typography.FONT_FAMILY}">{m['value']}</div>
 </div>
-""", unsafe_allow_html=True)
+""",
+                unsafe_allow_html=True,
+            )

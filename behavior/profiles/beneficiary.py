@@ -18,6 +18,7 @@ class BeneficiaryBehaviorProfile:
     Beneficiary/Recipient behavior profile.
     Tracks recipient behavior for detecting mule accounts, money laundering, etc.
     """
+
     beneficiary_id: str
     tenant_id: str
 
@@ -46,13 +47,15 @@ class BeneficiaryBehaviorProfile:
     fraud_types: list = field(default_factory=list)
 
     # Velocity tracking
-    velocity_windows: dict = field(default_factory=lambda: {
-        "1m": RollingWindow(max_size=100),
-        "5m": RollingWindow(max_size=500),
-        "1h": RollingWindow(max_size=1000),
-        "24h": RollingWindow(max_size=1000),
-        "7d": RollingWindow(max_size=5000),
-    })
+    velocity_windows: dict = field(
+        default_factory=lambda: {
+            "1m": RollingWindow(max_size=100),
+            "5m": RollingWindow(max_size=500),
+            "1h": RollingWindow(max_size=1000),
+            "24h": RollingWindow(max_size=1000),
+            "7d": RollingWindow(max_size=5000),
+        }
+    )
 
     # Metadata
     first_seen: datetime = None
@@ -63,7 +66,9 @@ class BeneficiaryBehaviorProfile:
         """Update profile with transaction."""
         self.total_received += transaction.amount
         self.transaction_count += 1
-        self.average_received_amount = self.total_received / max(1, self.transaction_count)
+        self.average_received_amount = self.total_received / max(
+            1, self.transaction_count
+        )
 
         # Track sender
         if transaction.account_id:
@@ -72,28 +77,28 @@ class BeneficiaryBehaviorProfile:
 
         # Update velocity
         # ... velocity window updates would go here
-        
+
         if is_fraud:
             self.fraud_involvement += 1
-        
+
         self.last_updated = datetime.now(timezone.utc)
 
     def get_risk_score(self) -> float:
         """Calculate risk score for this beneficiary."""
         score = 0.0
-        
+
         # High velocity
         if self.velocity_last_hour > 10:
             score += 0.3
-        
+
         # Low sender diversity
         if self.sender_diversity < 2:
             score += 0.2
-        
+
         # Fraud history
         if self.fraud_involvement > 0:
             score += min(0.5, self.fraud_involvement * 0.1)
-        
+
         return min(1.0, score)
 
 
@@ -102,6 +107,7 @@ class PaymentInstrumentProfile:
     """
     Payment instrument (card, account, wallet) behavior profile.
     """
+
     instrument_id: str
     instrument_type: str  # CARD, ACCOUNT, WALLET
     tenant_id: str
@@ -129,14 +135,16 @@ class PaymentInstrumentProfile:
         self.total_transactions += 1
         self.total_spend += transaction.amount
         self.average_spend = self.total_spend / max(1, self.total_transactions)
-        
+
         if is_fraud:
             self.fraud_count += 1
-            self.fraud_history.append({
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "amount": transaction.amount,
-                "merchant": transaction.merchant_id,
-            })
+            self.fraud_history.append(
+                {
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "amount": transaction.amount,
+                    "merchant": transaction.merchant_id,
+                }
+            )
 
     def save(self, path: str) -> None:
         pass

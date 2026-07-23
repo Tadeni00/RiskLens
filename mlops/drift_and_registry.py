@@ -3,6 +3,7 @@ FraudTrap — MLOps Layer
 Drift detection (PSI + performance), model registry wrapper,
 and automated retraining trigger.
 """
+
 from __future__ import annotations
 import json
 from dataclasses import dataclass, field
@@ -21,6 +22,7 @@ settings = get_settings()
 
 # ── Population Stability Index ────────────────────────────────────────────────
 
+
 def compute_psi(
     expected: np.ndarray,
     actual: np.ndarray,
@@ -33,8 +35,8 @@ def compute_psi(
     PSI > 0.20 → significant drift → trigger retrain
     """
     breakpoints = np.percentile(expected, np.linspace(0, 100, buckets + 1))
-    breakpoints[0]  = -np.inf
-    breakpoints[-1] =  np.inf
+    breakpoints[0] = -np.inf
+    breakpoints[-1] = np.inf
 
     def bucket_pcts(arr):
         counts = np.histogram(arr, bins=breakpoints)[0]
@@ -49,6 +51,7 @@ def compute_psi(
 
 # ── Drift detector ────────────────────────────────────────────────────────────
 
+
 @dataclass
 class DriftReport:
     tenant_id: str
@@ -58,7 +61,7 @@ class DriftReport:
     performance_delta: float = 0.0
     drift_detected: bool = False
     retrain_recommended: bool = False
-    alert_level: str = "ok"       # ok | warning | critical
+    alert_level: str = "ok"  # ok | warning | critical
 
 
 class DriftDetector:
@@ -86,9 +89,9 @@ class DriftDetector:
     ) -> None:
         payload = {
             "feature_distributions": feature_distributions,
-            "score_distribution":    score_distribution,
-            "baseline_metrics":      baseline_metrics,
-            "saved_at":              datetime.now(timezone.utc).isoformat(),
+            "score_distribution": score_distribution,
+            "baseline_metrics": baseline_metrics,
+            "saved_at": datetime.now(timezone.utc).isoformat(),
         }
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w") as f:
@@ -142,7 +145,8 @@ class DriftDetector:
         # ── Alert level ───────────────────────────────────────────────────────
         max_psi = max(report.feature_psi.values(), default=0.0)
         critical_features = sum(
-            1 for psi in report.feature_psi.values()
+            1
+            for psi in report.feature_psi.values()
             if psi > settings.psi_drift_threshold
         )
         perf_drop = report.performance_delta > settings.performance_drop_threshold
@@ -159,13 +163,18 @@ class DriftDetector:
         logger.info(
             "Drift report tenant={}: alert={}, max_psi={:.4f}, score_psi={:.4f}, "
             "perf_delta={:.4f}, retrain={}",
-            tenant_id, report.alert_level, max_psi,
-            report.score_psi, report.performance_delta, report.retrain_recommended,
+            tenant_id,
+            report.alert_level,
+            max_psi,
+            report.score_psi,
+            report.performance_delta,
+            report.retrain_recommended,
         )
         return report
 
 
 # ── Model registry ────────────────────────────────────────────────────────────
+
 
 class ModelRegistry:
     """
@@ -189,9 +198,7 @@ class ModelRegistry:
         model_uri = f"runs:/{run_id}/model"
         try:
             mv = mlflow.register_model(model_uri, model_name)
-            self._client.set_model_version_tag(
-                model_name, mv.version, "phase", phase
-            )
+            self._client.set_model_version_tag(model_name, mv.version, "phase", phase)
             self._client.set_model_version_tag(
                 model_name, mv.version, "role", "challenger"
             )
@@ -218,7 +225,7 @@ class ModelRegistry:
         Returns True if promotion happened.
         """
         champ_score = champion_metrics.get(metric_key, 0.0)
-        chal_score  = challenger_metrics.get(metric_key, 0.0)
+        chal_score = challenger_metrics.get(metric_key, 0.0)
 
         if chal_score > champ_score:
             try:
@@ -235,10 +242,12 @@ class ModelRegistry:
                     model_name, "champion", challenger_version
                 )
                 logger.info(
-                    "Promoted model={} version={} to champion "
-                    "({}={:.4f} > {:.4f})",
-                    model_name, challenger_version, metric_key,
-                    chal_score, champ_score,
+                    "Promoted model={} version={} to champion " "({}={:.4f} > {:.4f})",
+                    model_name,
+                    challenger_version,
+                    metric_key,
+                    chal_score,
+                    champ_score,
                 )
                 return True
             except Exception as exc:
@@ -247,12 +256,15 @@ class ModelRegistry:
             logger.info(
                 "Challenger ({}={:.4f}) did not beat champion ({:.4f}). "
                 "Keeping champion.",
-                metric_key, chal_score, champ_score,
+                metric_key,
+                chal_score,
+                champ_score,
             )
         return False
 
 
 # ── Retraining scheduler ──────────────────────────────────────────────────────
+
 
 class RetrainingScheduler:
     """
@@ -279,7 +291,8 @@ class RetrainingScheduler:
             return
         logger.info(
             "Drift-triggered retrain: tenant={}, alert={}",
-            tenant_id, drift_report.alert_level,
+            tenant_id,
+            drift_report.alert_level,
         )
         self._retrain(tenant_id, state, trigger="drift")
 
@@ -288,7 +301,8 @@ class RetrainingScheduler:
             updated_state = self.pipeline.run(tenant_id, state)
             logger.info(
                 "Retrain complete: tenant={}, trigger={}, phase={}, metrics={}",
-                tenant_id, trigger,
+                tenant_id,
+                trigger,
                 updated_state.current_phase.value,
                 updated_state.metrics,
             )

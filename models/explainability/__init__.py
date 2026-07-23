@@ -2,6 +2,7 @@
 FraudTrap — Explainability Framework
 Production-grade feature attribution and counterfactual explanations.
 """
+
 from models.explainability.types import (
     FeatureAttribution,
     SHAPExplanation,
@@ -21,7 +22,10 @@ from models.explainability.nn_counterfactual import (
 from models.explainability.dice_counterfactual import DiCECounterfactual
 from models.explainability.formatter import ExplanationFormatter
 from models.explainability.cache import ExplanationCache, SHAPCache
-from models.explainability.monitoring import ExplainabilityMonitor, ExplainabilityMetrics
+from models.explainability.monitoring import (
+    ExplainabilityMonitor,
+    ExplainabilityMetrics,
+)
 from models.explainability.engine import ExplainabilityEngine, ExplainabilityConfig
 
 __all__ = [

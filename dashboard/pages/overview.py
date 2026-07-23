@@ -2,6 +2,7 @@
 FraudTrap Dashboard — Overview Page
 Real-time fraud monitoring command center.
 """
+
 from datetime import datetime, timedelta, timezone
 
 import numpy as np
@@ -31,10 +32,12 @@ from dashboard.components.data_loader import (
 from dashboard.theme.colors import Colors
 from dashboard.theme.icons import Icons
 
-
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-def _sparkline_html(values: list[float], color: str = Colors.ACCENT, width: int = 60, height: int = 24) -> str:
+
+def _sparkline_html(
+    values: list[float], color: str = Colors.ACCENT, width: int = 60, height: int = 24
+) -> str:
     """Render an inline SVG sparkline."""
     if not values:
         return ""
@@ -52,7 +55,7 @@ def _sparkline_html(values: list[float], color: str = Colors.ACCENT, width: int 
         f'style="display:block;margin-top:4px">'
         f'<path d="{path_d}" fill="none" stroke="{color}" stroke-width="1.5" '
         f'stroke-linecap="round" stroke-linejoin="round"/>'
-        f'</svg>'
+        f"</svg>"
     )
 
 
@@ -78,6 +81,7 @@ def _format_amount(val: float, currency: str = "USD") -> str:
 
 # ── Main Render ──────────────────────────────────────────────────────────────
 
+
 def render(tenant_id: str):
     # ── Data Generation ──────────────────────────────────────────────────────
     df = make_transactions(500)
@@ -101,73 +105,84 @@ def render(tenant_id: str):
     total_revenue = float(df["amount"].sum())
     blocked_amount = float(df.loc[df["decision"] == "BLOCK", "amount"].sum())
     revenue_protected = blocked_amount
-    primary_currency = df["currency"].mode().iloc[0] if "currency" in df.columns else "NGN"
+    primary_currency = (
+        df["currency"].mode().iloc[0] if "currency" in df.columns else "NGN"
+    )
 
-    sparkline_vals = live_ts["txn_per_min"].tolist() if "txn_per_min" in live_ts.columns else [float(np.random.poisson(800 + 200 * np.sin(h * np.pi / 12))) for h in range(24)]
+    sparkline_vals = (
+        live_ts["txn_per_min"].tolist()
+        if "txn_per_min" in live_ts.columns
+        else [
+            float(np.random.poisson(800 + 200 * np.sin(h * np.pi / 12)))
+            for h in range(24)
+        ]
+    )
 
     with page_container("Overview", "Real-time fraud monitoring dashboard", "HOME"):
 
         # ── Section 1: KPI Strip ─────────────────────────────────────────────
-        kpi_row([
-            {
-                "label": "Transactions Today",
-                "value": f"{txn_today:,}",
-                "trend": 12.3,
-                "trend_label": "vs yesterday",
-                "icon": "BAR_CHART",
-            },
-            {
-                "label": "Fraud Prevented",
-                "value": f"{n_block:,}",
-                "trend": -8.1,
-                "trend_label": "vs 7d avg",
-                "icon": "SHIELD_CHECK",
-            },
-            {
-                "label": "Fraud Rate",
-                "value": f"{fraud_rate:.2f}%",
-                "trend": fraud_rate - 1.3,
-                "delta_suffix": "%",
-                "status": "healthy" if fraud_rate < 2.0 else "warning",
-                "icon": "TARGET",
-            },
-            {
-                "label": "Revenue Protected",
-                "value": _format_amount(revenue_protected, primary_currency),
-                "trend": 5.4,
-                "trend_label": "this week",
-                "icon": "CREDIT_CARD",
-            },
-            {
-                "label": "P95 Latency",
-                "value": f"{avg_lat:.0f}ms",
-                "trend": avg_lat - 78.0,
-                "delta_suffix": "ms",
-                "status": "healthy" if avg_lat < 100 else "warning",
-                "icon": "ZAP",
-            },
-            {
-                "label": "False Positive Rate",
-                "value": f"{fp_rate:.3f}%",
-                "trend": -0.12,
-                "delta_suffix": "%",
-                "status": "healthy" if fp_rate < 1.0 else "warning",
-                "icon": "ALERT_TRIANGLE",
-            },
-            {
-                "label": "Champion Model",
-                "value": "CatBoost v1.0",
-                "trend": None,
-                "icon": "BRAIN",
-            },
-            {
-                "label": "Current Drift Status",
-                "value": "Stable",
-                "trend": None,
-                "status": "healthy",
-                "icon": "ACTIVITY",
-            },
-        ])
+        kpi_row(
+            [
+                {
+                    "label": "Transactions Today",
+                    "value": f"{txn_today:,}",
+                    "trend": 12.3,
+                    "trend_label": "vs yesterday",
+                    "icon": "BAR_CHART",
+                },
+                {
+                    "label": "Fraud Prevented",
+                    "value": f"{n_block:,}",
+                    "trend": -8.1,
+                    "trend_label": "vs 7d avg",
+                    "icon": "SHIELD_CHECK",
+                },
+                {
+                    "label": "Fraud Rate",
+                    "value": f"{fraud_rate:.2f}%",
+                    "trend": fraud_rate - 1.3,
+                    "delta_suffix": "%",
+                    "status": "healthy" if fraud_rate < 2.0 else "warning",
+                    "icon": "TARGET",
+                },
+                {
+                    "label": "Revenue Protected",
+                    "value": _format_amount(revenue_protected, primary_currency),
+                    "trend": 5.4,
+                    "trend_label": "this week",
+                    "icon": "CREDIT_CARD",
+                },
+                {
+                    "label": "P95 Latency",
+                    "value": f"{avg_lat:.0f}ms",
+                    "trend": avg_lat - 78.0,
+                    "delta_suffix": "ms",
+                    "status": "healthy" if avg_lat < 100 else "warning",
+                    "icon": "ZAP",
+                },
+                {
+                    "label": "False Positive Rate",
+                    "value": f"{fp_rate:.3f}%",
+                    "trend": -0.12,
+                    "delta_suffix": "%",
+                    "status": "healthy" if fp_rate < 1.0 else "warning",
+                    "icon": "ALERT_TRIANGLE",
+                },
+                {
+                    "label": "Champion Model",
+                    "value": "CatBoost v1.0",
+                    "trend": None,
+                    "icon": "BRAIN",
+                },
+                {
+                    "label": "Current Drift Status",
+                    "value": "Stable",
+                    "trend": None,
+                    "status": "healthy",
+                    "icon": "ACTIVITY",
+                },
+            ]
+        )
 
         section_divider()
 
@@ -192,7 +207,11 @@ def render(tenant_id: str):
                 "status": "warning",
                 "details": "Port 9092 — Consumer lag detected",
                 "icon": "Zap",
-                "metrics": {"Lag": "12,400", "Partitions": "24", "Throughput": "8.2K/s"},
+                "metrics": {
+                    "Lag": "12,400",
+                    "Partitions": "24",
+                    "Throughput": "8.2K/s",
+                },
             },
             {
                 "title": "ClickHouse",
@@ -251,26 +270,32 @@ def render(tenant_id: str):
             hourly = _hourly_fraud_counts(df)
             if hourly.empty:
                 hours = pd.date_range(end=now, periods=24, freq="h")
-                hourly = pd.DataFrame({
-                    "hour": hours,
-                    "fraud_count": np.random.poisson(3, 24),
-                })
+                hourly = pd.DataFrame(
+                    {
+                        "hour": hours,
+                        "fraud_count": np.random.poisson(3, 24),
+                    }
+                )
 
             fig_bar = go.Figure()
-            fig_bar.add_trace(go.Bar(
-                x=hourly["hour"],
-                y=hourly["fraud_count"],
-                marker=dict(
-                    color=Colors.CHART_4,
-                    cornerradius=4,
-                    line=dict(width=0),
-                ),
-                hovertemplate="<b>%{x|%H:%M}</b><br>Fraud: %{y}<extra></extra>",
-            ))
+            fig_bar.add_trace(
+                go.Bar(
+                    x=hourly["hour"],
+                    y=hourly["fraud_count"],
+                    marker=dict(
+                        color=Colors.CHART_4,
+                        cornerradius=4,
+                        line=dict(width=0),
+                    ),
+                    hovertemplate="<b>%{x|%H:%M}</b><br>Fraud: %{y}<extra></extra>",
+                )
+            )
             fig_bar.update_layout(
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(family="'Inter', sans-serif", color=Colors.TEXT_SECONDARY, size=12),
+                font=dict(
+                    family="'Inter', sans-serif", color=Colors.TEXT_SECONDARY, size=12
+                ),
                 margin=dict(l=0, r=0, t=8, b=0),
                 height=280,
                 xaxis=dict(
@@ -287,7 +312,9 @@ def render(tenant_id: str):
                     showline=False,
                     zeroline=False,
                     tickfont=dict(color=Colors.TEXT_MUTED, size=11),
-                    title=dict(text="Fraud Count", font=dict(size=12, color=Colors.TEXT_MUTED)),
+                    title=dict(
+                        text="Fraud Count", font=dict(size=12, color=Colors.TEXT_MUTED)
+                    ),
                 ),
                 bargap=0.15,
                 hoverlabel=dict(
@@ -310,16 +337,20 @@ def render(tenant_id: str):
             counts = [int(decision_counts.get(d, 0)) for d in decisions]
             pie_colors = [Colors.SUCCESS, Colors.WARNING, Colors.CRITICAL]
 
-            fig_pie = go.Figure(go.Pie(
-                labels=decisions,
-                values=counts,
-                hole=0.55,
-                marker=dict(colors=pie_colors, line=dict(color=Colors.BG_CARD, width=2)),
-                textfont=dict(color=Colors.TEXT_PRIMARY, size=13),
-                hovertemplate="<b>%{label}</b><br>%{value:,} ({%{percent}})<extra></extra>",
-                textinfo="percent",
-                textposition="inside",
-            ))
+            fig_pie = go.Figure(
+                go.Pie(
+                    labels=decisions,
+                    values=counts,
+                    hole=0.55,
+                    marker=dict(
+                        colors=pie_colors, line=dict(color=Colors.BG_CARD, width=2)
+                    ),
+                    textfont=dict(color=Colors.TEXT_PRIMARY, size=13),
+                    hovertemplate="<b>%{label}</b><br>%{value:,} ({%{percent}})<extra></extra>",
+                    textinfo="percent",
+                    textposition="inside",
+                )
+            )
             fig_pie.update_layout(
                 paper_bgcolor="rgba(0,0,0,0)",
                 height=280,
@@ -348,7 +379,9 @@ def render(tenant_id: str):
 
         recent = df.sort_values("timestamp", ascending=False).head(10).copy()
         recent["time_str"] = recent["timestamp"].dt.strftime("%H:%M:%S")
-        recent["amount_str"] = recent.apply(lambda r: currency_fmt(r["amount"], r.get("currency", "NGN")), axis=1)
+        recent["amount_str"] = recent.apply(
+            lambda r: currency_fmt(r["amount"], r.get("currency", "NGN")), axis=1
+        )
         recent["score_str"] = recent["risk_score"].apply(lambda x: f"{x:.4f}")
         recent["latency_str"] = recent["latency_ms"].apply(lambda x: f"{x:.0f}ms")
 
@@ -358,7 +391,16 @@ def render(tenant_id: str):
             "BLOCK": Colors.CRITICAL,
         }
 
-        table_df = recent[["time_str", "amount_str", "channel", "decision", "score_str", "latency_str"]].copy()
+        table_df = recent[
+            [
+                "time_str",
+                "amount_str",
+                "channel",
+                "decision",
+                "score_str",
+                "latency_str",
+            ]
+        ].copy()
         table_df.columns = ["Time", "Amount", "Channel", "Decision", "Score", "Latency"]
 
         data_table(

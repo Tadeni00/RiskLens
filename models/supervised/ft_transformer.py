@@ -9,6 +9,7 @@ to capture complex feature interactions that tree-based models may miss.
 This model is NEVER executed for every transaction — only when the
 ConfidenceEstimator determines CatBoost is insufficiently confident.
 """
+
 from __future__ import annotations
 import hashlib
 import pickle
@@ -24,8 +25,8 @@ from loguru import logger
 
 from scoring.calibration import ProbabilityCalibrator
 
-
 # ── Transformer Architecture ─────────────────────────────────────────────────
+
 
 class FeatureTokenizer(nn.Module):
     """Tokenizes each feature into a d-dimensional embedding."""
@@ -89,10 +90,9 @@ class FTTransformerEncoder(nn.Module):
     ):
         super().__init__()
         self.tokenizer = FeatureTokenizer(n_features, d_token)
-        self.layers = nn.ModuleList([
-            FTTransformerBlock(d_token, n_heads, dropout)
-            for _ in range(n_layers)
-        ])
+        self.layers = nn.ModuleList(
+            [FTTransformerBlock(d_token, n_heads, dropout) for _ in range(n_layers)]
+        )
         self.head = nn.Sequential(
             nn.Linear(d_token, d_token),
             nn.ReLU(),
@@ -112,17 +112,18 @@ class FTTransformerEncoder(nn.Module):
 
 # ── Wrapper ──────────────────────────────────────────────────────────────────
 
+
 class FTTransformerPredictor:
     """
     Production wrapper for the FT-Transformer specialist model.
-    
+
     Handles:
     - Feature scaling (StandardScaler)
     - PyTorch ↔ NumPy interface
     - Probability calibration
     - Version pinning
     - Persistence (save/load)
-    
+
     This model is only invoked when the ConfidenceEstimator determines
     CatBoost is insufficiently confident.
     """
@@ -173,7 +174,9 @@ class FTTransformerPredictor:
         }
 
     def _compute_hashes(self, X: np.ndarray, y: np.ndarray) -> Dict[str, str]:
-        feature_str = "|".join(self.feature_names) if self.feature_names else str(X.shape[1])
+        feature_str = (
+            "|".join(self.feature_names) if self.feature_names else str(X.shape[1])
+        )
         feature_hash = hashlib.sha256(feature_str.encode()).hexdigest()[:16]
 
         if len(X) > 10000:
@@ -181,11 +184,13 @@ class FTTransformerPredictor:
             X_sample, y_sample = X[idx], y[idx]
         else:
             X_sample, y_sample = X, y
-        data_stats = np.concatenate([
-            X_sample.mean(axis=0),
-            X_sample.std(axis=0),
-            [y_sample.mean(), len(y_sample)],
-        ])
+        data_stats = np.concatenate(
+            [
+                X_sample.mean(axis=0),
+                X_sample.std(axis=0),
+                [y_sample.mean(), len(y_sample)],
+            ]
+        )
         dataset_hash = hashlib.sha256(data_stats.tobytes()).hexdigest()[:16]
 
         return {"feature_hash": feature_hash, "dataset_hash": dataset_hash}
@@ -217,22 +222,25 @@ class FTTransformerPredictor:
         torch.save(self.model.state_dict(), path / "ft_transformer_model.pt")
 
         with open(path / "ft_transformer_metadata.pkl", "wb") as f:
-            pickle.dump({
-                "n_features": self.n_features,
-                "feature_names": self.feature_names,
-                "calibration_method": self.calibration_method,
-                "model_version": self.model_version,
-                "scaler": self.scaler,
-                "calibrator": self.calibrator,
-                "is_fitted": self.is_fitted,
-                "training_hash": self.training_hash,
-                "feature_hash": self.feature_hash,
-                "dataset_hash": self.dataset_hash,
-                "trained_at": self.trained_at,
-                "pr_auc": self.pr_auc_,
-                "roc_auc": self.roc_auc_,
-                "config": self._config,
-            }, f)
+            pickle.dump(
+                {
+                    "n_features": self.n_features,
+                    "feature_names": self.feature_names,
+                    "calibration_method": self.calibration_method,
+                    "model_version": self.model_version,
+                    "scaler": self.scaler,
+                    "calibrator": self.calibrator,
+                    "is_fitted": self.is_fitted,
+                    "training_hash": self.training_hash,
+                    "feature_hash": self.feature_hash,
+                    "dataset_hash": self.dataset_hash,
+                    "trained_at": self.trained_at,
+                    "pr_auc": self.pr_auc_,
+                    "roc_auc": self.roc_auc_,
+                    "config": self._config,
+                },
+                f,
+            )
 
         logger.info("FTTransformerPredictor saved to {}", path)
 
@@ -265,13 +273,14 @@ class FTTransformerPredictor:
         obj.pr_auc_ = payload.get("pr_auc", 0.0)
         obj.roc_auc_ = payload.get("roc_auc", 0.0)
 
-        obj.model.load_state_dict(torch.load(
-            path / "ft_transformer_model.pt", map_location="cpu"
-        ))
+        obj.model.load_state_dict(
+            torch.load(path / "ft_transformer_model.pt", map_location="cpu")
+        )
         obj.model.eval()
 
         logger.info(
             "FTTransformerPredictor loaded from {} (version={})",
-            path, obj.model_version,
+            path,
+            obj.model_version,
         )
         return obj

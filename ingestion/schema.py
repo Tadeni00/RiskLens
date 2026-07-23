@@ -4,14 +4,15 @@ Flexible Pydantic schema that accepts any client payload.
 Mandatory fields are the minimum required to compute velocity features.
 All other fields enrich the feature vector but are optional.
 """
+
 from __future__ import annotations
 from datetime import datetime
 from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 import uuid
 
-
 # ── Mandatory core (every client MUST provide these) ─────────────────────────
+
 
 class TransactionRequest(BaseModel):
     """
@@ -23,7 +24,7 @@ class TransactionRequest(BaseModel):
     # Identity
     transaction_id: str = Field(
         default_factory=lambda: str(uuid.uuid4()),
-        description="Unique transaction identifier (idempotency key)"
+        description="Unique transaction identifier (idempotency key)",
     )
     tenant_id: str = Field(..., description="Client bank / fintech identifier")
     account_id: str = Field(..., description="Tokenised account identifier")
@@ -31,19 +32,20 @@ class TransactionRequest(BaseModel):
 
     # Transaction core
     amount: float = Field(..., gt=0, description="Transaction amount in local currency")
-    currency: str = Field(..., min_length=3, max_length=3, description="ISO 4217 currency code")
+    currency: str = Field(
+        ..., min_length=3, max_length=3, description="ISO 4217 currency code"
+    )
     timestamp: datetime = Field(..., description="Transaction initiation time (UTC)")
     transaction_type: str = Field(
         ...,
-        description="Type: PAYMENT, TRANSFER, WITHDRAWAL, TOP_UP, REFUND, LOAN_DISBURSEMENT"
+        description="Type: PAYMENT, TRANSFER, WITHDRAWAL, TOP_UP, REFUND, LOAN_DISBURSEMENT",
     )
-    channel: str = Field(
-        ...,
-        description="Channel: WEB, MOBILE, API, POS, ATM, USSD"
-    )
+    channel: str = Field(..., description="Channel: WEB, MOBILE, API, POS, ATM, USSD")
 
     # Counterparty (optional but high-signal)
-    merchant_id: Optional[str] = Field(None, description="Tokenised merchant identifier")
+    merchant_id: Optional[str] = Field(
+        None, description="Tokenised merchant identifier"
+    )
     merchant_category_code: Optional[str] = Field(None, description="MCC code")
     merchant_country: Optional[str] = Field(None, description="ISO 3166-1 alpha-2")
     counterparty_account_id: Optional[str] = Field(
@@ -52,8 +54,12 @@ class TransactionRequest(BaseModel):
 
     # Device / network (optional but high-signal for ATO)
     device_id: Optional[str] = Field(None, description="Tokenised device fingerprint")
-    device_type: Optional[str] = Field(None, description="MOBILE, DESKTOP, TABLET, POS_TERMINAL")
-    ip_address_hash: Optional[str] = Field(None, description="Hashed IP address (privacy-safe)")
+    device_type: Optional[str] = Field(
+        None, description="MOBILE, DESKTOP, TABLET, POS_TERMINAL"
+    )
+    ip_address_hash: Optional[str] = Field(
+        None, description="Hashed IP address (privacy-safe)"
+    )
     user_agent_hash: Optional[str] = Field(None, description="Hashed user-agent string")
 
     # Geolocation (optional)
@@ -66,12 +72,14 @@ class TransactionRequest(BaseModel):
         None, description="Mean inter-keystroke interval in ms"
     )
     session_duration_seconds: Optional[float] = Field(None)
-    field_visit_count: Optional[int] = Field(None, description="Number of form fields visited")
+    field_visit_count: Optional[int] = Field(
+        None, description="Number of form fields visited"
+    )
 
     # Client-specific extensions
     extra_fields: Optional[dict[str, Any]] = Field(
         None,
-        description="Pass-through dict for client-specific fields — stored but not used in base model"
+        description="Pass-through dict for client-specific fields — stored but not used in base model",
     )
 
     @field_validator("currency")
@@ -98,19 +106,25 @@ class TransactionRequest(BaseModel):
                 "merchant_id": "tok_merch_456",
                 "merchant_category_code": "5411",
                 "device_id": "tok_dev_abc",
-                "country_code": "NG"
+                "country_code": "NG",
             }
         }
 
 
 # ── Scoring response ──────────────────────────────────────────────────────────
 
+
 class FeatureContribution(BaseModel):
     """Individual feature contribution to the score."""
+
     feature: str = Field(description="Feature name")
     value: float = Field(description="Feature value for this transaction")
-    contribution: float = Field(description="Contribution to risk score (can be negative)")
-    method: str = Field(description="Attribution method: shap, rule_weight, vae_recon, iforest_path, tail_zscore, calibration")
+    contribution: float = Field(
+        description="Contribution to risk score (can be negative)"
+    )
+    method: str = Field(
+        description="Attribution method: shap, rule_weight, vae_recon, iforest_path, tail_zscore, calibration"
+    )
 
 
 class Explanation(BaseModel):
@@ -120,7 +134,10 @@ class Explanation(BaseModel):
     and calibration breakdown (semi-supervised).
     Enhanced with counterfactual and confidence data from the ExplainabilityEngine.
     """
-    model_type: str = Field(description="Model type: rules, cold_start, semi_supervised, supervised, champion, explainability")
+
+    model_type: str = Field(
+        description="Model type: rules, cold_start, semi_supervised, supervised, champion, explainability"
+    )
     base_value: float = Field(description="Model baseline (expected value)")
     prediction_value: float = Field(description="Final risk score")
     top_features: list[FeatureContribution] = Field(
@@ -128,21 +145,20 @@ class Explanation(BaseModel):
     )
     components: Optional[dict[str, float]] = Field(
         default=None,
-        description="Phase-specific component breakdown (e.g., vae/iforest/tail for cold-start)"
+        description="Phase-specific component breakdown (e.g., vae/iforest/tail for cold-start)",
     )
     latency_ms: float = Field(description="Time to compute explanation")
     # Extended fields from ExplainabilityEngine
     confidence: Optional[dict[str, Any]] = Field(
         default=None,
-        description="Model confidence metadata (expert_used, confidence, ft_invoked)"
+        description="Model confidence metadata (expert_used, confidence, ft_invoked)",
     )
     counterfactual: Optional[dict[str, Any]] = Field(
         default=None,
-        description="Counterfactual explanation (nearest_neighbor or dice)"
+        description="Counterfactual explanation (nearest_neighbor or dice)",
     )
     formatted_report: Optional[dict[str, Any]] = Field(
-        default=None,
-        description="Analyst-friendly formatted report"
+        default=None, description="Analyst-friendly formatted report"
     )
 
 
@@ -157,7 +173,9 @@ class ScoringResponse(BaseModel):
     model_version: str
     latency_ms: float
     explanation: Optional[Explanation] = None
-    explanation_type: Optional[str] = Field(default=None, description="sync | async_pending | none")
+    explanation_type: Optional[str] = Field(
+        default=None, description="sync | async_pending | none"
+    )
     triggered_rules: list[str] = Field(default_factory=list)
     trace_id: str = Field(description="Unique trace for audit log lookup")
     scored_at: datetime
@@ -165,15 +183,18 @@ class ScoringResponse(BaseModel):
 
 # ── Label ingestion ───────────────────────────────────────────────────────────
 
+
 class LabelPayload(BaseModel):
     """Ground-truth label arriving from chargeback or manual review."""
+
     transaction_id: str
     tenant_id: str
     label: int = Field(..., ge=0, le=1, description="1=fraud, 0=legitimate")
-    label_source: str = Field(description="CHARGEBACK | MANUAL_REVIEW | DISPUTE_RESOLVED")
+    label_source: str = Field(
+        description="CHARGEBACK | MANUAL_REVIEW | DISPUTE_RESOLVED"
+    )
     chargeback_reason_code: Optional[str] = Field(
-        None,
-        description="Visa/MC reason code — used to filter non-fraud chargebacks"
+        None, description="Visa/MC reason code — used to filter non-fraud chargebacks"
     )
     labelled_at: datetime
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)

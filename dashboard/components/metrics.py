@@ -2,6 +2,7 @@
 FraudTrap Dashboard — Metric Display Components
 Specialized metric rendering for fraud detection context.
 """
+
 import streamlit as st
 from dashboard.theme.colors import Colors
 from dashboard.theme.typography import Typography
@@ -10,6 +11,7 @@ from dashboard.theme.icons import Icons
 
 def latency_display(p50: float, p95: float, p99: float, target: float = 100.0):
     """Render latency metrics with SLA indicators."""
+
     def _indicator(val, target):
         if val <= target * 0.5:
             return "success", "Excellent"
@@ -24,7 +26,8 @@ def latency_display(p50: float, p95: float, p99: float, target: float = 100.0):
     p95_class, p95_label = _indicator(p95, target)
     p99_class, p99_label = _indicator(p99, target * 1.5)
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
     <div style="background:{Colors.BG_CARD};border:1px solid {Colors.BORDER_DEFAULT};border-radius:10px;padding:16px;text-align:center">
         <div style="font-size:{Typography.TEXT_SM};color:{Colors.TEXT_MUTED};text-transform:uppercase;letter-spacing:{Typography.TRACKING_WIDER};margin-bottom:8px">P50 Latency</div>
@@ -42,11 +45,14 @@ def latency_display(p50: float, p95: float, p99: float, target: float = 100.0):
         <span class="ft-badge {p99_class}" style="margin-top:8px">{p99_label}</span>
     </div>
 </div>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )
 
 
-def fraud_rate_display(rate: float, threshold_warning: float = 0.02,
-                       threshold_critical: float = 0.05):
+def fraud_rate_display(
+    rate: float, threshold_warning: float = 0.02, threshold_critical: float = 0.05
+):
     """Render fraud rate with visual indicator."""
     if rate <= threshold_warning:
         color = Colors.SUCCESS
@@ -58,7 +64,8 @@ def fraud_rate_display(rate: float, threshold_warning: float = 0.02,
         color = Colors.CRITICAL
         label = "High"
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
 <div style="display:flex;align-items:center;gap:16px;padding:16px 20px;background:{Colors.BG_CARD};border:1px solid {Colors.BORDER_DEFAULT};border-radius:10px">
     <div style="width:48px;height:48px;border-radius:12px;background:{Colors.rgba(color, 0.15)};display:flex;align-items:center;justify-content:center">
         {Icons.html('SHIELD', 24, color)}
@@ -71,7 +78,9 @@ def fraud_rate_display(rate: float, threshold_warning: float = 0.02,
         </div>
     </div>
 </div>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )
 
 
 def model_performance_summary(model_name: str, metrics: dict):
@@ -88,7 +97,8 @@ def model_performance_summary(model_name: str, metrics: dict):
     <span style="color:{Colors.TEXT_PRIMARY};font-weight:{Typography.WEIGHT_SEMIBOLD};font-size:{Typography.TEXT_SM}">{display_val}</span>
 </div>"""
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
 <div style="background:{Colors.BG_CARD};border:1px solid {Colors.BORDER_DEFAULT};border-radius:10px;padding:20px">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
         {Icons.html('BOX', 20, Colors.ACCENT)}
@@ -97,7 +107,9 @@ def model_performance_summary(model_name: str, metrics: dict):
     </div>
     {metrics_html}
 </div>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )
 
 
 def confidence_display(confidence: float, label: str = ""):
@@ -109,7 +121,8 @@ def confidence_display(confidence: float, label: str = ""):
     else:
         color = Colors.CRITICAL
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
 <div style="padding:12px 16px;background:{Colors.BG_CARD};border:1px solid {Colors.BORDER_DEFAULT};border-radius:8px">
     <div style="display:flex;justify-content:space-between;margin-bottom:6px">
         <span style="font-size:{Typography.TEXT_SM};color:{Colors.TEXT_MUTED}">{label or 'Confidence'}</span>
@@ -119,4 +132,6 @@ def confidence_display(confidence: float, label: str = ""):
         <div class="ft-progress-bar {'success' if confidence >= 0.9 else 'warning' if confidence >= 0.7 else 'critical'}" style="width:{confidence * 100}%"></div>
     </div>
 </div>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )

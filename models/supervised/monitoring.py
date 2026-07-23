@@ -3,6 +3,7 @@ FraudTrap — Phase 3: Supervised Monitoring
 Tracks CatBoost confidence distribution, FT-Transformer invocation rate,
 fusion model performance, latency impact, and calibration drift.
 """
+
 from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -15,6 +16,7 @@ from loguru import logger
 @dataclass
 class SupervisedMetrics:
     """Snapshot of Phase 3 monitoring metrics."""
+
     timestamp: str = ""
     catboost_confidence_mean: float = 0.0
     catboost_confidence_p50: float = 0.0
@@ -48,7 +50,7 @@ class SupervisedMetrics:
 class SupervisedMonitor:
     """
     Monitoring for the Phase 3 confidence-aware supervised layer.
-    
+
     Tracks:
     - CatBoost confidence distribution (should remain high)
     - Percentage of transactions routed to FT-Transformer
@@ -86,25 +88,26 @@ class SupervisedMonitor:
 
         # Keep window
         for attr in (
-            "_confidences", "_ft_invoked", "_predictions",
-            "_latencies", "_fusion_probs",
+            "_confidences",
+            "_ft_invoked",
+            "_predictions",
+            "_latencies",
+            "_fusion_probs",
         ):
             lst = getattr(self, attr)
             if len(lst) > self.window_size:
-                setattr(self, attr, lst[-self.window_size:])
+                setattr(self, attr, lst[-self.window_size :])
 
     def record_calibration_error(self, ece: float) -> None:
         """Record calibration error measurement."""
         self._calibration_errors.append(ece)
         if len(self._calibration_errors) > self.window_size:
-            self._calibration_errors = self._calibration_errors[-self.window_size:]
+            self._calibration_errors = self._calibration_errors[-self.window_size :]
 
     def get_metrics(self) -> SupervisedMetrics:
         """Compute current monitoring metrics."""
         if not self._confidences:
-            return SupervisedMetrics(
-                timestamp=datetime.now(timezone.utc).isoformat()
-            )
+            return SupervisedMetrics(timestamp=datetime.now(timezone.utc).isoformat())
 
         confs = np.array(self._confidences)
         lats = np.array(self._latencies)
@@ -145,11 +148,15 @@ class SupervisedMonitor:
     ) -> Dict[str, Any]:
         """
         Detect operational issues.
-        
+
         Returns dict with issue status and details.
         """
         if len(self._confidences) < 100:
-            return {"has_issues": False, "issues": [], "n_samples": len(self._confidences)}
+            return {
+                "has_issues": False,
+                "issues": [],
+                "n_samples": len(self._confidences),
+            }
 
         issues = []
 
@@ -165,9 +172,7 @@ class SupervisedMonitor:
             early = np.mean(self._confidences[:500])
             late = np.mean(self._confidences[-500:])
             if early - late > max_confidence_drop:
-                issues.append(
-                    f"CatBoost confidence dropping: {early:.3f} → {late:.3f}"
-                )
+                issues.append(f"CatBoost confidence dropping: {early:.3f} → {late:.3f}")
 
         # Check latency
         recent_lats = np.array(self._latencies[-1000:])

@@ -2,6 +2,7 @@
 FraudTrap Dashboard — Alert Components
 Professional alert and notification display components.
 """
+
 import streamlit as st
 from datetime import datetime
 from dashboard.theme.colors import Colors
@@ -9,7 +10,9 @@ from dashboard.theme.typography import Typography
 from dashboard.theme.icons import Icons
 
 
-def alert(message: str, level: str = "info", icon: str = None, timestamp: datetime = None):
+def alert(
+    message: str, level: str = "info", icon: str = None, timestamp: datetime = None
+):
     """
     Render an alert component.
 
@@ -31,7 +34,8 @@ def alert(message: str, level: str = "info", icon: str = None, timestamp: dateti
     if timestamp:
         timestamp_html = f'<span style="font-size:{Typography.TEXT_XS};color:{Colors.TEXT_MUTED};margin-left:auto">{timestamp.strftime("%H:%M:%S")}</span>'
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
 <div class="ft-alert {level}">
     <div style="display:flex;align-items:center;gap:8px">
         {Icons.html(icon_name, 16)}
@@ -39,7 +43,9 @@ def alert(message: str, level: str = "info", icon: str = None, timestamp: dateti
         {timestamp_html}
     </div>
 </div>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )
 
 
 def alert_list(alerts: list):
@@ -93,8 +99,11 @@ def status_timeline(events: list):
     </div>
 </div>"""
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
 <div style="background:{Colors.BG_CARD};border:1px solid {Colors.BORDER_DEFAULT};border-radius:10px;padding:16px">
     {items_html}
 </div>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )

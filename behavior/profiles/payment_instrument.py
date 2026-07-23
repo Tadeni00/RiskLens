@@ -15,6 +15,7 @@ class PaymentInstrumentProfile:
     """
     Payment instrument (card, account, wallet) behavior profile.
     """
+
     instrument_id: str
     instrument_type: str  # CARD, ACCOUNT, WALLET
     tenant_id: str
@@ -45,11 +46,13 @@ class PaymentInstrumentProfile:
 
         if is_fraud:
             self.fraud_count += 1
-            self.fraud_history.append({
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "amount": transaction.amount,
-                "merchant": transaction.merchant_id,
-            })
+            self.fraud_history.append(
+                {
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "amount": transaction.amount,
+                    "merchant": transaction.merchant_id,
+                }
+            )
 
     def save(self, path: str) -> None:
         pass

@@ -8,6 +8,7 @@ Key improvements:
 - Dynamic blending weights based on label quality
 - Uncertainty-aware pseudo-labeling
 """
+
 from __future__ import annotations
 import pickle
 from pathlib import Path
@@ -27,7 +28,7 @@ class SemiSupervisedBridge:
     Uses confirmed labels + high-confidence pseudo-labels from Phase 1
     to train a lightweight XGBoost that progressively replaces the
     unsupervised ensemble.
-    
+
     Adaptive thresholds:
     - Week 1 (few labels): 0.99 / 0.05 (very conservative)
     - Week 5: 0.96 / 0.10
@@ -41,8 +42,8 @@ class SemiSupervisedBridge:
     BASE_LOW_CONF_CEILING = 0.15
 
     # Pseudo-label thresholds (adaptive)
-    PSEUDO_HIGH_CONF_BASE = 0.92   # above → pseudo-fraud label
-    PSEUDO_LOW_CONF_BASE  = 0.15   # below → pseudo-legit label
+    PSEUDO_HIGH_CONF_BASE = 0.92  # above → pseudo-fraud label
+    PSEUDO_LOW_CONF_BASE = 0.15  # below → pseudo-legit label
     # 0.15–0.92 = uncertainty zone → routed to human review queue
 
     def __init__(self, cold_start: ColdStartEnsemble):
@@ -62,14 +63,18 @@ class SemiSupervisedBridge:
         """
         # Progress from 0 to 1 as confirmed labels grow from 0 to 10000
         progress = min(1.0, self.confirmed_label_count / 10000.0)
-        
-        high_conf = self.BASE_HIGH_CONF_START - progress * (self.BASE_HIGH_CONF_START - self.BASE_HIGH_CONF_FLOOR)
-        low_conf = self.BASE_LOW_CONF_START + progress * (self.BASE_LOW_CONF_CEILING - self.BASE_LOW_CONF_START)
-        
+
+        high_conf = self.BASE_HIGH_CONF_START - progress * (
+            self.BASE_HIGH_CONF_START - self.BASE_HIGH_CONF_FLOOR
+        )
+        low_conf = self.BASE_LOW_CONF_START + progress * (
+            self.BASE_LOW_CONF_CEILING - self.BASE_LOW_CONF_START
+        )
+
         # Pseudo-label thresholds also adapt
         pseudo_high = self.PSEUDO_HIGH_CONF_BASE - progress * 0.05  # 0.92 -> 0.87
-        pseudo_low = self.PSEUDO_LOW_CONF_BASE + progress * 0.05    # 0.15 -> 0.20
-        
+        pseudo_low = self.PSEUDO_LOW_CONF_BASE + progress * 0.05  # 0.15 -> 0.20
+
         return high_conf, low_conf, pseudo_high, pseudo_low
 
     # ── Pseudo-label generation ───────────────────────────────────────────────
@@ -87,12 +92,12 @@ class SemiSupervisedBridge:
         Uses adaptive thresholds based on confirmed label count.
         """
         scores = self.cold_start.score(X_unlabelled)
-        
+
         # Get adaptive thresholds
         _, _, pseudo_high, pseudo_low = self._adaptive_thresholds()
 
-        high_mask  = scores >= pseudo_high
-        low_mask   = scores <= pseudo_low
+        high_mask = scores >= pseudo_high
+        low_mask = scores <= pseudo_low
         confident_mask = high_mask | low_mask
 
         X_pseudo = X_unlabelled[confident_mask]
@@ -101,15 +106,19 @@ class SemiSupervisedBridge:
         review_idx = np.where(~confident_mask)[0]
         review_ids = (
             [transaction_ids[i] for i in review_idx]
-            if transaction_ids else list(review_idx.tolist())
+            if transaction_ids
+            else list(review_idx.tolist())
         )
 
         self.pseudo_label_count = int(confident_mask.sum())
         logger.info(
             "Pseudo-labels (adaptive thresholds: high={:.2f}, low={:.2f}): "
             "{} fraud, {} legit, {} sent to review queue",
-            pseudo_high, pseudo_low,
-            int(high_mask.sum()), int(low_mask.sum()), len(review_ids)
+            pseudo_high,
+            pseudo_low,
+            int(high_mask.sum()),
+            int(low_mask.sum()),
+            len(review_ids),
         )
         return X_pseudo, y_pseudo, review_ids
 
@@ -166,11 +175,11 @@ class SemiSupervisedBridge:
             if len(X_pseudo) > 0:
                 X_train = np.vstack([X_confirmed, X_pseudo])
                 # Confirmed labels weighted 3x pseudo-labels
-                w_conf   = np.ones(len(y_confirmed)) * 3.0
+                w_conf = np.ones(len(y_confirmed)) * 3.0
                 w_pseudo = np.ones(len(y_pseudo)) * 1.0
-                weights  = np.concatenate([w_conf, w_pseudo])
+                weights = np.concatenate([w_conf, w_pseudo])
                 if sample_weights is not None:
-                    weights[:len(y_confirmed)] *= sample_weights
+                    weights[: len(y_confirmed)] *= sample_weights
                 y_train = np.concatenate([y_confirmed, y_pseudo])
             else:
                 X_train, y_train, weights = X_confirmed, y_confirmed, sample_weights
@@ -205,7 +214,9 @@ class SemiSupervisedBridge:
         self.is_fitted = True
         logger.info(
             "SemiSupervisedBridge fitted (iter={}) — {} confirmed + {} pseudo labels",
-            self.training_iteration, self.confirmed_label_count, self.pseudo_label_count
+            self.training_iteration,
+            self.confirmed_label_count,
+            self.pseudo_label_count,
         )
         return self
 
@@ -227,7 +238,9 @@ class SemiSupervisedBridge:
 
         # Dynamic blending — more confirmed labels = more trust in XGBoost
         # Also factor in pseudo-label quality
-        label_quality = self.confirmed_label_count / max(1, self.confirmed_label_count + self.pseudo_label_count)
+        label_quality = self.confirmed_label_count / max(
+            1, self.confirmed_label_count + self.pseudo_label_count
+        )
         xgb_weight = min(0.70, 0.30 + 0.40 * label_quality)
         cold_weight = 1.0 - xgb_weight
 
@@ -241,100 +254,128 @@ class SemiSupervisedBridge:
         if not self.is_fitted:
             # Return cold-start only explanation
             return self.cold_start.explain(X, top_n=top_n)
-        
+
         n_samples = X.shape[0]
         X_scaled = self.scaler.transform(X)
-        
+
         # Get cold-start explanation
         cold_explanations = self.cold_start.explain(X, top_n=top_n)
-        
+
         # Get XGBoost SHAP values
         try:
             import shap
+
             explainer = shap.TreeExplainer(self.xgb)
             shap_values = explainer.shap_values(X_scaled)
-            
+
             if isinstance(shap_values, list):
                 shap_values = shap_values[1]  # Class 1 (fraud)
-            
+
             base_value = float(explainer.expected_value)
             if isinstance(base_value, (list, np.ndarray)):
-                base_value = float(base_value[1] if len(base_value) > 1 else base_value[0])
+                base_value = float(
+                    base_value[1] if len(base_value) > 1 else base_value[0]
+                )
         except Exception as exc:
             logger.warning("SHAP explanation failed for XGBoost: {}", exc)
             shap_values = np.zeros((n_samples, X_scaled.shape[1]))
             base_value = 0.0
-        
+
         # Dynamic blend weights
-        label_quality = self.confirmed_label_count / max(1, self.confirmed_label_count + self.pseudo_label_count)
+        label_quality = self.confirmed_label_count / max(
+            1, self.confirmed_label_count + self.pseudo_label_count
+        )
         xgb_weight = min(0.70, 0.30 + 0.40 * label_quality)
         cold_weight = 1.0 - xgb_weight
-        
+
         explanations = []
         for i in range(n_samples):
             # Cold-start component
             cold_comp = cold_explanations[i]
             cold_contrib = cold_weight * cold_comp["prediction_value"]
-            
+
             # XGBoost component
             xgb_contrib = xgb_weight * (base_value + shap_values[i].sum())
-            
+
             # Combined prediction
             combined = cold_contrib + xgb_contrib
-            
+
             # Feature-level attributions (combine cold-start + SHAP)
             # Cold-start components
             cold_components = cold_comp.get("top_features", [])
-            
+
             # XGBoost SHAP features
-            xgb_feature_names = self.xgb.feature_names_in_ if hasattr(self.xgb, 'feature_names_in_') else \
-                               [f"f{j}" for j in range(X_scaled.shape[1])]
-            
+            xgb_feature_names = (
+                self.xgb.feature_names_in_
+                if hasattr(self.xgb, "feature_names_in_")
+                else [f"f{j}" for j in range(X_scaled.shape[1])]
+            )
+
             shap_pairs = list(zip(xgb_feature_names, shap_values[i]))
             shap_pairs.sort(key=lambda x: abs(x[1]), reverse=True)
-            
+
             top_features = []
-            
+
             # Add cold-start components (weighted by cold_weight)
-            for cf in cold_components[:top_n//2]:
-                top_features.append({
-                    "feature": cf.get("feature", "cold_start_component"),
-                    "value": cf.get("value", 0.0),
-                    "contribution": cf.get("contribution", 0.0) * cold_weight,
-                    "method": "cold_start_component",
-                })
-            
+            for cf in cold_components[: top_n // 2]:
+                top_features.append(
+                    {
+                        "feature": cf.get("feature", "cold_start_component"),
+                        "value": cf.get("value", 0.0),
+                        "contribution": cf.get("contribution", 0.0) * cold_weight,
+                        "method": "cold_start_component",
+                    }
+                )
+
             # Add XGBoost SHAP features (weighted by xgb_weight)
-            for feat, shap_val in shap_pairs[:top_n//2]:
-                top_features.append({
-                    "feature": feat,
-                    "value": float(X_scaled[i, list(xgb_feature_names).index(feat)]) if feat in xgb_feature_names else 0.0,
-                    "contribution": float(shap_val) * xgb_weight,
-                    "method": "shap",
-                })
-            
-            explanations.append({
-                "model_type": "semi_supervised",
-                "base_value": base_value * xgb_weight,
-                "prediction_value": float(combined),
-                "top_features": top_features[:top_n],
-                "components": {
-                    "cold_start": {
-                        "weight": cold_weight,
-                        "prediction": float(cold_comp["prediction_value"]),
-                        "top_features": cold_comp.get("top_features", []),
+            for feat, shap_val in shap_pairs[: top_n // 2]:
+                top_features.append(
+                    {
+                        "feature": feat,
+                        "value": (
+                            float(X_scaled[i, list(xgb_feature_names).index(feat)])
+                            if feat in xgb_feature_names
+                            else 0.0
+                        ),
+                        "contribution": float(shap_val) * xgb_weight,
+                        "method": "shap",
+                    }
+                )
+
+            explanations.append(
+                {
+                    "model_type": "semi_supervised",
+                    "base_value": base_value * xgb_weight,
+                    "prediction_value": float(combined),
+                    "top_features": top_features[:top_n],
+                    "components": {
+                        "cold_start": {
+                            "weight": cold_weight,
+                            "prediction": float(cold_comp["prediction_value"]),
+                            "top_features": cold_comp.get("top_features", []),
+                        },
+                        "xgboost": {
+                            "weight": xgb_weight,
+                            "prediction": (
+                                float(xgb_contrib / xgb_weight)
+                                if xgb_weight > 0
+                                else 0.0
+                            ),
+                            "base_value": base_value,
+                            "shap_values": {
+                                feat: float(shap_val)
+                                for feat, shap_val in shap_pairs[:top_n]
+                            },
+                        },
+                        "blend_weights": {
+                            "cold_start": cold_weight,
+                            "xgboost": xgb_weight,
+                        },
+                        "label_quality": label_quality,
                     },
-                    "xgboost": {
-                        "weight": xgb_weight,
-                        "prediction": float(xgb_contrib / xgb_weight) if xgb_weight > 0 else 0.0,
-                        "base_value": base_value,
-                        "shap_values": {feat: float(shap_val) for feat, shap_val in shap_pairs[:top_n]},
-                    },
-                    "blend_weights": {"cold_start": cold_weight, "xgboost": xgb_weight},
-                    "label_quality": label_quality,
-                },
-            })
-        
+                }
+            )
+
         return explanations
 
     # ── Persistence ───────────────────────────────────────────────────────────
@@ -343,15 +384,18 @@ class SemiSupervisedBridge:
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
         with open(path / "semi_supervised.pkl", "wb") as f:
-            pickle.dump({
-                "scaler": self.scaler,
-                "xgb": self.xgb,
-                "calibrator": self.calibrator,
-                "is_fitted": self.is_fitted,
-                "pseudo_label_count": self.pseudo_label_count,
-                "confirmed_label_count": self.confirmed_label_count,
-                "training_iteration": self.training_iteration,
-            }, f)
+            pickle.dump(
+                {
+                    "scaler": self.scaler,
+                    "xgb": self.xgb,
+                    "calibrator": self.calibrator,
+                    "is_fitted": self.is_fitted,
+                    "pseudo_label_count": self.pseudo_label_count,
+                    "confirmed_label_count": self.confirmed_label_count,
+                    "training_iteration": self.training_iteration,
+                },
+                f,
+            )
         logger.info("SemiSupervisedBridge saved to {}", path)
 
     @classmethod

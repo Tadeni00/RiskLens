@@ -4,6 +4,7 @@ Consumes the labels Kafka topic, validates label quality,
 updates phase state counters, and writes to ClickHouse for training.
 Runs as a long-lived background process alongside the API.
 """
+
 from __future__ import annotations
 import json
 import time
@@ -22,15 +23,15 @@ settings = get_settings()
 
 # Chargeback reason codes that indicate actual fraud (not merchant disputes)
 FRAUD_REASON_CODES = {
-    "4863",   # Visa: Cardholder Does Not Recognize
-    "10.4",   # Visa: Other Fraud - Card Absent
-    "10.5",   # Visa: Visa Fraud Monitoring Program
-    "37",     # Mastercard: No Cardholder Authorization
-    "4853",   # Mastercard: Cardholder Dispute (sometimes fraud)
-    "UA01",   # Discover: Fraud - Card Present
-    "UA02",   # Discover: Fraud - Card Not Present
-    "4807",   # Visa: Warning Bulletin File
-    "4808",   # Visa: Authorization-Related Chargeback
+    "4863",  # Visa: Cardholder Does Not Recognize
+    "10.4",  # Visa: Other Fraud - Card Absent
+    "10.5",  # Visa: Visa Fraud Monitoring Program
+    "37",  # Mastercard: No Cardholder Authorization
+    "4853",  # Mastercard: Cardholder Dispute (sometimes fraud)
+    "UA01",  # Discover: Fraud - Card Present
+    "UA02",  # Discover: Fraud - Card Not Present
+    "4807",  # Visa: Warning Bulletin File
+    "4808",  # Visa: Authorization-Related Chargeback
 }
 
 # Parquet / ClickHouse writer placeholder
@@ -74,7 +75,8 @@ class LabelWorker:
             ):
                 logger.debug(
                     "Skipping non-fraud chargeback reason_code={} txn={}",
-                    label.chargeback_reason_code, label.transaction_id,
+                    label.chargeback_reason_code,
+                    label.transaction_id,
                 )
                 return
 
@@ -90,8 +92,10 @@ class LabelWorker:
         logger.debug(
             "Label processed: tenant={} txn={} label={} source={} "
             "total_fraud_labels={}",
-            label.tenant_id, label.transaction_id,
-            label.label, label.label_source,
+            label.tenant_id,
+            label.transaction_id,
+            label.label,
+            label.label_source,
             state.confirmed_fraud_labels,
         )
 
@@ -137,14 +141,14 @@ class LabelWorker:
         tenant_path.mkdir(parents=True, exist_ok=True)
 
         record = {
-            "transaction_id":        label.transaction_id,
-            "tenant_id":             label.tenant_id,
-            "label":                 label.label,
-            "label_source":          label.label_source,
+            "transaction_id": label.transaction_id,
+            "tenant_id": label.tenant_id,
+            "label": label.label,
+            "label_source": label.label_source,
             "chargeback_reason_code": label.chargeback_reason_code,
-            "labelled_at":           label.labelled_at.isoformat(),
-            "confidence":            label.confidence,
-            "ingested_at":           datetime.now(timezone.utc).isoformat(),
+            "labelled_at": label.labelled_at.isoformat(),
+            "confidence": label.confidence,
+            "ingested_at": datetime.now(timezone.utc).isoformat(),
         }
 
         # Append to JSONL (parquet writer would replace this in production)
@@ -163,7 +167,8 @@ class LabelWorker:
             if state.confirmed_fraud_labels == phase1_gate:
                 logger.info(
                     "Phase 1 fraud label threshold reached for tenant={}. "
-                    "Queueing retrain.", state.tenant_id,
+                    "Queueing retrain.",
+                    state.tenant_id,
                 )
                 self._queue_retrain(state.tenant_id, "phase_gate")
 
@@ -171,7 +176,8 @@ class LabelWorker:
             if state.confirmed_fraud_labels == phase2_gate:
                 logger.info(
                     "Phase 2 fraud label threshold reached for tenant={}. "
-                    "Queueing retrain.", state.tenant_id,
+                    "Queueing retrain.",
+                    state.tenant_id,
                 )
                 self._queue_retrain(state.tenant_id, "phase_gate")
 
@@ -180,23 +186,28 @@ class LabelWorker:
         if self._redis:
             self._redis.lpush(
                 "fraudtrap:retrain:queue",
-                json.dumps({
-                    "tenant_id": tenant_id,
-                    "trigger":   trigger,
-                    "queued_at": datetime.now(timezone.utc).isoformat(),
-                }),
+                json.dumps(
+                    {
+                        "tenant_id": tenant_id,
+                        "trigger": trigger,
+                        "queued_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                ),
             )
 
 
 if __name__ == "__main__":
     import redis as redis_lib
     from config.settings import get_settings
+
     s = get_settings()
     try:
         r = redis_lib.Redis(host=s.redis_host, port=s.redis_port)
         r.ping()
     except Exception:
         r = None
-        logger.warning("Redis unavailable — running label worker without state persistence")
+        logger.warning(
+            "Redis unavailable — running label worker without state persistence"
+        )
     worker = LabelWorker(redis_client=r)
     worker.start()

@@ -3,6 +3,7 @@ FraudTrap — Phase 2: Semi-Supervised Training Pipeline
 Manages the full training lifecycle for the NetPFN model:
   Pseudo-label generation → Dataset construction → Training → Calibration → Validation
 """
+
 from __future__ import annotations
 import time
 from dataclasses import dataclass, field
@@ -19,13 +20,17 @@ from loguru import logger
 
 from models.cold_start.ensemble import ColdStartEnsemble
 from models.semi_supervised.netpfn import NetPFNModel, NetPFNWrapper, NetPFNLoss
-from models.semi_supervised.prediction import SemiSupervisedPrediction, PseudoLabelResult
+from models.semi_supervised.prediction import (
+    SemiSupervisedPrediction,
+    PseudoLabelResult,
+)
 from scoring.calibration import ProbabilityCalibrator
 
 
 @dataclass
 class SemiSupervisedConfig:
     """Configuration for Phase 2 training."""
+
     # Model architecture
     embedding_dim: int = 64
     hidden_dims: Optional[List[int]] = None
@@ -59,6 +64,7 @@ class SemiSupervisedConfig:
 @dataclass
 class SemiSupervisedTrainingResult:
     """Result of a Phase 2 training run."""
+
     model_version: str = ""
     n_confirmed: int = 0
     n_pseudo: int = 0
@@ -90,7 +96,7 @@ class SemiSupervisedTrainingResult:
 class SemiSupervisedTrainer:
     """
     Training pipeline for the Phase 2 NetPFN model.
-    
+
     Workflow:
     1. Generate pseudo-labels from cold-start ensemble
     2. Combine confirmed + pseudo labels
@@ -113,7 +119,7 @@ class SemiSupervisedTrainer:
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, PseudoLabelResult]:
         """
         Combine confirmed labels with pseudo-labels from cold-start.
-        
+
         Returns:
             X_train: Combined feature matrix
             y_train: Combined labels
@@ -125,9 +131,7 @@ class SemiSupervisedTrainer:
             and len(X_unlabelled) > 0
             and cold_start is not None
         ):
-            pseudo_result = self.generate_pseudo_labels(
-                X_unlabelled, cold_start
-            )
+            pseudo_result = self.generate_pseudo_labels(X_unlabelled, cold_start)
             X_pseudo = pseudo_result.X_pseudo
             y_pseudo = pseudo_result.y_pseudo
 
@@ -138,9 +142,7 @@ class SemiSupervisedTrainer:
                 w_confirmed = np.full(
                     len(y_confirmed), self.config.confirmed_label_weight
                 )
-                w_pseudo = np.full(
-                    len(y_pseudo), self.config.pseudo_label_weight
-                )
+                w_pseudo = np.full(len(y_pseudo), self.config.pseudo_label_weight)
                 weights = np.concatenate([w_confirmed, w_pseudo])
             else:
                 X_combined = X_confirmed
@@ -181,7 +183,9 @@ class SemiSupervisedTrainer:
         confident_mask = high_mask | low_mask
 
         X_pseudo = X_unlabelled[confident_mask]
-        y_pseudo = (scores[confident_mask] >= self.config.pseudo_label_threshold).astype(int)
+        y_pseudo = (
+            scores[confident_mask] >= self.config.pseudo_label_threshold
+        ).astype(int)
 
         n_high = int(high_mask.sum())
         n_low = int(low_mask.sum())
@@ -190,7 +194,9 @@ class SemiSupervisedTrainer:
         logger.info(
             "Pseudo-labels: {} high-confidence fraud, {} low-confidence legit, "
             "{} sent to review (thresholds: high={:.2f}, low={:.2f})",
-            n_high, n_low, n_review,
+            n_high,
+            n_low,
+            n_review,
             self.config.pseudo_label_threshold,
             self.config.pseudo_low_threshold,
         )
@@ -214,7 +220,7 @@ class SemiSupervisedTrainer:
     ) -> Tuple[NetPFNWrapper, SemiSupervisedTrainingResult]:
         """
         Train the NetPFN model end-to-end.
-        
+
         Returns:
             (trained wrapper, training result)
         """
@@ -278,8 +284,7 @@ class SemiSupervisedTrainer:
             y_val_t = torch.FloatTensor(y_val)
 
             train_dataset = TensorDataset(
-                X_train_t, y_train_t,
-                *([w_train_t] if w_train_t is not None else [])
+                X_train_t, y_train_t, *([w_train_t] if w_train_t is not None else [])
             )
             sampler = self._create_sampler(y_train, w_train)
             train_loader = DataLoader(
@@ -312,9 +317,7 @@ class SemiSupervisedTrainer:
                         fraud_prob, confidence, batch_y, batch_w, wrapper.model
                     )
                     loss.backward()
-                    torch.nn.utils.clip_grad_norm_(
-                        wrapper.model.parameters(), 1.0
-                    )
+                    torch.nn.utils.clip_grad_norm_(wrapper.model.parameters(), 1.0)
                     optimizer.step()
 
                     epoch_loss += loss.item()
@@ -339,15 +342,12 @@ class SemiSupervisedTrainer:
                         best_val_pr_auc = val_pr_auc
                         patience_counter = 0
                         best_state = {
-                            k: v.clone()
-                            for k, v in wrapper.model.state_dict().items()
+                            k: v.clone() for k, v in wrapper.model.state_dict().items()
                         }
                     else:
                         patience_counter += 1
                         if patience_counter >= self.config.early_stopping_patience:
-                            logger.info(
-                                "Early stopping at epoch {}", epoch + 1
-                            )
+                            logger.info("Early stopping at epoch {}", epoch + 1)
                             break
 
             # Restore best model
@@ -372,6 +372,7 @@ class SemiSupervisedTrainer:
 
             # Compute calibration error
             from sklearn.calibration import calibration_curve
+
             fraction_pos, mean_predicted = calibration_curve(
                 y_val, val_probs_cal, n_bins=10
             )
@@ -422,18 +423,25 @@ class SemiSupervisedTrainer:
 
         X_train_val, X_val, y_train_val, y_val, w_train_val, w_val = (
             train_test_split(
-                X, y, weights,
+                X,
+                y,
+                weights,
                 test_size=val_ratio_adjusted,
                 random_state=self.config.random_seed,
                 stratify=y,
             )
             if weights is not None
-            else (*train_test_split(
-                X, y,
-                test_size=val_ratio_adjusted,
-                random_state=self.config.random_seed,
-                stratify=y,
-            ), None, None)
+            else (
+                *train_test_split(
+                    X,
+                    y,
+                    test_size=val_ratio_adjusted,
+                    random_state=self.config.random_seed,
+                    stratify=y,
+                ),
+                None,
+                None,
+            )
         )
 
         return X_train_val, X_val, y_train_val, y_val, w_train_val, w_val

@@ -2,6 +2,7 @@
 FraudTrap — Explainability Framework Tests
 Unit, integration, and performance tests for the explainability layer.
 """
+
 from __future__ import annotations
 import time
 import sys
@@ -32,8 +33,8 @@ from models.explainability.cache import ExplanationCache, SHAPCache
 from models.explainability.monitoring import ExplainabilityMonitor
 from models.explainability.engine import ExplainabilityEngine, ExplainabilityConfig
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def synthetic_data():
@@ -76,10 +77,16 @@ def sample_counterfactual():
         prediction_delta=0.78,
         changes=(
             CounterfactualChange(
-                feature="amount", current_value=850000, counterfactual_value=180000, realistic=True,
+                feature="amount",
+                current_value=850000,
+                counterfactual_value=180000,
+                realistic=True,
             ),
             CounterfactualChange(
-                feature="device_age", current_value=0, counterfactual_value=30, realistic=True,
+                feature="device_age",
+                current_value=0,
+                counterfactual_value=30,
+                realistic=True,
             ),
         ),
         source="nearest_neighbor",
@@ -103,6 +110,7 @@ def sample_confidence():
 
 # ── Type tests ────────────────────────────────────────────────────────────────
 
+
 class TestTypes:
     def test_feature_attribution(self, sample_attribution):
         assert sample_attribution.feature == "transaction_velocity"
@@ -124,7 +132,9 @@ class TestTypes:
         assert sample_confidence.expert_used == "CatBoost"
         assert sample_confidence.ft_invoked is False
 
-    def test_full_explanation(self, sample_shap_explanation, sample_counterfactual, sample_confidence):
+    def test_full_explanation(
+        self, sample_shap_explanation, sample_counterfactual, sample_confidence
+    ):
         full = FullExplanation(
             transaction_id="txn_001",
             tenant_id="tenant_001",
@@ -142,6 +152,7 @@ class TestTypes:
 
 # ── SHAP Explainer tests ─────────────────────────────────────────────────────
 
+
 class TestSHAPExplainer:
     def test_init(self):
         explainer = SHAPExplainer(top_features=5)
@@ -157,6 +168,7 @@ class TestSHAPExplainer:
 
 
 # ── Nearest Neighbor Counterfactual tests ─────────────────────────────────────
+
 
 class TestNearestNeighborCounterfactual:
     def test_weighted_distance(self):
@@ -228,8 +240,11 @@ class TestNearestNeighborCounterfactual:
 
 # ── Formatter tests ───────────────────────────────────────────────────────────
 
+
 class TestFormatter:
-    def test_format_with_all(self, sample_shap_explanation, sample_counterfactual, sample_confidence):
+    def test_format_with_all(
+        self, sample_shap_explanation, sample_counterfactual, sample_confidence
+    ):
         formatter = ExplanationFormatter(max_drivers=5)
         report = formatter.format(
             fraud_probability=0.94,
@@ -242,7 +257,9 @@ class TestFormatter:
         assert report.counterfactual_summary is not None
         assert len(report.minimal_changes) > 0
 
-    def test_format_without_counterfactual(self, sample_shap_explanation, sample_confidence):
+    def test_format_without_counterfactual(
+        self, sample_shap_explanation, sample_confidence
+    ):
         formatter = ExplanationFormatter()
         report = formatter.format(
             fraud_probability=0.94,
@@ -259,6 +276,7 @@ class TestFormatter:
 
 
 # ── Cache tests ───────────────────────────────────────────────────────────────
+
 
 class TestCache:
     def test_put_and_get(self):
@@ -303,7 +321,9 @@ class TestCache:
 
     def test_cache_hit_rate(self):
         cache = ExplanationCache()
-        exp = FullExplanation(transaction_id="txn_001", tenant_id="t", fraud_probability=0.5)
+        exp = FullExplanation(
+            transaction_id="txn_001", tenant_id="t", fraud_probability=0.5
+        )
         cache.put("t", "txn_001", exp)
         cache.get("t", "txn_001")  # hit
         cache.get("t", "nonexistent")  # miss
@@ -317,6 +337,7 @@ class TestCache:
 
 
 # ── Monitor tests ─────────────────────────────────────────────────────────────
+
 
 class TestMonitor:
     def test_record_explanation(self):
@@ -344,6 +365,7 @@ class TestMonitor:
 
 
 # ── ExplainabilityEngine tests ────────────────────────────────────────────────
+
 
 class TestExplainabilityEngine:
     def test_init(self):
@@ -388,6 +410,7 @@ class TestExplainabilityEngine:
 
 
 # ── Performance tests ─────────────────────────────────────────────────────────
+
 
 class TestPerformance:
     def test_cache_get_latency(self):

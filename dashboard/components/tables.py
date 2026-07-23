@@ -2,6 +2,7 @@
 FraudTrap Dashboard — Table Components
 Professional data tables with sorting, filtering, and status indicators.
 """
+
 import streamlit as st
 import pandas as pd
 from dashboard.theme.colors import Colors
@@ -9,9 +10,15 @@ from dashboard.theme.typography import Typography
 from dashboard.theme.icons import Icons
 
 
-def data_table(df: pd.DataFrame, columns: dict = None, max_rows: int = 50,
-               sortable: bool = True, status_col: str = None,
-               row_actions: list = None, striped: bool = False) -> str:
+def data_table(
+    df: pd.DataFrame,
+    columns: dict = None,
+    max_rows: int = 50,
+    sortable: bool = True,
+    status_col: str = None,
+    row_actions: list = None,
+    striped: bool = False,
+) -> str:
     """
     Render a professional data table.
 
@@ -48,10 +55,14 @@ def data_table(df: pd.DataFrame, columns: dict = None, max_rows: int = 50,
             if status_col and col == display_df.columns[0]:
                 status_val = str(row.get(status_col, "")).lower()
                 status_colors = {
-                    "healthy": Colors.SUCCESS, "active": Colors.SUCCESS,
-                    "warning": Colors.WARNING, "pending": Colors.WARNING,
-                    "critical": Colors.CRITICAL, "blocked": Colors.CRITICAL,
-                    "offline": Colors.TEXT_MUTED, "archived": Colors.TEXT_MUTED,
+                    "healthy": Colors.SUCCESS,
+                    "active": Colors.SUCCESS,
+                    "warning": Colors.WARNING,
+                    "pending": Colors.WARNING,
+                    "critical": Colors.CRITICAL,
+                    "blocked": Colors.CRITICAL,
+                    "offline": Colors.TEXT_MUTED,
+                    "archived": Colors.TEXT_MUTED,
                 }
                 dot_color = status_colors.get(status_val, Colors.TEXT_MUTED)
                 val = f'<span style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:50%;background:{dot_color}"></span>{val}</span>'
@@ -82,7 +93,10 @@ def metric_table(metrics: list, title: str = "") -> str:
         metrics: List of dicts with 'label', 'value', optional 'status', 'trend'
     """
     if title:
-        st.markdown(f"<div style='margin-bottom:12px;color:{Colors.TEXT_PRIMARY};font-weight:{Typography.WEIGHT_SEMIBOLD};font-size:{Typography.TEXT_MD}'>{title}</div>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div style='margin-bottom:12px;color:{Colors.TEXT_PRIMARY};font-weight:{Typography.WEIGHT_SEMIBOLD};font-size:{Typography.TEXT_MD}'>{title}</div>",
+            unsafe_allow_html=True,
+        )
 
     rows_html = ""
     for m in metrics:
@@ -104,17 +118,25 @@ def metric_table(metrics: list, title: str = "") -> str:
     <td style="padding:10px 16px;color:{Colors.TEXT_PRIMARY};font-weight:{Typography.WEIGHT_SEMIBOLD};border-bottom:1px solid {Colors.BORDER_SUBTLE};text-align:right;font-size:{Typography.TEXT_BASE}">{m['value']}{status_html} {trend_html}</td>
 </tr>"""
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
 <div style="border:1px solid {Colors.BORDER_DEFAULT};border-radius:10px;background:{Colors.BG_CARD};overflow:hidden">
     <table style="width:100%;border-collapse:collapse;font-family:{Typography.FONT_FAMILY}">
         <tbody>{rows_html}</tbody>
     </table>
 </div>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )
 
 
-def leader_board(entries: list, title: str = "", rank_col: str = "rank",
-                 name_col: str = "name", value_col: str = "value") -> str:
+def leader_board(
+    entries: list,
+    title: str = "",
+    rank_col: str = "rank",
+    name_col: str = "name",
+    value_col: str = "value",
+) -> str:
     """
     Render a leaderboard card.
 
@@ -122,7 +144,10 @@ def leader_board(entries: list, title: str = "", rank_col: str = "rank",
         entries: List of dicts with rank, name, value, optional 'trend', 'badge'
     """
     if title:
-        st.markdown(f"<div style='margin-bottom:12px;color:{Colors.TEXT_PRIMARY};font-weight:{Typography.WEIGHT_SEMIBOLD};font-size:{Typography.TEXT_MD}'>{title}</div>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div style='margin-bottom:12px;color:{Colors.TEXT_PRIMARY};font-weight:{Typography.WEIGHT_SEMIBOLD};font-size:{Typography.TEXT_MD}'>{title}</div>",
+            unsafe_allow_html=True,
+        )
 
     items_html = ""
     for i, entry in enumerate(entries[:10]):
@@ -160,8 +185,11 @@ def leader_board(entries: list, title: str = "", rank_col: str = "rank",
     {trend_html}
 </div>"""
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
 <div style="border:1px solid {Colors.BORDER_DEFAULT};border-radius:10px;background:{Colors.BG_CARD};overflow:hidden">
     {items_html}
 </div>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )

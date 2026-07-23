@@ -13,6 +13,7 @@ Key improvements:
 - Rules explainability
 - Watchdog-based hot-reload with atomic swap
 """
+
 from __future__ import annotations
 import json
 import threading
@@ -30,6 +31,7 @@ from loguru import logger
 try:
     from watchdog.observers import Observer
     from watchdog.events import FileSystemEventHandler
+
     WATCHDOG_AVAILABLE = True
 except Exception as exc:
     WATCHDOG_AVAILABLE = False
@@ -40,7 +42,10 @@ from ingestion.schema import TransactionRequest, ScoringResponse, Explanation
 from features.engineering import assemble_feature_vector, get_redis
 from scoring.rules_engine import RulesEngine
 from scoring.simple_model import SimpleFraudModel
-from scoring.validation import validate_feature_compatibility, auto_register_schema_if_missing
+from scoring.validation import (
+    validate_feature_compatibility,
+    auto_register_schema_if_missing,
+)
 
 try:
     from models.cold_start.ensemble import ColdStartEnsemble
@@ -69,6 +74,7 @@ except Exception as exc:
 try:
     from models.explainability.engine import ExplainabilityEngine, ExplainabilityConfig
     from models.explainability.types import ConfidenceInfo
+
     EXPLAINABILITY_AVAILABLE = True
 except Exception as exc:
     ExplainabilityEngine = None
@@ -83,22 +89,27 @@ settings = get_settings()
 _GNN_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="gnn-scorer")
 
 # Thread pool for async explanation (cold-start, semi-supervised)
-_EXPLANATION_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="explanation")
+_EXPLANATION_EXECUTOR = ThreadPoolExecutor(
+    max_workers=2, thread_name_prefix="explanation"
+)
 
 
 class _ModelFileHandler:
     """Watchdog handler for model file changes."""
-    
+
     def __init__(self, registry: "ModelRegistry"):
         self.registry = registry
         self._last_reload = 0.0
         self._debounce_seconds = 1.0  # Debounce rapid file writes
-    
+
     def on_modified(self, event):
-        if getattr(event, 'is_directory', False):
+        if getattr(event, "is_directory", False):
             return
         # Only reload on model artifact changes
-        if not any(getattr(event, 'src_path', '').endswith(ext) for ext in ('.pkl', '.pt', '.txt')):
+        if not any(
+            getattr(event, "src_path", "").endswith(ext)
+            for ext in (".pkl", ".pt", ".txt")
+        ):
             return
         now = time.monotonic()
         if now - self._last_reload < self._debounce_seconds:
@@ -115,6 +126,7 @@ class ModelRegistry:
     Supports version pinning: model_version, training_hash, feature_hash, dataset_hash.
     Uses double-buffered atomic swap for zero-downtime reloads.
     """
+
     def __init__(self):
         self.cold_start: Optional[ColdStartEnsemble] = None
         self.semi_supervised: Optional[NetPFNWrapper] = None
@@ -127,12 +139,12 @@ class ModelRegistry:
         self.training_hash: Optional[str] = None
         self.dataset_hash: Optional[str] = None
         self.trained_at: Optional[str] = None
-        
+
         self.champion_models: dict[str, ChampionModel] = {}
         self.semi_supervised_models: dict[str, NetPFNWrapper] = {}
         self.cold_start_models: dict[str, ColdStartEnsemble] = {}
         self.simple_models: dict[str, SimpleFraudModel] = {}
-        
+
         # Double-buffered state for atomic swap
         self._staging = {}
         self._active = {}
@@ -144,7 +156,7 @@ class ModelRegistry:
         """Load all models from disk into staging, then atomically swap."""
         model_dir = Path(model_dir)
         self._model_dir = model_dir
-        
+
         if not model_dir.exists():
             logger.info("Model directory does not exist yet: {}", model_dir)
             return
@@ -153,9 +165,11 @@ class ModelRegistry:
         staging = {}
         staging["simple_models"] = self._load_simple_models(model_dir)
         staging["cold_start_models"] = self._load_cold_start_models(model_dir)
-        staging["semi_supervised_models"] = self._load_semi_supervised_models(model_dir, staging.get("cold_start_models", {}))
+        staging["semi_supervised_models"] = self._load_semi_supervised_models(
+            model_dir, staging.get("cold_start_models", {})
+        )
         staging["champion_models"] = self._load_supervised_models(model_dir)
-        
+
         # Load shared models
         cold_path = model_dir / "cold_start"
         if cold_path.exists() and ColdStartEnsemble:
@@ -182,7 +196,7 @@ class ModelRegistry:
                 logger.info("Champion model loaded (version={})", self.model_version)
             except Exception as exc:
                 logger.warning("Failed to load shared champion model: {}", exc)
-        
+
         # Load champion model (preferred over ensemble for production)
         champion_path = model_dir / "champion"
         if champion_path.exists() and ChampionModel:
@@ -201,7 +215,12 @@ class ModelRegistry:
             logger.info("GNN scorer loaded")
 
         # Version fallback
-        if not staging.get("simple_models") and not staging.get("supervised") and not staging.get("semi_supervised") and not staging.get("cold_start"):
+        if (
+            not staging.get("simple_models")
+            and not staging.get("supervised")
+            and not staging.get("semi_supervised")
+            and not staging.get("cold_start")
+        ):
             version_file = model_dir / "version.txt"
             if version_file.exists():
                 staging["model_version"] = version_file.read_text().strip()
@@ -214,8 +233,11 @@ class ModelRegistry:
         with self._lock:
             self._staging = staging
             self._swap_active()
-            logger.info("Model swap complete: active_phase={}, version={}", 
-                       self.active_phase, self.model_version)
+            logger.info(
+                "Model swap complete: active_phase={}, version={}",
+                self.active_phase,
+                self.model_version,
+            )
 
         # Start watchdog on first load
         if self._observer is None and WATCHDOG_AVAILABLE:
@@ -228,7 +250,7 @@ class ModelRegistry:
         self.cold_start_models = s.get("cold_start_models", {})
         self.semi_supervised_models = s.get("semi_supervised_models", {})
         self.champion_models = s.get("champion_models", {})
-        
+
         self.cold_start = s.get("cold_start")
         self.semi_supervised = s.get("semi_supervised")
         self.champion = s.get("champion")
@@ -259,15 +281,15 @@ class ModelRegistry:
 
     def _extract_version_info(self, model) -> None:
         """Extract version pinning info from loaded model."""
-        if hasattr(model, 'model_version'):
+        if hasattr(model, "model_version"):
             self.model_version = model.model_version
-        if hasattr(model, 'training_hash'):
+        if hasattr(model, "training_hash"):
             self.training_hash = model.training_hash
-        if hasattr(model, 'feature_hash'):
+        if hasattr(model, "feature_hash"):
             self.feature_hash = model.feature_hash
-        if hasattr(model, 'dataset_hash'):
+        if hasattr(model, "dataset_hash"):
             self.dataset_hash = model.dataset_hash
-        if hasattr(model, 'trained_at'):
+        if hasattr(model, "trained_at"):
             self.trained_at = model.trained_at
 
     def _warmup_models(self) -> None:
@@ -314,9 +336,15 @@ class ModelRegistry:
             try:
                 loaded[tenant_id] = SimpleFraudModel.load(model_path)
             except Exception as exc:
-                logger.warning("Could not load simple model for tenant {}: {}", tenant_id, exc)
+                logger.warning(
+                    "Could not load simple model for tenant {}: {}", tenant_id, exc
+                )
         if loaded:
-            logger.info("Loaded {} tenant simple model(s): {}", len(loaded), ", ".join(sorted(loaded)))
+            logger.info(
+                "Loaded {} tenant simple model(s): {}",
+                len(loaded),
+                ", ".join(sorted(loaded)),
+            )
         return loaded
 
     def _load_cold_start_models(self, model_dir: Path) -> dict[str, ColdStartEnsemble]:
@@ -327,12 +355,20 @@ class ModelRegistry:
                 if ColdStartEnsemble:
                     loaded[tenant_id] = ColdStartEnsemble.load(p1_dir)
             except Exception as exc:
-                logger.warning("Could not load cold start model for tenant {}: {}", tenant_id, exc)
+                logger.warning(
+                    "Could not load cold start model for tenant {}: {}", tenant_id, exc
+                )
         if loaded:
-            logger.info("Loaded {} tenant cold-start model(s): {}", len(loaded), ", ".join(sorted(loaded)))
+            logger.info(
+                "Loaded {} tenant cold-start model(s): {}",
+                len(loaded),
+                ", ".join(sorted(loaded)),
+            )
         return loaded
 
-    def _load_semi_supervised_models(self, model_dir: Path, cold_models: dict) -> dict[str, NetPFNWrapper]:
+    def _load_semi_supervised_models(
+        self, model_dir: Path, cold_models: dict
+    ) -> dict[str, NetPFNWrapper]:
         loaded: dict[str, NetPFNWrapper] = {}
         for p2_dir in sorted(model_dir.glob("*/phase2")):
             tenant_id = p2_dir.parent.name
@@ -340,9 +376,15 @@ class ModelRegistry:
                 if NetPFNWrapper:
                     loaded[tenant_id] = NetPFNWrapper.load(p2_dir)
             except Exception as exc:
-                logger.warning("Could not load NetPFN for tenant {}: {}", tenant_id, exc)
+                logger.warning(
+                    "Could not load NetPFN for tenant {}: {}", tenant_id, exc
+                )
         if loaded:
-            logger.info("Loaded {} tenant semi-supervised model(s): {}", len(loaded), ", ".join(sorted(loaded)))
+            logger.info(
+                "Loaded {} tenant semi-supervised model(s): {}",
+                len(loaded),
+                ", ".join(sorted(loaded)),
+            )
         return loaded
 
     def _load_supervised_models(self, model_dir: Path) -> dict[str, ChampionModel]:
@@ -353,9 +395,15 @@ class ModelRegistry:
                 if ChampionModel:
                     loaded[tenant_id] = ChampionModel.load(p3_dir)
             except Exception as exc:
-                logger.warning("Could not load champion model for tenant {}: {}", tenant_id, exc)
+                logger.warning(
+                    "Could not load champion model for tenant {}: {}", tenant_id, exc
+                )
         if loaded:
-            logger.info("Loaded {} tenant champion model(s): {}", len(loaded), ", ".join(sorted(loaded)))
+            logger.info(
+                "Loaded {} tenant champion model(s): {}",
+                len(loaded),
+                ", ".join(sorted(loaded)),
+            )
         return loaded
 
     def get_active_model(self, tenant_id: str | None = None):
@@ -392,11 +440,11 @@ class ModelRegistry:
                     return "cold-start-ensemble"
                 if tenant_id in self.simple_models:
                     return self.simple_models[tenant_id].model_version
-            
+
             # Return champion version if available
             if self.champion:
                 return self.champion.model_version
-            
+
             return self.model_version
 
     def get_version_info(self) -> dict:
@@ -421,6 +469,7 @@ def get_registry() -> ModelRegistry:
 
 
 # ── Scoring orchestrator ──────────────────────────────────────────────────────
+
 
 class ScoringOrchestrator:
     """
@@ -465,7 +514,7 @@ class ScoringOrchestrator:
         scored_at = datetime.now(timezone.utc)
 
         r = self._get_redis()
-        
+
         # Resolve tenant's phase dynamically from Redis
         model_phase = "UNSUPERVISED"
         if r:
@@ -479,14 +528,17 @@ class ScoringOrchestrator:
 
         # ── Step 1: Feature assembly (~5–15ms including Redis) ────────────────
         features = assemble_feature_vector(txn, r)
-        
+
         # Feature validation: check for NaN/Inf before scoring
         if not self._validate_features(features):
-            logger.warning("Feature validation failed for txn={}, using heuristic score", txn.transaction_id)
-        
+            logger.warning(
+                "Feature validation failed for txn={}, using heuristic score",
+                txn.transaction_id,
+            )
+
         # Schema compatibility validation (logs mismatch, falls back to heuristic floor)
         validate_feature_compatibility(txn.tenant_id, features)
-        
+
         # Auto-register schema if missing (first request for tenant)
         auto_register_schema_if_missing(txn.tenant_id, features)
 
@@ -495,8 +547,9 @@ class ScoringOrchestrator:
         feature_array = self._features_to_array(features, model)
 
         # ── Step 2: Tier 1 — rules engine (<1ms) ─────────────────────────────
-        rule_result = self.rules_engine.evaluate(txn, features) \
-            if self.rules_engine else None
+        rule_result = (
+            self.rules_engine.evaluate(txn, features) if self.rules_engine else None
+        )
 
         if rule_result and rule_result.hard_block:
             latency = (time.monotonic() - t_start) * 1000
@@ -526,40 +579,57 @@ class ScoringOrchestrator:
                 X = feature_array.reshape(1, -1)
 
                 # Cold-start model: anomaly scoring
-                if ColdStartEnsemble is not None and isinstance(model, ColdStartEnsemble):
+                if ColdStartEnsemble is not None and isinstance(
+                    model, ColdStartEnsemble
+                ):
                     risk_score = float(model.score(X)[0])
-                    confidence_info = ConfidenceInfo(
-                        expert_used="ColdStartEnsemble",
-                        confidence=1.0 - risk_score,
-                    ) if ConfidenceInfo else None
+                    confidence_info = (
+                        ConfidenceInfo(
+                            expert_used="ColdStartEnsemble",
+                            confidence=1.0 - risk_score,
+                        )
+                        if ConfidenceInfo
+                        else None
+                    )
 
                 # Champion model: confidence-aware routing
                 elif ChampionModel is not None and isinstance(model, ChampionModel):
                     predictions = model.score_with_confidence(X)
                     pred = predictions[0]
                     risk_score = pred.probability
-                    confidence_info = ConfidenceInfo(
-                        expert_used="FTTransformer" if pred.ft_invoked else "CatBoost",
-                        confidence=pred.confidence,
-                        ft_invoked=pred.ft_invoked,
-                        fusion_output=pred.fusion_output,
-                    ) if ConfidenceInfo else None
+                    confidence_info = (
+                        ConfidenceInfo(
+                            expert_used=(
+                                "FTTransformer" if pred.ft_invoked else "CatBoost"
+                            ),
+                            confidence=pred.confidence,
+                            ft_invoked=pred.ft_invoked,
+                            fusion_output=pred.fusion_output,
+                        )
+                        if ConfidenceInfo
+                        else None
+                    )
 
                     # Log specialist invocation
                     if pred.ft_invoked:
                         logger.debug(
                             "FT-Transformer invoked: prob={:.4f}, confidence={:.4f}, fusion={:.4f}",
-                            pred.probability, pred.confidence,
+                            pred.probability,
+                            pred.confidence,
                             pred.fusion_output or 0.0,
                         )
 
                 # NetPFN semi-supervised model
                 elif NetPFNWrapper is not None and isinstance(model, NetPFNWrapper):
                     risk_score = float(model.score(X)[0])
-                    confidence_info = ConfidenceInfo(
-                        expert_used="NetPFN",
-                        confidence=1.0 - abs(risk_score - 0.5) * 2,
-                    ) if ConfidenceInfo else None
+                    confidence_info = (
+                        ConfidenceInfo(
+                            expert_used="NetPFN",
+                            confidence=1.0 - abs(risk_score - 0.5) * 2,
+                        )
+                        if ConfidenceInfo
+                        else None
+                    )
 
                 # Fallback: heuristic
                 else:
@@ -572,25 +642,35 @@ class ScoringOrchestrator:
                 # ── Explainability Engine (new pipeline) ───────────────────────
                 if EXPLAINABILITY_AVAILABLE and risk_score >= settings.score_review_low:
                     explanation = self._explain_with_engine(
-                        txn.tenant_id, txn.transaction_id, X,
-                        risk_score, model, confidence_info,
+                        txn.tenant_id,
+                        txn.transaction_id,
+                        X,
+                        risk_score,
+                        model,
+                        confidence_info,
                     )
-                
+
                 # Fallback: legacy explanation methods
                 if explanation is None:
-                    explanation = self._explain_legacy(txn, features, model, X, risk_score)
-                
+                    explanation = self._explain_legacy(
+                        txn, features, model, X, risk_score
+                    )
+
                 # MC Dropout uncertainty for GNN (async, non-blocking)
-                if GNNScorer is not None and self.registry.gnn_scorer and self.registry.gnn_scorer.is_fitted:
+                if (
+                    GNNScorer is not None
+                    and self.registry.gnn_scorer
+                    and self.registry.gnn_scorer.is_fitted
+                ):
                     self._gnn_future = _GNN_EXECUTOR.submit(
                         self._score_gnn_async, txn.account_id, txn.tenant_id
                     )
-                    
+
             except Exception as exc:
                 logger.error("Model scoring failed, using default score: {}", exc)
 
         decision = self._make_decision(risk_score)
-        latency  = (time.monotonic() - t_start) * 1000
+        latency = (time.monotonic() - t_start) * 1000
 
         if latency > settings.scoring_timeout_ms:
             logger.warning(
@@ -623,7 +703,9 @@ class ScoringOrchestrator:
                 return False
         return True
 
-    def _score_gnn_async(self, account_id: str, tenant_id: str) -> Optional[tuple[float, float]]:
+    def _score_gnn_async(
+        self, account_id: str, tenant_id: str
+    ) -> Optional[tuple[float, float]]:
         """Async GNN scoring with MC Dropout uncertainty. Returns (score, uncertainty)."""
         try:
             r = self._get_redis()
@@ -719,7 +801,9 @@ class ScoringOrchestrator:
             logger.warning("NetPFN explanation failed: {}", exc)
             return None
 
-    def _explain_rules(self, txn: TransactionRequest, features: dict[str, float]) -> Explanation:
+    def _explain_rules(
+        self, txn: TransactionRequest, features: dict[str, float]
+    ) -> Explanation:
         """Rules explanation (sync - very fast)."""
         try:
             result = self.rules_engine.explain(txn, features)
@@ -767,7 +851,7 @@ class ScoringOrchestrator:
         except Exception as exc:
             logger.warning("Supervised explanation failed: {}", exc)
             return None
-    
+
     def _explain_champion(self, model, X: np.ndarray) -> Explanation:
         """Sync champion model explanation using feature importance."""
         try:
@@ -775,7 +859,7 @@ class ScoringOrchestrator:
             importance = model.get_feature_importance(top_n=8)
             if not importance:
                 return self._explain_rules(None, {})
-            
+
             top_feats = [
                 {
                     "feature": ft["feature"],
@@ -785,10 +869,10 @@ class ScoringOrchestrator:
                 }
                 for ft in importance
             ]
-            
+
             # Get prediction value
             prediction_value = float(model.score(X)[0])
-            
+
             return Explanation(
                 model_type="champion",
                 base_value=0.0,
@@ -811,7 +895,9 @@ class ScoringOrchestrator:
         except Exception as exc:
             logger.warning("Async cold-start explanation failed: {}", exc)
 
-    def _explain_semi_supervised_async(self, model, X: np.ndarray, trace_id: str) -> None:
+    def _explain_semi_supervised_async(
+        self, model, X: np.ndarray, trace_id: str
+    ) -> None:
         """Async semi-supervised explanation."""
         try:
             explanation = self._explain_semi_supervised(model, X)
@@ -845,14 +931,14 @@ class ScoringOrchestrator:
         try:
             if self._explainability is None:
                 self._init_explainability(tenant_id, model)
-            
+
             if self._explainability is None:
                 return None
-            
+
             feature_names = self.registry.feature_names or []
             if not feature_names:
                 return None
-            
+
             full_exp = self._explainability.explain(
                 tenant_id=tenant_id,
                 transaction_id=transaction_id,
@@ -861,62 +947,76 @@ class ScoringOrchestrator:
                 feature_names=feature_names,
                 confidence=confidence_info,
             )
-            
+
             if full_exp is None or full_exp.formatted is None:
                 return None
-            
+
             # Convert to existing Explanation schema
             top_feats = []
             if full_exp.shap and full_exp.shap.top_features:
                 for attr in full_exp.shap.top_features:
-                    top_feats.append({
-                        "feature": attr.feature,
-                        "value": attr.value,
-                        "contribution": attr.impact,
-                        "method": attr.method,
-                    })
-            
+                    top_feats.append(
+                        {
+                            "feature": attr.feature,
+                            "value": attr.value,
+                            "contribution": attr.impact,
+                            "method": attr.method,
+                        }
+                    )
+
             # Add counterfactual info as a feature
             if full_exp.counterfactual and full_exp.counterfactual.changes:
-                top_feats.append({
-                    "feature": "counterfactual",
-                    "value": full_exp.counterfactual.prediction_delta,
-                    "contribution": 0.0,
-                    "method": full_exp.counterfactual.source,
-                })
-            
+                top_feats.append(
+                    {
+                        "feature": "counterfactual",
+                        "value": full_exp.counterfactual.prediction_delta,
+                        "contribution": 0.0,
+                        "method": full_exp.counterfactual.source,
+                    }
+                )
+
             return Explanation(
                 model_type="explainability",
                 base_value=full_exp.shap.base_value if full_exp.shap else 0.0,
                 prediction_value=risk_score,
                 top_features=top_feats,
                 latency_ms=full_exp.total_latency_ms,
-                confidence=full_exp.formatted.confidence.__dict__ if full_exp.formatted and full_exp.formatted.confidence else None,
-                counterfactual=full_exp.counterfactual.__dict__ if full_exp.counterfactual else None,
-                formatted_report=full_exp.formatted.to_dict() if full_exp.formatted else None,
+                confidence=(
+                    full_exp.formatted.confidence.__dict__
+                    if full_exp.formatted and full_exp.formatted.confidence
+                    else None
+                ),
+                counterfactual=(
+                    full_exp.counterfactual.__dict__
+                    if full_exp.counterfactual
+                    else None
+                ),
+                formatted_report=(
+                    full_exp.formatted.to_dict() if full_exp.formatted else None
+                ),
             )
-        
+
         except Exception as exc:
             logger.warning("ExplainabilityEngine failed: {}", exc)
             return None
-    
+
     def _init_explainability(self, tenant_id: str, model) -> None:
         """Initialize the explainability engine for a tenant."""
         try:
             if ExplainabilityEngine is None:
                 return
-            
+
             config = ExplainabilityConfig(
                 enabled=True,
                 shap_top_features=5,
                 counterfactual_enabled=True,
             )
-            
+
             self._explainability = ExplainabilityEngine(config=config)
-            
+
             # Fit with available data
             feature_names = self.registry.feature_names or []
-            if feature_names and hasattr(model, 'feature_importance_'):
+            if feature_names and hasattr(model, "feature_importance_"):
                 # Use a dummy background dataset for SHAP initialization
                 X_bg = np.zeros((100, len(feature_names)), dtype=np.float32)
                 self._explainability.fit(
@@ -925,13 +1025,13 @@ class ScoringOrchestrator:
                     feature_names=feature_names,
                     tenant_id=tenant_id,
                 )
-            
+
             logger.info("ExplainabilityEngine initialized for tenant={}", tenant_id)
-        
+
         except Exception as exc:
             logger.warning("ExplainabilityEngine init failed: {}", exc)
             self._explainability = None
-    
+
     def _explain_legacy(
         self,
         txn: TransactionRequest,
@@ -942,23 +1042,27 @@ class ScoringOrchestrator:
     ) -> Optional[Explanation]:
         """Legacy explanation fallback for when ExplainabilityEngine is unavailable."""
         explanation = None
-        
+
         # Champion model
         if ChampionModel is not None and isinstance(model, ChampionModel):
             explanation = self._explain_champion(model, X)
-        
+
         # NetPFN
         elif NetPFNWrapper is not None and isinstance(model, NetPFNWrapper):
             explanation = self._explain_netpfn(model, X)
-        
+
         # Rules fallback
         if explanation is None and self.rules_engine:
             explanation = self._explain_rules(txn, features)
-        
+
         # Cold-start
-        elif explanation is None and ColdStartEnsemble is not None and isinstance(model, ColdStartEnsemble):
+        elif (
+            explanation is None
+            and ColdStartEnsemble is not None
+            and isinstance(model, ColdStartEnsemble)
+        ):
             explanation = self._explain_cold_start(model, X)
-        
+
         return explanation
 
     def _cache_explanation(self, trace_id: str, explanation: Explanation) -> None:
@@ -966,15 +1070,23 @@ class ScoringOrchestrator:
         try:
             r = self._get_redis()
             if r:
-                r.setex(f"fraudtrap:explanation:{trace_id}", 3600, explanation.model_dump_json())
+                r.setex(
+                    f"fraudtrap:explanation:{trace_id}",
+                    3600,
+                    explanation.model_dump_json(),
+                )
         except Exception as exc:
             logger.warning("Failed to cache explanation: {}", exc)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
-    def _features_to_array(self, features: dict[str, float], model=None) -> Optional[np.ndarray]:
+    def _features_to_array(
+        self, features: dict[str, float], model=None
+    ) -> Optional[np.ndarray]:
         """Convert feature dict to numpy array aligned with model's feature order."""
-        feature_names = getattr(model, "feature_names", None) or self.registry.feature_names
+        feature_names = (
+            getattr(model, "feature_names", None) or self.registry.feature_names
+        )
         if not feature_names:
             logger.warning(
                 "Model has no persisted feature_names; falling back to sorted live feature keys"
@@ -989,9 +1101,13 @@ class ScoringOrchestrator:
                     len(missing),
                     missing[:10],
                 )
-            values = np.array([features.get(f, 0.0) for f in feature_names], dtype=np.float32)
+            values = np.array(
+                [features.get(f, 0.0) for f in feature_names], dtype=np.float32
+            )
             if not np.all(np.isfinite(values)):
-                logger.warning("Non-finite feature value detected; replacing NaN/Inf before scoring")
+                logger.warning(
+                    "Non-finite feature value detected; replacing NaN/Inf before scoring"
+                )
                 values = np.nan_to_num(values, nan=0.0, posinf=1e6, neginf=-1e6)
             return values
         except Exception as exc:
@@ -1031,16 +1147,17 @@ class ScoringOrchestrator:
 
         try:
             from ingestion.kafka_client import FraudTrapProducer
+
             if not hasattr(self, "_producer"):
                 self._producer = FraudTrapProducer()
                 self._producer.connect()
-            
+
             event = {
                 **txn.model_dump(mode="json"),
                 **response.model_dump(mode="json"),
                 "is_fraud": int((txn.extra_fields or {}).get("simulated_label", 0)),
             }
-            
+
             self._producer.emit_audit_event(event)
             self._producer.emit_scored_transaction(response.model_dump(mode="json"))
 

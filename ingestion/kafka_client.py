@@ -2,6 +2,7 @@
 FraudTrap — Kafka Ingestion Layer
 Handles producing scored events and consuming raw transactions.
 """
+
 from __future__ import annotations
 import json
 from datetime import datetime, timezone
@@ -18,14 +19,17 @@ settings = get_settings()
 
 def _serialise(obj: dict) -> bytes:
     """JSON serialiser that handles datetime objects."""
+
     def _default(o):
         if isinstance(o, datetime):
             return o.isoformat()
         raise TypeError(f"Not serialisable: {type(o)}")
+
     return json.dumps(obj, default=_default).encode("utf-8")
 
 
 # ── Producer ─────────────────────────────────────────────────────────────────
+
 
 class FraudTrapProducer:
     """
@@ -44,10 +48,10 @@ class FraudTrapProducer:
         self._producer = KafkaProducer(
             bootstrap_servers=settings.kafka_brokers.split(","),
             value_serializer=_serialise,
-            acks="all",                 # wait for all ISR acknowledgement
+            acks="all",  # wait for all ISR acknowledgement
             retries=3,
             compression_type="gzip",
-            linger_ms=5,               # micro-batching for throughput
+            linger_ms=5,  # micro-batching for throughput
             batch_size=65_536,
         )
         logger.info("Kafka producer connected to {}", settings.kafka_brokers)
@@ -85,6 +89,7 @@ class FraudTrapProducer:
 
 
 # ── Consumer ─────────────────────────────────────────────────────────────────
+
 
 class FraudTrapConsumer:
     """
@@ -132,7 +137,10 @@ class FraudTrapConsumer:
             except Exception as exc:
                 logger.error(
                     "Handler failed for topic={} partition={} offset={}: {}",
-                    message.topic, message.partition, message.offset, exc,
+                    message.topic,
+                    message.partition,
+                    message.offset,
+                    exc,
                 )
                 # Do NOT commit — message will be reprocessed on restart
 

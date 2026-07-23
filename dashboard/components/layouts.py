@@ -2,6 +2,7 @@
 FraudTrap Dashboard — Layout Components
 Page layout helpers for consistent structure.
 """
+
 import streamlit as st
 from dashboard.theme.colors import Colors
 from dashboard.theme.typography import Typography
@@ -17,9 +18,11 @@ def page_container(title: str, subtitle: str = "", icon: str = None):
             # page content here
             pass
     """
+
     class PageContext:
         def __enter__(self):
             from dashboard.theme.css import page_header
+
             page_header(title, subtitle, icon)
             return self
 
@@ -73,12 +76,15 @@ def metric_row(metrics: list):
             if m.get("icon"):
                 icon_html = Icons.html(m["icon"], 14, Colors.ACCENT) + " "
 
-            st.markdown(f"""
+            st.markdown(
+                f"""
 <div style="padding:12px 16px;background:{Colors.BG_CARD};border:1px solid {Colors.BORDER_DEFAULT};border-radius:8px">
     <div style="font-size:{Typography.TEXT_XS};color:{Colors.TEXT_MUTED};text-transform:uppercase;letter-spacing:{Typography.TRACKING_WIDER};margin-bottom:4px">{icon_html}{m['label']}</div>
     <div style="font-size:{Typography.TEXT_LG};font-weight:{Typography.WEIGHT_BOLD};color:{m.get('color', Colors.TEXT_PRIMARY)}">{m['value']}</div>
 </div>
-""", unsafe_allow_html=True)
+""",
+                unsafe_allow_html=True,
+            )
 
 
 def info_panel(title: str, items: list, icon: str = None):
@@ -103,9 +109,12 @@ def info_panel(title: str, items: list, icon: str = None):
     if icon:
         icon_html = Icons.html(icon, 16, Colors.ACCENT) + " "
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
 <div style="background:{Colors.BG_CARD};border:1px solid {Colors.BORDER_DEFAULT};border-radius:10px;padding:20px">
     <div style="font-size:{Typography.TEXT_MD};font-weight:{Typography.WEIGHT_SEMIBOLD};color:{Colors.TEXT_PRIMARY};margin-bottom:12px">{icon_html}{title}</div>
     {items_html}
 </div>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )

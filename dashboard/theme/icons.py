@@ -43,18 +43,26 @@ class Icons:
     KEY = '<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>'
 
     # ── Actions ──────────────────────────────────────────────────────────────
-    SEARCH = '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>'
+    SEARCH = (
+        '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>'
+    )
     FILTER = '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>'
     REFRESH = '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>'
     DOWNLOAD = '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>'
     UPLOAD = '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>'
-    PLUS = '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'
+    PLUS = (
+        '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'
+    )
     MINUS = '<line x1="5" y1="12" x2="19" y2="12"/>'
     CHEVRON_RIGHT = '<polyline points="9 18 15 12 9 6"/>'
     CHEVRON_DOWN = '<polyline points="6 9 12 15 18 9"/>'
     CHEVRON_UP = '<polyline points="18 15 12 9 6 15"/>'
-    ARROW_UP = '<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>'
-    ARROW_DOWN = '<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>'
+    ARROW_UP = (
+        '<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>'
+    )
+    ARROW_DOWN = (
+        '<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>'
+    )
     EXTERNAL_LINK = '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>'
     COPY = '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'
     TRASH = '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'
@@ -78,7 +86,9 @@ class Icons:
     BELL = '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>'
     BELL_OFF = '<path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0 1 18 8"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/>'
     MAIL = '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>'
-    MESSAGE_SQUARE = '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'
+    MESSAGE_SQUARE = (
+        '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'
+    )
     SEND = '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>'
 
     # ── Files ────────────────────────────────────────────────────────────────
@@ -103,8 +113,14 @@ class Icons:
     LINK = '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'
 
     @classmethod
-    def svg(cls, icon_name: str, size: int = 16, color: str = "currentColor",
-            stroke_width: float = 2, class_name: str = "") -> str:
+    def svg(
+        cls,
+        icon_name: str,
+        size: int = 16,
+        color: str = "currentColor",
+        stroke_width: float = 2,
+        class_name: str = "",
+    ) -> str:
         """Render an SVG icon."""
         paths = getattr(cls, icon_name.upper(), None)
         if not paths:
@@ -118,8 +134,15 @@ class Icons:
         )
 
     @classmethod
-    def html(cls, icon_name: str, size: int = 16, color: str = "currentColor",
-             stroke_width: float = 2, class_name: str = "", vertical_align: str = "middle") -> str:
+    def html(
+        cls,
+        icon_name: str,
+        size: int = 16,
+        color: str = "currentColor",
+        stroke_width: float = 2,
+        class_name: str = "",
+        vertical_align: str = "middle",
+    ) -> str:
         """Render an SVG icon wrapped for inline HTML use."""
         svg = cls.svg(icon_name, size, color, stroke_width, class_name)
         return f'<span style="display:inline-flex;align-items:center;vertical-align:{vertical_align};line-height:1">{svg}</span>'
