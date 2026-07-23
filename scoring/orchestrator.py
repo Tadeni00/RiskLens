@@ -54,10 +54,10 @@ except Exception as exc:
     logger.warning("Cold-start ensemble unavailable: {}", exc)
 
 try:
-    from models.semi_supervised.netpfn import NetPFNWrapper
+    from models.semi_supervised.tabpfn import TabPFNModel
 except Exception as exc:
-    NetPFNWrapper = None
-    logger.warning("NetPFN (TabPFN) semi-supervised model package unavailable: {}", exc)
+    TabPFNModel = None
+    logger.warning("TabPFN semi-supervised model package unavailable: {}", exc)
 
 try:
     from models.supervised.champion import ChampionModel
@@ -129,7 +129,7 @@ class ModelRegistry:
 
     def __init__(self):
         self.cold_start: Optional[ColdStartEnsemble] = None
-        self.semi_supervised: Optional[NetPFNWrapper] = None
+        self.semi_supervised: Optional[TabPFNModel] = None
         self.champion: Optional[ChampionModel] = None
         self.gnn_scorer: Optional[GNNScorer] = None
         self.active_phase: str = "UNSUPERVISED"
@@ -141,7 +141,7 @@ class ModelRegistry:
         self.trained_at: Optional[str] = None
 
         self.champion_models: dict[str, ChampionModel] = {}
-        self.semi_supervised_models: dict[str, NetPFNWrapper] = {}
+        self.semi_supervised_models: dict[str, TabPFNModel] = {}
         self.cold_start_models: dict[str, ColdStartEnsemble] = {}
         self.simple_models: dict[str, SimpleFraudModel] = {}
 
@@ -178,9 +178,9 @@ class ModelRegistry:
             logger.info("Cold-start model loaded (version={})", self.model_version)
 
         semi_path = model_dir / "semi_supervised"
-        if semi_path.exists() and NetPFNWrapper:
+        if semi_path.exists() and TabPFNModel:
             try:
-                staging["semi_supervised"] = NetPFNWrapper.load(semi_path)
+                staging["semi_supervised"] = TabPFNModel.load(semi_path)
                 staging["active_phase"] = "SEMI_SUPERVISED"
                 logger.info("Semi-supervised TabPFN model loaded")
             except Exception as exc:
@@ -368,13 +368,13 @@ class ModelRegistry:
 
     def _load_semi_supervised_models(
         self, model_dir: Path, cold_models: dict
-    ) -> dict[str, NetPFNWrapper]:
-        loaded: dict[str, NetPFNWrapper] = {}
+    ) -> dict[str, TabPFNModel]:
+        loaded: dict[str, TabPFNModel] = {}
         for p2_dir in sorted(model_dir.glob("*/phase2")):
             tenant_id = p2_dir.parent.name
             try:
-                if NetPFNWrapper:
-                    loaded[tenant_id] = NetPFNWrapper.load(p2_dir)
+                if TabPFNModel:
+                    loaded[tenant_id] = TabPFNModel.load(p2_dir)
             except Exception as exc:
                 logger.warning(
                     "Could not load TabPFN for tenant {}: {}", tenant_id, exc
@@ -620,7 +620,7 @@ class ScoringOrchestrator:
                         )
 
                 # TabPFN semi-supervised model
-                elif NetPFNWrapper is not None and isinstance(model, NetPFNWrapper):
+                elif TabPFNModel is not None and isinstance(model, TabPFNModel):
                     preds = model.predict_with_uncertainty(X)
                     pred = preds[0]
                     risk_score = pred.probability
@@ -777,7 +777,7 @@ class ScoringOrchestrator:
             logger.warning("Semi-supervised explanation failed: {}", exc)
             return None
 
-    def _explain_netpfn(self, model, X: np.ndarray) -> Explanation:
+    def _explain_tabpfn(self, model, X: np.ndarray) -> Explanation:
         """TabPFN explanation (permutation importance)."""
         try:
             explanations = model.explain(X, top_n=8)
@@ -1050,8 +1050,8 @@ class ScoringOrchestrator:
             explanation = self._explain_champion(model, X)
 
         # TabPFN
-        elif NetPFNWrapper is not None and isinstance(model, NetPFNWrapper):
-            explanation = self._explain_netpfn(model, X)
+        elif TabPFNModel is not None and isinstance(model, TabPFNModel):
+            explanation = self._explain_tabpfn(model, X)
 
         # Rules fallback
         if explanation is None and self.rules_engine:

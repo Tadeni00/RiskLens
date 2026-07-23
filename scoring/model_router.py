@@ -14,7 +14,7 @@ import numpy as np
 from loguru import logger
 
 from models.cold_start.ensemble import ColdStartEnsemble
-from models.semi_supervised.netpfn import NetPFNWrapper
+from models.semi_supervised.tabpfn import TabPFNModel
 from models.supervised.champion import ChampionModel
 from scoring.simple_model import SimpleFraudModel
 

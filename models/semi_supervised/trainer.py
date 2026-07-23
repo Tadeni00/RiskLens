@@ -22,7 +22,7 @@ from sklearn.metrics import average_precision_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 
 from models.cold_start.ensemble import ColdStartEnsemble
-from models.semi_supervised.netpfn import NetPFNWrapper
+from models.semi_supervised.tabpfn import TabPFNModel
 from models.semi_supervised.prediction import PseudoLabelResult
 from scoring.calibration import ProbabilityCalibrator
 
@@ -206,7 +206,7 @@ class SemiSupervisedTrainer:
         sample_weights: Optional[np.ndarray] = None,
         feature_names: Optional[List[str]] = None,
         dataset_version: str = "1.0.0",
-    ) -> Tuple[NetPFNWrapper, SemiSupervisedTrainingResult]:
+    ) -> Tuple[TabPFNModel, SemiSupervisedTrainingResult]:
         """
         Fit TabPFN on the labelled dataset.
 
@@ -227,7 +227,7 @@ class SemiSupervisedTrainer:
             result.n_total = len(y)
 
             # Build wrapper
-            wrapper = NetPFNWrapper(
+            wrapper = TabPFNModel(
                 input_dim=input_dim,
                 feature_names=feature_names,
                 calibration_method=self.config.calibration_method,

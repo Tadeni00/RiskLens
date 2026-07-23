@@ -1,6 +1,6 @@
 """
 FraudTrap — Phase 2 & 3 Architecture Tests
-Covers: TabPFN (NetPFNWrapper), SemiSupervisedTrainer, ConfidenceEstimator, FTTransformer,
+Covers: TabPFNModel, SemiSupervisedTrainer, ConfidenceEstimator, FTTransformer,
 MetaFusionLayer, ChampionModel confidence-aware routing.
 """
 
@@ -65,12 +65,12 @@ def fitted_cold_start(synthetic_labeled_data):
 
 
 @pytest.fixture
-def fitted_netpfn(synthetic_labeled_data):
+def fitted_tabpfn(synthetic_labeled_data):
     """Fit a TabPFN model for testing."""
-    from models.semi_supervised.netpfn import NetPFNWrapper
+    from models.semi_supervised.tabpfn import TabPFNModel
 
     X, y = synthetic_labeled_data
-    model = NetPFNWrapper(input_dim=X.shape[1])
+    model = TabPFNModel(input_dim=X.shape[1])
     model.fit(X, y)
     return model, X, y
 
@@ -203,15 +203,15 @@ class TestPseudoLabelResult:
 
 
 class TestTabPFN:
-    def test_fit_and_score(self, fitted_netpfn):
-        model, X, y = fitted_netpfn
+    def test_fit_and_score(self, fitted_tabpfn):
+        model, X, y = fitted_tabpfn
         scores = model.score(X[:50])
         assert scores.shape == (50,)
         assert np.all(scores >= 0.0)
         assert np.all(scores <= 1.0)
 
-    def test_scores_higher_for_fraud(self, fitted_netpfn):
-        model, X, y = fitted_netpfn
+    def test_scores_higher_for_fraud(self, fitted_tabpfn):
+        model, X, y = fitted_tabpfn
         fraud_idx = np.where(y == 1)[0][:20]
         legit_idx = np.where(y == 0)[0][:20]
         if len(fraud_idx) > 0 and len(legit_idx) > 0:
@@ -219,17 +219,17 @@ class TestTabPFN:
             legit_scores = model.score(X[legit_idx]).mean()
             assert fraud_scores > legit_scores
 
-    def test_explain(self, fitted_netpfn):
-        model, X, _ = fitted_netpfn
+    def test_explain(self, fitted_tabpfn):
+        model, X, _ = fitted_tabpfn
         explanations = model.explain(X[:1])
         assert len(explanations) == 1
         assert "prediction_value" in explanations[0]
         assert "top_features" in explanations[0]
 
-    def test_save_load(self, fitted_netpfn, tmp_path):
-        model, X, _ = fitted_netpfn
-        model.save(tmp_path / "netpfn")
-        loaded = type(model).load(tmp_path / "netpfn")
+    def test_save_load(self, fitted_tabpfn, tmp_path):
+        model, X, _ = fitted_tabpfn
+        model.save(tmp_path / "tabpfn")
+        loaded = type(model).load(tmp_path / "tabpfn")
         orig_scores = model.score(X[:10])
         loaded_scores = loaded.score(X[:10])
         np.testing.assert_allclose(orig_scores, loaded_scores, rtol=1e-4)
@@ -427,9 +427,9 @@ class TestPhaseTransitions:
 
 
 class TestLatencyBudget:
-    def test_tabpfn_scoring_under_50ms(self, fitted_netpfn):
+    def test_tabpfn_scoring_under_50ms(self, fitted_tabpfn):
         """TabPFN scoring must complete in < 50ms for single sample."""
-        model, X, _ = fitted_netpfn
+        model, X, _ = fitted_tabpfn
         sample = X[:1]
         times = []
         for _ in range(50):

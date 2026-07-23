@@ -23,7 +23,7 @@ from sklearn.metrics import average_precision_score, f1_score
 
 from config.settings import get_settings
 from models.cold_start.ensemble import ColdStartEnsemble
-from models.semi_supervised.netpfn import NetPFNWrapper
+from models.semi_supervised.tabpfn import TabPFNModel
 from models.semi_supervised.trainer import SemiSupervisedTrainer, SemiSupervisedConfig
 from models.supervised.champion import ChampionModel
 from models.supervised.ft_transformer import FTTransformerPredictor

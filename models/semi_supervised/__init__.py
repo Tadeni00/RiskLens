@@ -11,11 +11,11 @@ Reference:
 """
 
 from models.semi_supervised.prediction import SemiSupervisedPrediction
-from models.semi_supervised.netpfn import NetPFNWrapper
+from models.semi_supervised.tabpfn import TabPFNModel
 from models.semi_supervised.trainer import SemiSupervisedTrainer
 
 __all__ = [
     "SemiSupervisedPrediction",
-    "NetPFNWrapper",
+    "TabPFNModel",
     "SemiSupervisedTrainer",
 ]

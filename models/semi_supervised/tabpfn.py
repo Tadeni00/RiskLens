@@ -25,18 +25,14 @@ Reference:
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import pickle
 import time
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
-from sklearn.calibration import calibration_curve
-from sklearn.metrics import average_precision_score, roc_auc_score
 from sklearn.preprocessing import StandardScaler
 
 from models.semi_supervised.prediction import SemiSupervisedPrediction
@@ -59,19 +55,18 @@ def _entropy_uncertainty(probas: np.ndarray) -> np.ndarray:
     """
     eps = 1e-12
     probas_clipped = np.clip(probas, eps, 1.0 - eps)
-    # If 1-D, treat as p_fraud only
     if probas_clipped.ndim == 1:
         p = np.stack([1.0 - probas_clipped, probas_clipped], axis=1)
     else:
         p = probas_clipped
     H = -(p * np.log(p)).sum(axis=1)
-    return H / np.log(2)  # normalise to [0, 1]
+    return H / np.log(2)
 
 
-# ── NetPFN Wrapper ────────────────────────────────────────────────────────────
+# ── TabPFN Model ─────────────────────────────────────────────────────────────
 
 
-class NetPFNWrapper:
+class TabPFNModel:
     """
     Production wrapper around Prior Labs TabPFN for FraudTrap's semi-supervised
     layer.
@@ -172,7 +167,7 @@ class NetPFNWrapper:
         X: np.ndarray,
         y: np.ndarray,
         sample_weights: Optional[np.ndarray] = None,
-    ) -> "NetPFNWrapper":
+    ) -> "TabPFNModel":
         """
         Fit the TabPFN model on the labelled training data.
 
@@ -205,14 +200,14 @@ class NetPFNWrapper:
     def predict(self, X: np.ndarray) -> np.ndarray:
         """Return hard class predictions (0 or 1)."""
         if not self.is_fitted:
-            raise RuntimeError("NetPFNWrapper must be fitted before predict")
+            raise RuntimeError("TabPFNModel must be fitted before predict")
         X_scaled = self.scaler.transform(X)
         return self._classifier.predict(X_scaled)
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
         """Return calibrated fraud probabilities (1-D array)."""
         if not self.is_fitted:
-            raise RuntimeError("NetPFNWrapper must be fitted before scoring")
+            raise RuntimeError("TabPFNModel must be fitted before scoring")
         X_scaled = self.scaler.transform(X)
         probas_2d = self._classifier.predict_proba(X_scaled)
         fraud_prob = probas_2d[:, 1]
@@ -228,7 +223,7 @@ class NetPFNWrapper:
     def predict_with_uncertainty(self, X: np.ndarray) -> List[SemiSupervisedPrediction]:
         """Return fully typed predictions with uncertainty estimates."""
         if not self.is_fitted:
-            raise RuntimeError("NetPFNWrapper must be fitted before scoring")
+            raise RuntimeError("TabPFNModel must be fitted before scoring")
         X_scaled = self.scaler.transform(X)
         probas_2d = self._classifier.predict_proba(X_scaled)
         fraud_prob = probas_2d[:, 1]
@@ -258,17 +253,13 @@ class NetPFNWrapper:
         feature is replaced with its median value from the training set.
         """
         if not self.is_fitted:
-            raise RuntimeError("NetPFNWrapper must be fitted before explain")
+            raise RuntimeError("TabPFNModel must be fitted before explain")
 
         X_scaled = self.scaler.transform(X)
         base_probas = self._classifier.predict_proba(X_scaled)
         base_fraud = base_probas[:, 1]
 
         # Reference: median of training data (stored in scaler)
-        x_median = self.scaler.transform(
-            self.scaler.inverse_transform(np.zeros((1, self.input_dim)))
-        ).flatten()
-        # Actually use scaler center_ as the "median" proxy
         x_median = self.scaler.center_
 
         feature_names = (
@@ -280,7 +271,6 @@ class NetPFNWrapper:
         explanations = []
         for i in range(len(X)):
             x_orig = X_scaled[i : i + 1].copy()
-            x_perturbed = x_orig.copy()
             feat_importances = []
 
             for j in range(self.input_dim):
@@ -321,7 +311,6 @@ class NetPFNWrapper:
         """Return the number of training samples stored by TabPFN."""
         if self._classifier is None:
             return 0
-        # TabPFN stores X_train_ and y_train_ after fit()
         X_train = getattr(self._classifier, "X_train_", None)
         if X_train is not None:
             return len(X_train)
@@ -334,13 +323,11 @@ class NetPFNWrapper:
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
 
-        # Save the TabPFN classifier via joblib (sklearn-compatible)
         import joblib
 
         joblib.dump(self._classifier, path / "tabpfn_model.joblib")
 
-        # Save metadata
-        with open(path / "netpfn_metadata.pkl", "wb") as f:
+        with open(path / "tabpfn_metadata.pkl", "wb") as f:
             pickle.dump(
                 {
                     "input_dim": self.input_dim,
@@ -365,14 +352,19 @@ class NetPFNWrapper:
                 f,
             )
 
-        logger.info("NetPFNWrapper (TabPFN) saved to %s", path)
+        logger.info("TabPFNModel saved to %s", path)
 
     @classmethod
-    def load(cls, path: Path) -> "NetPFNWrapper":
-        """Load a previously saved wrapper from disk."""
+    def load(cls, path: Path) -> "TabPFNModel":
+        """Load a previously saved model from disk."""
         path = Path(path)
 
-        with open(path / "netpfn_metadata.pkl", "rb") as f:
+        # Try new filename first, fall back to legacy
+        metadata_path = path / "tabpfn_metadata.pkl"
+        if not metadata_path.exists():
+            metadata_path = path / "netpfn_metadata.pkl"
+
+        with open(metadata_path, "rb") as f:
             payload = pickle.load(f)
 
         obj = cls(
@@ -397,27 +389,17 @@ class NetPFNWrapper:
         obj.pr_auc_ = payload.get("pr_auc", 0.0)
         obj.roc_auc_ = payload.get("roc_auc", 0.0)
 
-        # Load the TabPFN classifier
         import joblib
 
         model_path = path / "tabpfn_model.joblib"
         if model_path.exists():
             obj._classifier = joblib.load(model_path)
         else:
-            # Fallback: try loading legacy PyTorch checkpoint (pre-migration)
-            legacy_pt = path / "netpfn_model.pt"
-            if legacy_pt.exists():
-                logger.warning(
-                    "Legacy PyTorch checkpoint found at %s. "
-                    "This is from the old prototype-based implementation "
-                    "and is NOT compatible with TabPFN.  Please retrain.",
-                    legacy_pt,
-                )
             obj._classifier = None
             obj.is_fitted = False
 
         logger.info(
-            "NetPFNWrapper (TabPFN) loaded from %s (version=%s)",
+            "TabPFNModel loaded from %s (version=%s)",
             path,
             obj.model_version,
         )
