@@ -2,136 +2,295 @@
 
 # FraudTrap
 
-### Production-Grade · Real-Time · Multi-Tenant Fraud Detection Platform
+### Adaptive Fraud Intelligence Platform
 
 <br/>
 
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![CatBoost](https://img.shields.io/badge/CatBoost-1.2+-FFC107?style=for-the-badge&logoColor=black)](https://catboost.ai)
-[![Redis](https://img.shields.io/badge/Redis-7.0+-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io)
-[![Kafka](https://img.shields.io/badge/Kafka-3.5+-231F20?style=for-the-badge&logo=apachekafka&logoColor=white)](https://kafka.apache.org)
-[![ClickHouse](https://img.shields.io/badge/ClickHouse-23.8+-FFCC00?style=for-the-badge&logoColor=black)](https://clickhouse.com)
-[![Docker](https://img.shields.io/badge/Docker-24.0+-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://docker.com)
-[![MLflow](https://img.shields.io/badge/MLflow-2.8+-0199E1?style=for-the-badge&logo=mlflow&logoColor=white)](https://mlflow.org)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io)
-[![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.111+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.5+-EE4C2C?style=flat-square&logo=pytorch&logoColor=white)](https://pytorch.org)
+[![CatBoost](https://img.shields.io/badge/CatBoost-1.2+-FFC107?style=flat-square&logoColor=black)](https://catboost.ai)
+[![Redis](https://img.shields.io/badge/Redis-7.0+-DC382D?style=flat-square&logo=redis&logoColor=white)](https://redis.io)
+[![Kafka](https://img.shields.io/badge/Kafka-3.5+-231F20?style=flat-square&logo=apachekafka&logoColor=white)](https://kafka.apache.org)
+[![ClickHouse](https://img.shields.io/badge/ClickHouse-23.8+-FFCC00?style=flat-square&logoColor=black)](https://clickhouse.com)
+[![Docker](https://img.shields.io/badge/Docker-24+-2496ED?style=flat-square&logo=docker&logoColor=white)](https://docker.com)
+[![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
 <br/>
 
-An end-to-end fraud detection platform — not a model, not a notebook, not a prototype.
+**Real-time fraud scoring. Adaptive ML lifecycle. Multi-tenant isolation. Production-grade.**
 
-A production system that scores transactions in real-time, adapts to each tenant's fraud patterns,
-explains every decision, and evolves through three stages of ML maturity as labeled data accumulates.
+FraudTrap is not a model. It is not a notebook. It is an end-to-end fraud intelligence platform
+that scores transactions in under 100ms, explains every decision, adapts to each tenant's fraud
+patterns, and evolves through three stages of ML maturity as labelled data accumulates.
+
+<br/>
+
+![Dashboard Preview](docs/images/dashboard-preview.png)
+![Architecture Overview](docs/images/architecture-overview.png)
 
 </div>
 
 ---
 
-## What FraudTrap Is
+## Table of Contents
 
-FraudTrap is a **multi-tenant, real-time fraud detection platform** built for:
-
-| Sector | Examples |
-|--------|----------|
-| Banks | GTBank, Access Bank, Zenith Bank |
-| Fintechs | OPay, Kuda, Yoco |
-| Payment Processors | Flutterwave, Paystack |
-| Lending Companies | Carbon, FairMoney |
-| Wallets | PalmPay, OPay Wallet |
-| Digital Commerce | Jumia Pay, KongaPay |
-
-It performs:
-
-- **Online inference** — sub-100ms transaction scoring
-- **Behavioural profiling** — real-time entity profiles (customer, merchant, device, beneficiary, payment instrument)
-- **Fraud detection** — three-phase ML lifecycle from zero labels to fully supervised
-- **Drift monitoring** — PSI, KL divergence, concept drift detection
-- **Model lifecycle management** — champion-challenger, promotion, rollback
-- **Explainability** — SHAP attributions, counterfactual explanations, analyst-friendly reports
-
-It supports:
-
-- **Multi-tenancy** — each bank gets its own model lifecycle, thresholds, and profiles
-- **Real-time scoring** — Redis-backed feature serving, <100ms P95 latency
-- **Continuous learning** — online profile updates, semi-supervised label propagation
-
-> **FraudTrap is not a machine learning model.**
-> It is an end-to-end fraud detection platform with production infrastructure, monitoring, and operational tooling.
+- [Why FraudTrap Exists](#why-fraudtrap-exists)
+- [Key Engineering Highlights](#key-engineering-highlights)
+- [System Overview](#system-overview)
+- [End-to-End Architecture](#end-to-end-architecture)
+- [Request Lifecycle](#request-lifecycle)
+- [Adaptive ML Lifecycle](#adaptive-ml-lifecycle)
+- [Behaviour Intelligence Engine](#behaviour-intelligence-engine)
+- [Confidence-Aware Routing](#confidence-aware-routing)
+- [Explainability](#explainability)
+- [Model Governance](#model-governance)
+- [Drift Monitoring](#drift-monitoring)
+- [Dashboard](#dashboard)
+- [Repository Structure](#repository-structure)
+- [Getting Started](#getting-started)
+- [API Examples](#api-examples)
+- [Performance](#performance)
+- [Research Directions](#research-directions)
+- [License](#license)
 
 ---
 
-## Architecture
+## Why FraudTrap Exists
 
-```mermaid
-graph TD
-    TXN[Transaction] --> FE[Feature Store<br/>Redis]
-    FE --> BE[Behaviour Engine<br/>5 Entity Profiles]
-    BE --> RE[Rules Engine<br/>Tier 1 · &lt;1ms]
-    RE --> MR[ML Model Router<br/>Phase Detection]
-    
-    MR --> CS[Cold Start Layer<br/>VAE + IF + Tail]
-    MR --> AL[Adaptive Learning Layer<br/>TabPFN]
-    MR --> SV[Supervised Layer<br/>CatBoost Champion]
-    
-    SV --> CE{Confidence<br/>Check}
-    CE -->|High| DEC[Decision Engine]
-    CE -->|Low| FT[FT-Transformer<br/>Specialist]
-    FT --> MF[Meta Fusion]
-    MF --> DEC
-    
-    CS --> DEC
-    AL --> DEC
-    
-    DEC --> APPROVE[APPROVE]
-    DEC --> REVIEW[REVIEW]
-    DEC --> BLOCK[BLOCK]
-    
-    DEC --> REDIS[(Redis<br/>Score Cache)]
-    DEC --> KAFKA[Kafka<br/>Audit Events]
-    DEC --> CH[(ClickHouse<br/>Analytics)]
-    
-    KAFKA --> LABELS[Label Worker]
-    LABELS --> AL
-    LABELS --> SV
-    
-    CH --> DRIFT[Drift Monitor]
-    DRIFT --> RETRAIN[Retrain Trigger]
-    RETRAIN --> SV
+Fraud detection in banking has a fundamental cold-start problem.
+
+When a new bank joins your platform, you have **zero fraud labels**. You do not know which transactions are legitimate and which are fraudulent. Traditional supervised ML systems require thousands of labelled fraud cases before they become useful — meaning a new bank is unprotected for weeks or months while labels accumulate from chargebacks and manual reviews.
+
+Even after labels arrive, the problem compounds:
+
+| Challenge | Why It's Hard |
+|-----------|---------------|
+| **Cold-start onboarding** | New tenants have zero labels. Supervised models cannot score a single transaction. |
+| **Label scarcity** | Most tenants operate with 100–5,000 confirmed fraud cases. Not enough for traditional ML. |
+| **Evolving fraud patterns** | Fraudsters adapt. A model trained on last quarter's patterns misses this quarter's attacks. |
+| **Tenant isolation** | A bank's fraud patterns are unique. Sharing models across banks introduces noise and bias. |
+| **Latency requirements** | Real-time payments demand sub-100ms decisions. Batch inference is not an option. |
+| **Regulatory compliance** | Every decision must be explainable, auditable, and reversible. |
+
+FraudTrap solves this by **evolving its learning strategy per tenant** — not by deploying a single model, but by progressing through three stages of ML maturity as data accumulates.
+
+```
+Day 1:     Zero labels    →  Anomaly detection (unsupervised)
+Week 4:    100+ labels    →  In-context learning (adaptive)
+Month 6:   5000+ labels   →  Production classifier (supervised)
 ```
 
-### Component Inventory
-
-| Layer | Component | Technology | Purpose |
-|-------|-----------|------------|---------|
-| **API** | Scoring API | FastAPI | Transaction scoring, <90ms P95 |
-| **Features** | Feature Store | Redis | Online feature serving |
-| **Rules** | Rules Engine | Python | Sub-millisecond deterministic checks |
-| **Behaviour** | Profile Engine | Redis + Python | Real-time entity profiling |
-| **ML Phase 1** | Cold Start | VAE + IF + Tail | Zero-label anomaly detection |
-| **ML Layer 2** | Adaptive Learning | TabPFN | Foundation model for limited labels |
-| **ML Phase 3** | Champion | CatBoost | Production fraud classifier |
-| **ML Phase 3** | Specialist | FT-Transformer | Low-confidence edge cases |
-| **ML Phase 3** | Meta Fusion | Logistic Regression | Combines champion + specialist |
-| **Explainability** | SHAP + Counterfactual | SHAP + FAISS | Decision explanations |
-| **Monitoring** | Drift Detection | PSI + KL Divergence | Model stability monitoring |
-| **Storage** | Analytics | ClickHouse | Offline analytics, drift metrics |
-| **Storage** | Metadata | PostgreSQL | Model registry, audit logs |
-| **MLOps** | Experiment Tracking | MLflow | Training metadata, versioning |
-| **Dashboard** | Operations Console | Streamlit | 9-page enterprise dashboard |
+Every tenant is protected from their first transaction. The system automatically adapts as information becomes available.
 
 ---
 
-## The Three-Phase ML Lifecycle
+## Key Engineering Highlights
 
-FraudTrap implements a **gated progression** from unsupervised to supervised learning. Each tenant advances independently based on accumulated labels.
+<table>
+<tr>
+<td width="50%">
+
+**Adaptive Three-Stage ML Lifecycle**
+
+Cold Start → Adaptive Learning → Supervised. Each tenant progresses independently based on accumulated labels and validated performance gates.
+
+**Confidence-Aware Inference**
+
+CatBoost handles 85–90% of transactions at ~4ms. FT-Transformer specialist is invoked only for low-confidence edge cases. Meta Fusion combines predictions when both models disagree.
+
+**Behaviour Intelligence**
+
+Five real-time entity profiles — customer, merchant, device, beneficiary, payment instrument — updated incrementally with every transaction.
+
+</td>
+<td width="50%">
+
+**Explainable AI**
+
+SHAP attributions, counterfactual explanations, nearest-neighbor retrieval, and natural-language reports. Every decision is regulator-ready.
+
+**Multi-Tenant Model Isolation**
+
+Per-tenant models, thresholds, drift monitoring, and feature statistics. Zero cross-tenant interference.
+
+**Production Observability**
+
+Drift detection (PSI, KL divergence), SLA monitoring, champion-challenger evaluation, and automated promotion/rollback.
+
+</td>
+</tr>
+</table>
+
+| Capability | Status |
+|------------|--------|
+| Sub-100ms real-time scoring | ✅ Production |
+| 5-entity behavioural profiling | ✅ Production |
+| 3-stage adaptive ML lifecycle | ✅ Production |
+| Confidence-aware champion-specialist routing | ✅ Production |
+| SHAP + counterfactual explainability | ✅ Production |
+| Drift detection + auto-retrain | ✅ Production |
+| Champion-challenger evaluation | ✅ Production |
+| 12-page enterprise dashboard | ✅ Production |
+| 12-service Docker Compose stack | ✅ Production |
+| CI/CD pipelines (GitHub Actions) | ✅ Production |
+
+---
+
+## System Overview
+
+A transaction flows through eight layers from request to decision:
 
 ```mermaid
 graph LR
-    A["New Tenant<br/>0 Labels"] -->|"Phase 1"| B["Cold Start<br/>VAE + IF + Tail"]
-    B -->|"100+ Labels"| C["Adaptive Learning<br/>TabPFN"]
-    C -->|"5000+ Labels"| D["Supervised<br/>CatBoost + FT-Transformer"]
+    TXN[Transaction<br/>Request] --> L1[Feature<br/>Store]
+    L1 --> L2[Behaviour<br/>Engine]
+    L2 --> L3[Rules<br/>Engine]
+    L3 --> L4[ML Model<br/>Router]
+    L4 --> L5[Confidence<br/>Check]
+    L5 --> L6[Decision<br/>Engine]
+    L6 --> L7[Audit &<br/>Profiles]
+    L7 --> L8[Dashboard &<br/>Monitoring]
+```
+
+| Layer | Component | Latency | Purpose |
+|-------|-----------|---------|---------|
+| 1 | Feature Store (Redis) | ~2ms | Retrieve pre-computed features from Redis |
+| 2 | Behaviour Engine | ~3ms | Update and query 5 entity profiles |
+| 3 | Rules Engine | <1ms | Deterministic blocklists, velocity, geographic rules |
+| 4 | ML Model Router | ~1ms | Route to appropriate phase model (Cold Start / Adaptive / Supervised) |
+| 5 | Confidence Check | <1ms | Determine if specialist consultation is needed |
+| 6 | Scoring (CatBoost) | ~4ms | Primary fraud classification |
+| 7 | Decision Engine | <1ms | Combine scores, apply thresholds, map to APPROVE / REVIEW / BLOCK |
+| 8 | Audit + Profile Update | async | Log to Kafka, update Redis profiles, write ClickHouse analytics |
+
+**Total P95 latency: ~90ms** (well within the 100ms SLA).
+
+---
+
+## End-to-End Architecture
+
+```mermaid
+graph TB
+    subgraph "Ingestion"
+        TXN[Transaction<br/>Producer]
+        KAFKA[(Kafka)]
+        TXN --> KAFKA
+    end
+
+    subgraph "Real-Time Scoring"
+        API[FastAPI<br/>Scoring API]
+        KAFKA --> API
+
+        FS[(Redis<br/>Feature Store)]
+        API --> FS
+
+        BE[Behaviour<br/>Engine]
+        FS --> BE
+
+        RE[Rules<br/>Engine<br/>Tier 1]
+        BE --> RE
+
+        MR[ML Model<br/>Router]
+        RE --> MR
+    end
+
+    subgraph "ML Lifecycle"
+        CS[Cold Start<br/>VAE + IF + Tail]
+        AL[Adaptive Learning<br/>TabPFN]
+        CB[CatBoost<br/>Champion]
+        FT[FT-Transformer<br/>Specialist]
+        MF[Meta Fusion]
+
+        MR --> CS
+        MR --> AL
+        MR --> CB
+
+        CB -->|Low Confidence| FT
+        FT --> MF
+        MF --> DEC[Decision<br/>Engine]
+        CB -->|High Confidence| DEC
+        CS --> DEC
+        AL --> DEC
+    end
+
+    subgraph "Storage & Monitoring"
+        DEC --> REDIS[(Redis<br/>Score Cache)]
+        DEC --> KAFKA2[Kafka<br/>Audit Events]
+        DEC --> CH[(ClickHouse<br/>Analytics)]
+        KAFKA2 --> LW[Label<br/>Worker]
+        LW --> AL
+        LW --> CB
+        CH --> DRIFT[Drift<br/>Monitor]
+        DRIFT --> RETRAIN[Retrain<br/>Trigger]
+    end
+
+    subgraph "Operations"
+        DASH[Dashboard<br/>Streamlit]
+        MLFLOW[MLflow<br/>Registry]
+        PG[(PostgreSQL<br/>Metadata)]
+    end
+```
+
+---
+
+## Request Lifecycle
+
+A single transaction scoring request follows this exact path:
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API as FastAPI
+    participant Redis as Feature Store
+    participant Rules as Rules Engine
+    participant Router as ML Router
+    participant CatBoost as CatBoost Champion
+    participant FT as FT-Transformer
+    participant Decision as Decision Engine
+    participant Kafka as Kafka
+
+    Client->>API: POST /v1/score
+    API->>Redis: Fetch features (~2ms)
+    Redis-->>API: Feature vector (40 features)
+
+    API->>Rules: Evaluate rules (<1ms)
+    alt Hard block triggered
+        Rules-->>API: BLOCK (risk=1.0)
+        API-->>Client: BLOCK
+    end
+
+    API->>Router: Route to phase model
+    Router-->>API: Phase model selected
+
+    API->>CatBoost: Score (~4ms)
+    CatBoost-->>API: probability, confidence
+
+    alt Low confidence (< threshold)
+        API->>FT: Consult specialist (~15ms)
+        FT-->>API: specialist probability
+        API->>Decision: Meta Fusion
+    end
+
+    API->>Decision: Final score + decision
+    Decision-->>API: APPROVE / REVIEW / BLOCK
+
+    API-->>Client: ScoringResponse
+
+    API->>Kafka: Emit audit event (async)
+```
+
+---
+
+## Adaptive ML Lifecycle
+
+FraudTrap implements a **gated progression** from zero labels to fully supervised learning. Each tenant advances independently based on accumulated labels and validated performance.
+
+```mermaid
+graph LR
+    A["New Tenant<br/>0 Labels"] -->|"Gate 1"| B["Cold Start<br/>VAE + IF + Tail"]
+    B -->|"Gate 2"| C["Adaptive Learning<br/>TabPFN"]
+    C -->|"Gate 3"| D["Supervised<br/>CatBoost + FT-Transformer"]
 
     style A fill:#D69E2E,color:#000
     style B fill:#D69E2E,color:#000
@@ -139,21 +298,22 @@ graph LR
     style D fill:#17A673,color:#fff
 ```
 
-| Phase | Name | Models | Labels Required | Latency |
-|-------|------|--------|-----------------|---------|
-| 1 | Cold Start | VAE + Isolation Forest + Empirical Tail Detector | 0 | ~15ms |
-| 2 | Adaptive Learning | TabPFN (Prior Labs) | 100+ | ~10ms |
-| 3 | Supervised | CatBoost Champion + FT-Transformer Specialist | 5,000+ | ~4ms |
+### Phase Progression Gates
+
+| Transition | Minimum Labels | Min Transactions | Min Weeks | Min PR-AUC | Trigger |
+|------------|----------------|------------------|-----------|------------|---------|
+| Cold Start → Adaptive Learning | 500 | 500,000 | 8 | 0.65 | Automatic |
+| Adaptive Learning → Supervised | 5,000 | — | — | 0.78 | Automatic |
+
+A tenant is **never promoted** to a more complex model until the simpler model has been validated. This prevents premature escalation and ensures each layer earns its place.
 
 ---
 
-## Layer 1: Cold Start Intelligence
+### Layer 1: Cold Start
 
-**Purpose**: Protect new tenants from day one — no fraud labels required.
+**Problem**: New tenants have zero fraud labels. Supervised learning is impossible.
 
-When a bank joins FraudTrap, it has zero historical fraud data. Traditional supervised models cannot score a single transaction. Cold Start solves this with an ensemble of three complementary anomaly detectors.
-
-### Models
+**Solution**: An ensemble of three complementary anomaly detectors that require no labelled data.
 
 | Model | What It Detects | Why It Exists |
 |-------|-----------------|---------------|
@@ -161,7 +321,7 @@ When a bank joins FraudTrap, it has zero historical fraud data. Traditional supe
 | **Isolation Forest** | Point anomalies | Isolates outliers by random partitioning; no density estimation needed |
 | **Empirical Tail Detector** | Statistical extremes | Generalised Pareto distribution on tail probabilities |
 
-### Score Fusion
+**Score fusion**:
 
 ```
 risk_score = 0.55 × VAE_reconstruction_error
@@ -169,225 +329,92 @@ risk_score = 0.55 × VAE_reconstruction_error
            + 0.15 × TailDetector_zscore
 ```
 
-### Why This Works
-
-- **VAE** catches distributional anomalies (unusual spending patterns) but misses local outliers
-- **Isolation Forest** catches point anomalies (single suspicious transactions) but misses collective fraud
-- **Tail Detector** catches extreme values (massive transfers) but misses subtle patterns
-- **Combined**: broader coverage with lower false positive rate
-
-### Capabilities
-
-- ✅ Works with zero labels
-- ✅ Protects new tenants from day one
-- ✅ Protects new customers within existing tenants
-- ✅ Component-level attribution (explainable anomaly scores)
-- ✅ Automatic calibration from training distribution
+**Why this design**: Each detector catches a different class of anomaly. VAE misses local outliers. Isolation Forest misses collective fraud. Tail Detector misses subtle patterns. Combined, they provide broader coverage with lower false positive rates.
 
 ---
 
-## Layer 2: Adaptive Learning Intelligence
+### Layer 2: Adaptive Learning
 
-**Purpose**: Bridge the gap between zero-label cold start and fully supervised learning.
+**Problem**: Tenants with 100–5,000 labels have too few for traditional supervised models but enough that anomaly detection alone is insufficient.
 
-FraudTrap uses **TabPFN** as the default scarce-label learner due to its excellent performance on small tabular datasets.
+**Solution**: TabPFN — a pretrained foundation model for tabular data that performs in-context learning without gradient training.
 
-The Adaptive Learning Layer combines weak supervision, analyst feedback, behavioral intelligence, confidence estimation, and pseudo-label generation to continuously improve training data quality during the transition from unsupervised detection to mature supervised learning.
+**How it works**:
 
-### TabPFN Responsibilities
+| Step | Description |
+|------|-------------|
+| 1. Pseudo-label generation | Cold Start scores unlabeled transactions |
+| 2. Confidence filtering | Only high-confidence pseudo-labels are used (threshold: 0.97) |
+| 3. In-context fitting | TabPFN stores the labelled dataset for in-context learning |
+| 4. Calibrated prediction | TabPFN produces well-calibrated probabilities via transformer attention |
+| 5. Uncertainty estimation | Prediction entropy quantifies model uncertainty per transaction |
 
-TabPFN is responsible for:
-
-- Learning effectively from limited labelled data
-- Generating calibrated fraud probabilities
-- Producing high-confidence pseudo-labels
-- Estimating prediction confidence
-- Identifying informative samples for analyst review (active learning)
-
-TabPFN is **not** part of the real-time production inference path.
-
-Instead, it serves as the platform's adaptive learner for early-stage tenants and evolving datasets.
-
-### AdaptiveLearner Abstraction
-
-Because TabPFN has commercial licensing considerations, FraudTrap abstracts the scarce-label learner behind the `AdaptiveLearner` interface.
-
-Organizations requiring a fully permissive alternative can substitute **NetPFN** without changing the surrounding pipeline.
-
-This architecture keeps FraudTrap modular, vendor-independent, and future-proof.
-
-> **Note:** TabPFN requires a license key (`TABPFN_TOKEN`). Set it in `docker/.env` for local development or as a secret in your CI/CD environment. Obtain a key at [priorlabs.ai](https://priorlabs.ai).
-
-```yaml
-adaptive_learning:
-    learner: tabpfn  # or netpfn
-    confidence_threshold: 0.92
-    pseudo_label_threshold: 0.97
-    active_learning_threshold: 0.70
-```
-
-### Architecture
-
-```
-Transaction Features
-        │
-        ▼
-┌─────────────────────────┐
-│ TabPFN Foundation Model  │  (pretrained transformer)
-│  Distribution Embedder   │
-│  Row/Cross-row Attention │
-│  In-context Learning     │
-└────────┬────────────────┘
-         │
-         ▼
-┌─────────────────────────┐
-│ Calibrated Probabilities │  (fraud probability + uncertainty)
-└─────────────────────────┘
-```
-
-### Label Sources
-
-| Source | Quality | Weight |
-|--------|---------|--------|
-| Analyst manual review | High | 1.0 |
-| Chargeback confirmation | High | 0.9 |
-| Customer report | Medium | 0.7 |
-| Cold Start pseudo-labels | Low-Medium | 0.5 |
-
-### How It Works
-
-1. **Pseudo-label generation** — Cold Start scores unlabeled transactions
-2. **Confidence filtering** — Only high-confidence pseudo-labels are used (threshold: 0.8)
-3. **In-context fitting** — TabPFN stores the labelled dataset for in-context learning
-4. **Calibrated prediction** — TabPFN produces well-calibrated probabilities via transformer attention
-5. **Uncertainty estimation** — Prediction entropy quantifies model uncertainty per transaction
-
-### Why TabPFN Instead of XGBoost
+**Why TabPFN over XGBoost**:
 
 | Aspect | XGBoost Bridge | TabPFN |
 |--------|---------------|--------|
 | Label efficiency | Needs 500+ labels | Works with 100+ |
-| Training | Gradient boosting | In-context learning (no training) |
+| Training | Gradient boosting (epochs, hyperparams) | In-context learning (no training) |
 | Uncertainty | Not naturally available | Entropy-based uncertainty |
 | Calibration | Requires post-hoc calibration | Naturally well-calibrated |
 | Adaptability | Retrain from scratch | Add new data to context |
 
-### Why TabPFN
+**AdaptiveLearner abstraction**: The scarce-label learner is abstracted behind the `AdaptiveLearner` interface (`models/adaptive_learning/learner.py`). TabPFN is the default implementation. Deployments concerned with commercial licensing may substitute NetPFN by setting `learner: netpfn` in `config/supervised.yaml` without changing the surrounding pipeline.
 
-TabPFN (Tabular Prior-data Fitted Network) is a pretrained foundation model for tabular data developed by [Prior Labs](https://github.com/PriorLabs/TabPFN) and published in *Nature* (2025).
-
-FraudTrap uses TabPFN as its semi-supervised layer for three reasons:
-
-1. **Label scarcity** — Fraud labels are scarce. Most tenants enter Phase 2 with 100–5,000 confirmed labels. TabPFN was designed for exactly this regime: small-to-medium tabular datasets where traditional supervised models overfit.
-
-2. **No training from scratch** — TabPFN is pretrained on synthetic tabular tasks. At prediction time it stores the labelled dataset and runs a single forward pass through its transformer architecture. There are no gradients, no learning rates, no epochs. This eliminates an entire class of hyperparameter tuning.
-
-3. **Natural uncertainty** — TabPFN produces well-calibrated class probabilities. Uncertainty is derived from prediction entropy, giving FraudTrap a reliable signal for routing low-confidence transactions to manual review without any additional calibration infrastructure.
+> **TabPFN Licensing**: TabPFN requires a license key (`TABPFN_TOKEN`). Set it in `docker/.env` for local development or as a secret in your CI/CD environment. Obtain a key at [priorlabs.ai](https://priorlabs.ai).
 
 ```python
 from models.adaptive_learning.tabpfn_learner import TabPFNAdaptiveLearner
 
-model = TabPFNModel()
+model = TabPFNAdaptiveLearner()
 model.fit(X_train, y_train)
 
-probas = model.predict_proba(X_test)          # calibrated fraud probabilities
-preds  = model.predict_with_uncertainty(X_test) # + uncertainty estimates
+probas = model.predict_proba(X_test)                # calibrated fraud probabilities
+preds  = model.predict_with_uncertainty(X_test)      # + uncertainty estimates
 ```
 
 ---
 
-## Layer 3: Supervised Intelligence
+### Layer 3: Supervised
 
-**Purpose**: Maximum accuracy when sufficient labeled data exists.
+**Problem**: Mature tenants with 5,000+ labels need maximum accuracy at production latency.
 
-Once 5,000+ fraud labels accumulate with PR-AUC ≥ 0.78, the supervised layer activates. This layer implements a **confidence-aware routing** strategy.
+**Solution**: CatBoost champion with FT-Transformer specialist and Meta Fusion.
 
-### Champion Model: CatBoost
+| Component | Invocation Rate | Latency | Purpose |
+|-----------|----------------|---------|---------|
+| CatBoost | 100% of transactions | ~4ms | Primary fraud classification |
+| FT-Transformer | ~10–15% of transactions | ~15ms | Low-confidence edge cases |
+| Meta Fusion | When FT-Transformer is invoked | <1ms | Combines both predictions |
 
-CatBoost is the **sole production model** serving live traffic.
-
-**Why CatBoost:**
+**Why CatBoost as champion**:
 
 | Property | Benefit |
 |----------|---------|
 | Native categorical handling | No target encoding leakage; handles `channel`, `country_code`, `merchant_category_code` natively |
 | Ordered boosting | Reduces overfitting on imbalanced fraud data |
-| Built-in class imbalance handling | `auto_class_weights: Balanced` parameter |
+| Built-in class imbalance handling | `auto_class_weights: Balanced` |
 | Fast inference | ~4ms per transaction |
-| GPU support | Training acceleration |
-| Built-in feature importance | No need for permutation importance |
+| Built-in feature importance | No permutation importance needed |
 | Robust to missing values | Handles missing features gracefully |
 
-### Confidence-Aware Routing
+**Why FT-Transformer is a specialist, not a challenger**: FT-Transformer captures non-linear interactions that tree models miss, but it is slower than CatBoost. By invoking it only for low-confidence cases (~10–15% of transactions), we get the best of both worlds: CatBoost's speed for easy cases and FT-Transformer's accuracy for hard cases. This keeps latency within SLA while improving accuracy on uncertain transactions.
 
-```
-Transaction
-    │
-    ▼
-┌──────────────────┐
-│ CatBoost Champion│  (fast, handles categoricals natively)
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────┐
-│Confidence Estim. │  (conformal prediction + distance-based)
-└────────┬─────────┘
-         │
-    ┌────┴────┐
-    │         │
-    ▼         ▼
- High Conf  Low Conf
-    │         │
-    │         ▼
-    │   ┌──────────────────┐
-    │   │ FT-Transformer   │  (tabular attention specialist)
-    │   └────────┬─────────┘
-    │            │
-    │            ▼
-    │   ┌──────────────────┐
-    │   │  Meta Fusion     │  (logistic regression combiner)
-    │   └────────┬─────────┘
-    │            │
-    └────┬───────┘
-         │
-         ▼
-  Final Probability
-```
-
-### Selective Inference Strategy
-
-| Component | Invocation Rate | Latency | Purpose |
-|-----------|----------------|---------|---------|
-| CatBoost | 100% of transactions | ~4ms | Primary fraud detection |
-| FT-Transformer | ~10-15% of transactions | ~15ms | Edge cases where CatBoost lacks confidence |
-| Meta Fusion | When FT-Transformer is invoked | <1ms | Combines both predictions |
-
-**Key design decision**: FT-Transformer is **not** a challenger. It is a **production specialist** that handles difficult transactions where CatBoost's confidence is low. This balances accuracy against latency.
-
-### Meta Fusion
-
-When FT-Transformer is invoked, the final prediction is:
+**Meta Fusion** combines predictions only when both models are invoked:
 
 ```
 P(fraud) = σ(w₁ × P(catboost) + w₂ × P(ft_transformer) + bias)
 ```
 
-The fusion weights are learned via logistic regression on a held-out validation set.
-
-### Offline Challengers
-
-| Model | Role | Status |
-|-------|------|--------|
-| LightGBM | Offline benchmark | Never in production |
-| XGBoost | Offline benchmark | Never in production |
-
-These models are trained offline and evaluated continuously against the champion. They are **never used for production inference**. If a challenger consistently outperforms the champion, it is recommended for promotion through the model registry.
+Fusion weights are learned via logistic regression on a held-out validation set.
 
 ---
 
-## Behaviour Engine
+## Behaviour Intelligence Engine
 
-**Purpose**: Real-time entity profiling that makes the system smarter with every transaction.
+**Problem**: Transaction-level features miss the relational context that makes fraud detectable.
+
+**Solution**: Five real-time entity profiles, updated incrementally with every transaction.
 
 ### Entity Profiles
 
@@ -401,22 +428,29 @@ These models are trained offline and evaluated continuously against the champion
 
 ### Profile Hierarchy (Cold-Start Fallback)
 
+```mermaid
+graph LR
+    A[Customer<br/>Profile] -->|fallback| B[Merchant<br/>Profile]
+    B -->|fallback| C[Tenant<br/>Profile]
+    C -->|fallback| D[Global<br/>Profile]
+
+    style A fill:#2D6CDF,color:#fff
+    style B fill:#4A90D9,color:#fff
+    style C fill:#7AB3E0,color:#000
+    style D fill:#B0D4F1,color:#000
 ```
-Customer Profile ──► Merchant Profile ──► Tenant Profile ──► Global Profile
-   (primary)           (fallback)          (fallback)         (fallback)
-```
 
-If a customer is new, we fall back to merchant patterns. If the merchant is new, we use tenant baselines. If the tenant is new, we use global defaults.
+If a customer is new, we fall back to merchant patterns. If the merchant is new, we use tenant baselines. If the tenant is new, we use global defaults. No entity is ever scored with zero context.
 
-### How Profiles Update
+### Incremental Profile Updates
 
-Every transaction triggers **incremental profile updates**. No batch recomputation. No model retraining.
+Every transaction triggers profile updates — no batch recomputation, no model retraining:
 
 ```
 Transaction arrives
         │
         ▼
-Generate features from profiles
+Generate features from profiles (~2ms)
         │
         ▼
 Score transaction
@@ -444,79 +478,82 @@ Transaction N+1 benefits from updated profiles
 
 ---
 
-## Multi-Tenant Design
+## Confidence-Aware Routing
 
-**Purpose**: Each bank gets its own model lifecycle without cross-tenant interference.
+**Problem**: A single model either (a) processes all transactions equally, wasting latency on easy cases, or (b) misses hard cases that require deeper analysis.
 
-### Tenant Isolation
+**Solution**: Route transactions based on model confidence. CatBoost handles easy cases at ~4ms. FT-Transformer is consulted only for difficult predictions.
 
-Each tenant maintains:
+```mermaid
+graph TD
+    TXN[Transaction] --> CB[CatBoost<br/>Champion]
+    CB --> CONF{Confidence<br/>Check}
 
-- ✅ Independent models (per-phase)
-- ✅ Independent thresholds (configurable per tenant)
-- ✅ Independent drift monitoring
-- ✅ Independent feature statistics
-- ✅ Independent behavioural profiles
+    CONF -->|"> 0.85 confidence"| DEC[Decision<br/>Engine]
+    CONF -->|"< 0.85 confidence"| FT[FT-Transformer<br/>Specialist]
 
-### Tenant Maturity Routing
+    FT --> MF[Meta Fusion<br/>Logistic Regression]
+    MF --> DEC
 
-```
-New Tenant
-    │
-    ▼  (zero labels, zero history)
-Phase 1: Cold Start
-    │  VAE + Isolation Forest + Tail
-    │  No labels required
-    │
-    ▼  (100+ fraud labels)
-Phase 2: Adaptive Learning
-    │  TabPFN (Prior Labs foundation model)
-    │  Pseudo-labels + confidence-aware routing
-    │
-    ▼  (5000+ labels, PR-AUC ≥ 0.78)
-Phase 3: Supervised
-       CatBoost Champion
-       + FT-Transformer Specialist
-       + Meta Fusion
-       Champion-Challenger evaluation
+    DEC --> APPROVE[APPROVE]
+    DEC --> REVIEW[REVIEW]
+    DEC --> BLOCK[BLOCK]
+
+    style CB fill:#17A673,color:#fff
+    style FT fill:#2D6CDF,color:#fff
+    style MF fill:#D69E2E,color:#000
 ```
 
-Each tenant can be on a **different phase simultaneously**. A new bank starts at Phase 1 while an established bank runs Phase 3.
+### Selective Inference Strategy
+
+| Component | Invocation Rate | Latency | Purpose |
+|-----------|----------------|---------|---------|
+| CatBoost | 100% of transactions | ~4ms | Primary fraud detection |
+| FT-Transformer | ~10–15% of transactions | ~15ms | Edge cases where CatBoost lacks confidence |
+| Meta Fusion | When FT-Transformer is invoked | <1ms | Combines both predictions |
+
+**Key design decision**: FT-Transformer is **not** a challenger. It is a **production specialist** that handles difficult transactions where CatBoost's confidence is low. This balances accuracy against latency — 85–90% of transactions complete in ~4ms, while the remaining 10–15% get deeper analysis at ~20ms total.
+
+### Why Not an Ensemble?
+
+Ensembles process every transaction through multiple models, increasing latency linearly. FraudTrap's selective inference approach achieves similar accuracy gains while keeping P95 latency under 100ms. The confidence gate ensures specialist consultation only when it matters.
 
 ---
 
 ## Explainability
 
-**Purpose**: Every decision includes a regulator-friendly explanation.
+**Problem**: Black-box fraud decisions erode analyst trust and fail regulatory requirements.
+
+**Solution**: A complete explainability subsystem that generates SHAP attributions, counterfactual explanations, nearest-neighbor retrieval, and natural-language reports for every decision.
 
 ### Explanation Stack
 
-```
-┌─────────────────────────────────────────────────────────┐
-│              ExplainabilityEngine                        │
-│  ┌─────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │ SHAP        │  │ Counterfactual│  │  Formatter   │  │
-│  │ Explainer   │  │ Engine       │  │              │  │
-│  │             │  │              │  │  Analyst-    │  │
-│  │ TreeExplainer│ │  Nearest     │  │  friendly    │  │
-│  │ (CatBoost)  │  │  Neighbor   │  │  natural     │  │
-│  │             │  │  + DiCE     │  │  language    │  │
-│  └─────────────┘  └──────────────┘  └──────────────┘  │
-│  ┌─────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │ SHAP Cache  │  │ Explanation  │  │  Monitoring  │  │
-│  │ (LRU+TTL)   │  │ Cache        │  │  Latency,    │  │
-│  │             │  │ (LRU+TTL)    │  │  cache hits  │  │
-│  └─────────────┘  └──────────────┘  └──────────────┘  │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph "ExplainabilityEngine"
+        SHAP[SHAP<br/>TreeExplainer]
+        CF[Counterfactual<br/>Nearest Neighbor + DiCE]
+        NN[Nearest Neighbor<br/>FAISS Retrieval]
+        FMT[Formatter<br/>Natural Language]
+        CACHE[Cache<br/>LRU + TTL]
+    end
+
+    SHAP --> FMT
+    CF --> FMT
+    NN --> FMT
+    FMT --> REPORT[Analyst-Ready<br/>Report]
+    CACHE --> SHAP
+    CACHE --> CF
+    CACHE --> NN
 ```
 
 ### Explanation Components
 
 | Component | Purpose | Latency Impact |
 |-----------|---------|----------------|
-| **SHAP Attributions** | Feature contribution scores | +5-10ms |
-| **Counterfactual** | "What would need to change" | +10-20ms |
-| **Nearest Neighbor** | Most similar past transactions | +2-5ms (FAISS) |
+| **SHAP Attributions** | Feature contribution scores | +5–10ms |
+| **Counterfactual** | "What would need to change" | +10–20ms |
+| **Nearest Neighbor** | Most similar past transactions | +2–5ms (FAISS) |
 | **Formatted Report** | Analyst-friendly natural language | +1ms |
 | **Confidence Info** | Model certainty and prediction intervals | +1ms |
 
@@ -544,18 +581,66 @@ Each tenant can be on a **different phase simultaneously**. A new bank starts at
 }
 ```
 
+**Why counterfactual explanations matter**: They tell analysts exactly what would need to change for the decision to flip. This improves trust, accelerates investigations, and satisfies regulatory requirements for "right to explanation" under frameworks like GDPR and PCI-DSS.
+
 ### Regulatory Compliance
 
-- **Audit trail**: Every score logged with `trace_id`, `model_version`, features
-- **Reason codes**: Human-readable explanations for each decision
-- **Model versioning**: Every model stores `training_hash`, `feature_hash`, `dataset_hash`
-- **PII safety**: Sensitive features never logged in explanations
+| Requirement | FraudTrap Implementation |
+|-------------|--------------------------|
+| Audit trail | Every score logged with `trace_id`, `model_version`, features |
+| Reason codes | Human-readable explanations for each decision |
+| Model versioning | `training_hash`, `feature_hash`, `dataset_hash` for reproducibility |
+| PII safety | Sensitive features never logged in explanations |
 
 ---
 
-## Drift Detection
+## Model Governance
 
-**Purpose**: Detect when fraud patterns change and the model needs retraining.
+**Problem**: Deploying models without version control, promotion criteria, and rollback mechanisms leads to silent failures and production incidents.
+
+**Solution**: A complete model lifecycle with version tracking, automated evaluation, and controlled promotion.
+
+### Model Registry
+
+| Operation | Description |
+|-----------|-------------|
+| `register` | Register a new model version with metadata |
+| `promote` | Promote challenger to champion |
+| `rollback` | Revert to previous champion |
+| `archive` | Move deprecated models to archive |
+| `compare_models` | Side-by-side metric comparison |
+
+### Metadata Tracked Per Model
+
+- Model version (semver)
+- Training date and duration
+- Training dataset hash
+- Feature hash
+- Validation metrics (PR-AUC, ROC-AUC, F2, F1, Precision, Recall)
+- Calibration error (ECE)
+- Latency measurements
+- Promotion/approval status
+
+### Champion-Challenger Evaluation
+
+Offline challenger models (LightGBM, XGBoost) are trained continuously and evaluated against the champion. They are **never used for production inference**. If a challenger consistently outperforms the champion, it is recommended for promotion through the model registry.
+
+### Promotion Criteria
+
+| Criterion | Threshold |
+|-----------|-----------|
+| Minimum PR-AUC improvement | +0.01 |
+| Maximum false positive rate increase | +0.01 |
+| Maximum calibration error | 0.05 |
+| Minimum evaluation period | 7 days |
+
+---
+
+## Drift Monitoring
+
+**Problem**: Fraud patterns evolve. A model trained on last quarter's patterns misses this quarter's attacks.
+
+**Solution**: Continuous monitoring with automated retrain triggers and emergency rollback.
 
 ### Monitoring Stack
 
@@ -572,47 +657,34 @@ Each tenant can be on a **different phase simultaneously**. A new bank starts at
 ### Drift Response Protocol
 
 ```
-PSI > 0.1  →  Warning alert (logged, monitored)
-PSI > 0.2  →  Automatic retraining triggered
-PSI > 0.4  →  Emergency rollback to previous champion
-PR-AUC < 0.70  →  Champion demoted, challenger evaluation
-Latency > 100ms  →  Specialist invocation rate reduced
+PSI > 0.1     →  Warning alert (logged, monitored)
+PSI > 0.2     →  Automatic retraining triggered
+PSI > 0.4     →  Emergency rollback to previous champion
+PR-AUC < 0.70 →  Champion demoted, challenger evaluation
+Latency > 100ms → Specialist invocation rate reduced
 ```
 
----
+### CI/CD Pipelines
 
-## Model Registry
-
-**Purpose**: Version control, promotion, and rollback for production models.
-
-### Operations
-
-| Operation | Description |
-|-----------|-------------|
-| `register` | Register a new model version with metadata |
-| `promote` | Promote challenger to champion |
-| `rollback` | Revert to previous champion |
-| `archive` | Move deprecated models to archive |
-| `compare_models` | Side-by-side metric comparison |
-
-### Metadata Tracked
-
-- Model version (semver)
-- Training date and duration
-- Training dataset hash
-- Feature hash
-- Validation metrics (PR-AUC, ROC-AUC, F2, F1, Precision, Recall)
-- Calibration error (ECE)
-- Latency measurements
-- Promotion/approval status
+| Pipeline | Trigger | Purpose |
+|----------|---------|---------|
+| `model-ci.yml` | Push to main | Model training, evaluation, promotion checks |
+| `drift-monitor.yml` | Scheduled (hourly) | Drift detection, alert generation |
+| `retrain-scheduler.yml` | Scheduled (weekly) | Automated retrain pipeline |
 
 ---
 
 ## Dashboard
 
-A **9-page enterprise operations console** built with Streamlit.
+A **12-page enterprise operations console** built with Streamlit.
 
 > **Design philosophy**: The dashboard should not look like a Streamlit application. It should feel like a polished enterprise operations console that a major bank or fintech could deploy today.
+
+![Dashboard Overview](docs/images/dashboard-overview.png)
+
+![Dashboard Overview](docs/images/dashboard-live-monitoring.png)
+
+![Dashboard Overview](docs/images/dashboard-model-lifecycle.png)
 
 ### Pages
 
@@ -620,13 +692,16 @@ A **9-page enterprise operations console** built with Streamlit.
 |------|---------|
 | **Overview** | 8 KPIs, operational health, 24h timeline, decision distribution |
 | **Risk Intelligence** | Geographic fraud map, hourly timeline, merchant/customer leaderboards |
-| **Behavior Profiles** | 5 entity profiles, velocity analysis, feature importance |
+| **Behaviour Profiles** | 5 entity profiles, velocity analysis, feature importance |
 | **Models** | Architecture diagram, champion metrics, model leaderboard, confusion matrix |
+| **Model Performance** | Detailed model evaluation metrics, precision-recall curves |
 | **Explainability** | SHAP waterfall, counterfactual flow, similar transactions |
 | **Drift Monitoring** | PSI bars, KL divergence, concept drift timeline |
 | **Live Monitoring** | Real-time metrics, latency, throughput, infrastructure health |
 | **Compliance** | Regulatory checklist, bias monitoring, audit trail |
 | **Lifecycle** | Model timeline, phase progression, registry, promotion readiness |
+| **Monitoring** | System health, alert history, SLA compliance |
+| **EDA** | Exploratory data analysis, feature distributions
 
 ### Design System
 
@@ -640,118 +715,62 @@ A **9-page enterprise operations console** built with Streamlit.
 
 ---
 
-## Tech Stack
-
-| Category | Technology | Purpose |
-|----------|------------|---------|
-| **API** | FastAPI | REST API with Swagger docs |
-| **ML** | PyTorch | VAE, FT-Transformer |
-| **ML** | TabPFN | Semi-supervised foundation model (Prior Labs) |
-| **ML** | CatBoost | Production fraud classifier |
-| **ML** | scikit-learn | Isolation Forest, calibration, metrics |
-| **ML** | SHAP | Feature attributions |
-| **Features** | Redis | Online feature store, score cache |
-| **Streaming** | Apache Kafka | Transaction events, audit, labels |
-| **Analytics** | ClickHouse | Offline analytics, drift metrics |
-| **Database** | PostgreSQL | Metadata, model registry, labels |
-| **MLOps** | MLflow | Experiment tracking |
-| **Dashboard** | Streamlit | Operations console |
-| **Monitoring** | Prometheus | System metrics |
-| **Container** | Docker Compose | 11-service local stack |
-| **Config** | Pydantic Settings | Environment-driven configuration |
-
----
-
 ## Repository Structure
 
 ```
 fraudtrap/
-├── api/                    # FastAPI app and HTTP endpoints
-├── behavior/               # Behavioural Intelligence Layer
-│   ├── profiles/           # Online behavioural profiles
-│   ├── feature_generation/ # Velocity, trust, similarity, novelty
-│   ├── storage/            # RedisFeatureStore, InMemoryFeatureStore
-│   ├── services/           # BehaviorEngine orchestration
-│   └── tests/              # Unit tests
-├── config/                 # Environment-driven settings (Pydantic)
-├── dashboard/              # Enterprise dashboard (9 pages)
-│   ├── theme/              # Design system (colors, typography, CSS, icons)
-│   ├── components/         # Reusable UI components
-│   ├── pages/              # Dashboard pages
-│   └── utils/              # Utilities
-├── docker/                 # Dockerfiles and compose file
-├── features/               # Feature engineering (Redis pipelines)
-├── ingestion/              # Kafka producer/consumer, schemas
+├── api/                        # FastAPI app and HTTP endpoints
+│   ├── main.py                 # Scoring API, phase, explain, drift endpoints
+│   └── admin.py                # Admin API: rules, blocklists, model management
+├── behavior/                   # Behaviour Intelligence Engine
+│   ├── profiles/               # Online behavioural profiles (customer, merchant, device, ...)
+│   ├── feature_generation/     # Velocity, trust, similarity, novelty features
+│   ├── storage/                # RedisFeatureStore, InMemoryFeatureStore
+│   ├── services/               # BehaviorEngine orchestration
+│   └── integration.py          # Cross-module integration layer
+├── config/                     # Environment-driven settings (Pydantic)
+│   ├── settings.py             # Central configuration
+│   └── supervised.yaml         # ML pipeline configuration
+├── dashboard/                  # Enterprise operations console (9 pages)
+│   ├── app.py                  # Streamlit entry point
+│   ├── pages/                  # Dashboard pages (overview, risk, models, ...)
+│   ├── components/             # Reusable UI components
+│   ├── theme/                  # Design system (colors, typography, CSS)
+│   └── config/                 # Dashboard configuration
+├── docker/                     # Dockerfiles and compose file
+│   ├── docker-compose.yml      # 12-service local stack
+│   ├── Dockerfile.api          # API container
+│   ├── Dockerfile.dashboard    # Dashboard container
+│   └── Dockerfile.training     # Training worker container
+├── features/                   # Feature engineering (Redis pipelines)
+├── ingestion/                  # Kafka producer/consumer, schemas
 ├── models/
-│   ├── cold_start/         # VAE + Isolation Forest + Tail Detector
-│   ├── adaptive_learning/  # Adaptive Learning Layer (TabPFN)
-│   ├── supervised/         # Champion, FT-Transformer, Meta Fusion, Challengers
-│   └── explainability/     # SHAP, Counterfactual, Formatter, Cache
-├── monitoring/             # Drift, metrics, alerts, rollup
-├── scoring/                # Orchestrator, rules, calibration, model router
-├── scripts/                # Data gen, training, simulation
-├── tests/                  # Unit, integration, load tests
-├── training/               # Dataset builder, pipeline
+│   ├── cold_start/             # VAE + Isolation Forest + Tail Detector
+│   ├── adaptive_learning/      # Adaptive Learning Layer (TabPFN, AdaptiveLearner)
+│   ├── supervised/             # Champion, FT-Transformer, Meta Fusion, Challengers
+│   ├── explainability/         # SHAP, Counterfactual, Formatter, Cache
+│   └── gnn/                    # Graph Neural Network (experimental)
+├── scoring/                    # Orchestrator, rules, calibration, model router
+│   ├── orchestrator.py         # Main scoring entry point
+│   ├── model_router.py         # Phase-based model routing
+│   ├── rules_engine.py         # Deterministic rules evaluation
+│   ├── calibration.py          # Isotonic regression calibration
+│   └── version_manager.py      # Model versioning and metadata
+├── training/                   # Dataset builder, training pipeline
+├── scripts/                    # Data gen, training, simulation
+├── tests/                      # Unit, integration, load tests
 ├── docs/
-│   └── runbooks/           # Operational runbooks
-├── .github/workflows/      # CI/CD pipelines
+│   ├── FraudTrap_Technical_Documentation.md
+│   └── runbooks/               # 12 operational runbooks
+├── .github/workflows/          # CI/CD pipelines
+│   ├── model-ci.yml
+│   ├── drift-monitor.yml
+│   └── retrain-scheduler.yml
 ├── FraudTrap_End_to_End_Notebook.ipynb    # Architecture walkthrough
-└── requirements.txt        # Core dependencies
+├── FraudTrap_Complete_Study_Guide.docx    # 11-chapter platform guide
+├── openapi.yaml                # OpenAPI specification
+└── requirements.txt            # Core dependencies
 ```
-
----
-
-## Production Features
-
-- ✅ Real-time scoring (<100ms P95)
-- ✅ Multi-tenant isolation
-- ✅ Redis feature serving
-- ✅ Kafka event streaming
-- ✅ ClickHouse analytics
-- ✅ Champion–challenger architecture
-- ✅ Confidence-aware routing (CatBoost + FT-Transformer)
-- ✅ Behaviour profiling (5 entity types)
-- ✅ Cold-start detection (VAE + IF + Tail)
-- ✅ Semi-supervised learning (TabPFN)
-- ✅ Drift detection (PSI, KL divergence)
-- ✅ Explainability (SHAP + Counterfactual)
-- ✅ Probability calibration (Isotonic Regression)
-- ✅ Model registry with versioning
-- ✅ Champion–challenger evaluation
-- ✅ Automated promotion/rollback
-- ✅ Graceful degradation
-- ✅ Audit trail logging
-- ✅ Enterprise dashboard (9 pages)
-- ✅ Docker Compose local stack (11 services)
-- ✅ CI/CD pipelines (GitHub Actions)
-
----
-
-## Roadmap
-
-### Implemented
-
-- ✅ Three-layer ML lifecycle (Cold Start → Adaptive Learning → Supervised)
-- ✅ CatBoost champion with FT-Transformer specialist
-- ✅ TabPFN semi-supervised learning
-- ✅ Behavioural profiling (5 entity types)
-- ✅ SHAP + counterfactual explainability
-- ✅ Drift detection (PSI, KL divergence)
-- ✅ Champion–challenger evaluation
-- ✅ Enterprise dashboard (9 pages)
-- ✅ Docker Compose stack
-- ✅ CI/CD pipelines
-
-### Planned
-
-- 🔲 **Graph Neural Network** — mule ring detection and collusion networks
-- 🔲 **Federated Learning** — cross-tenant pattern sharing (privacy-preserving)
-- 🔲 **Active Learning** — intelligent label solicitation from analysts
-- 🔲 **Online Learning** — model adaptation without full retraining
-- 🔲 **Reinforcement Learning** — adaptive decision thresholds
-- 🔲 **Multi-modal Features** — transaction + device + behavioral signals
-- 🔲 **AutoML** — tenant-specific hyperparameter tuning
-- 🔲 **Regulatory Sandbox** — automated compliance reporting
 
 ---
 
@@ -765,26 +784,43 @@ fraudtrap/
 ### Docker (Recommended)
 
 ```bash
-# Start the full stack
+# Clone the repository
+git clone https://github.com/Tadeni00/FraudTrap.git
+cd FraudTrap
+
+# Start the full stack (12 services)
 docker compose -f docker/docker-compose.yml up -d
 
 # Check status
 docker compose -f docker/docker-compose.yml ps
+```
 
-# Open
-# API:       http://localhost:8000
-# API docs:  http://localhost:8000/docs
-# Dashboard: http://localhost:8501
-# MLflow:    http://localhost:5000
+| Service | URL | Purpose |
+|---------|-----|---------|
+| **API** | http://localhost:8000 | Scoring API |
+| **API Docs** | http://localhost:8000/docs | Swagger documentation |
+| **Dashboard** | http://localhost:8501 | Operations console |
+| **MLflow** | http://localhost:5000 | Experiment tracking |
+
+### Generate Sample Data
+
+```bash
+docker compose -f docker/docker-compose.yml run --rm sample_data
+```
+
+### Train Models
+
+```bash
+# Train all tenants
+docker exec docker-training_worker-1 python scripts/run_training.py --all-tenants
+
+# Train a specific tenant
+docker exec docker-training_worker-1 python scripts/run_training.py --tenant bank_ng_gtb
 ```
 
 ### Local Development
 
 ```bash
-# Clone
-git clone https://github.com/your-org/fraudtrap.git
-cd fraudtrap
-
 # Install dependencies
 pip install -r requirements.txt
 
@@ -792,7 +828,7 @@ pip install -r requirements.txt
 python scripts/generate_sample_data.py --rows 50000
 
 # Train models
-python -m scripts.train_simple_model --all-tenants
+python scripts/run_training.py --all-tenants
 
 # Start API
 uvicorn api.main:app --reload --port 8000
@@ -800,26 +836,6 @@ uvicorn api.main:app --reload --port 8000
 # Start dashboard
 streamlit run dashboard/app.py
 ```
-
----
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `ENVIRONMENT` | `development` | Runtime environment |
-| `API_URL` | `http://localhost:8000` | API endpoint |
-| `REDIS_HOST` | `localhost` | Redis host |
-| `REDIS_PORT` | `6379` | Redis port |
-| `KAFKA_BOOTSTRAP` | `localhost:9092` | Kafka broker |
-| `CLICKHOUSE_HOST` | `localhost` | ClickHouse host |
-| `CLICKHOUSE_PORT` | `9000` | ClickHouse port |
-| `POSTGRES_HOST` | `localhost` | PostgreSQL host |
-| `POSTGRES_PORT` | `5432` | PostgreSQL port |
-| `MLFLOW_TRACKING_URI` | `http://localhost:5000` | MLflow endpoint |
-| `MODEL_DIR` | `artifacts/models` | Model artifact path |
 
 ---
 
@@ -843,13 +859,28 @@ curl -X POST http://localhost:8000/v1/score \
   }'
 ```
 
+**Response**:
+
+```json
+{
+  "transaction_id": "txn_abc123",
+  "tenant_id": "bank_ng_gtb",
+  "risk_score": 0.72,
+  "decision": "REVIEW",
+  "model_phase": "ADAPTIVE_LEARNING",
+  "model_version": "adaptive-learning-tabpfn",
+  "latency_ms": 87.3,
+  "trace_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
 ### Get Explanation
 
 ```bash
 curl http://localhost:8000/v1/explain/{trace_id}
 ```
 
-### Check Model Health
+### Check Model Phase
 
 ```bash
 curl http://localhost:8000/v1/phase/bank_ng_gtb
@@ -861,28 +892,40 @@ curl http://localhost:8000/v1/phase/bank_ng_gtb
 curl http://localhost:8000/v1/drift/bank_ng_gtb
 ```
 
-### Get Behaviour Profile
+### Admin: Model Status
 
 ```bash
-curl http://localhost:8000/v1/profile/customer/{customer_id}
+curl http://localhost:8000/v1/admin/models/status
+```
+
+### Admin: Reload Rules
+
+```bash
+curl -X POST http://localhost:8000/v1/admin/rules/reload
 ```
 
 ---
 
-## Documentation
+## Configuration
 
-| Document | Description |
-|----------|-------------|
-| [Architecture Notebook](FraudTrap_End_to_End_Notebook.ipynb) | 16-section architecture walkthrough |
-| [API Documentation](API_DOCUMENTATION_v2.md) | Full API reference |
-| [OpenAPI Spec](openapi.yaml) | OpenAPI specification |
-| [Postman Collection](FraudTrap_API.postman_collection.json) | 22 API requests |
-| [Runbooks](docs/runbooks/) | Operational runbooks |
-| [Study Guide](FraudTrap_Complete_Study_Guide.docx) | 11-chapter platform guide |
+### Environment Variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `ENVIRONMENT` | `development` | Runtime environment |
+| `REDIS_HOST` | `localhost` | Redis host |
+| `REDIS_PORT` | `6379` | Redis port |
+| `KAFKA_BROKERS` | `localhost:9092` | Kafka broker |
+| `CLICKHOUSE_HOST` | `localhost` | ClickHouse host |
+| `CLICKHOUSE_PORT` | `9000` | ClickHouse port |
+| `POSTGRES_URL` | `postgresql://...` | PostgreSQL connection |
+| `MLFLOW_TRACKING_URI` | `http://localhost:5000` | MLflow endpoint |
+| `MODEL_DIR` | `artifacts/models` | Model artifact path |
+| `TABPFN_TOKEN` | — | TabPFN license key (required for Adaptive Learning) |
 
 ---
 
-## Performance Benchmarks
+## Performance
 
 | Metric | Target | Achieved |
 |--------|--------|----------|
@@ -893,6 +936,69 @@ curl http://localhost:8000/v1/profile/customer/{customer_id}
 | **Cold Start Training** | < 5 minutes | ~2 minutes |
 | **Champion Inference** | < 10ms | ~4ms |
 | **Dashboard Refresh** | < 3 seconds | ~1.5 seconds |
+
+### Why These Design Decisions?
+
+| Decision | Rationale |
+|----------|-----------|
+| **Redis for features** | Sub-millisecond latency for feature lookups. A relational database would add 5–10ms per query, unacceptable for a 90ms SLA. |
+| **Kafka for streaming** | Decoupled event architecture. Producers and consumers operate independently. Handles backpressure naturally. |
+| **ClickHouse for analytics** | Column-oriented OLAP database. Orders of magnitude faster than PostgreSQL for analytical queries on time-series data. |
+| **CatBoost over XGBoost/LightGBM** | Native categorical handling eliminates target encoding leakage. Ordered boosting reduces overfitting on imbalanced fraud data. |
+| **TabPFN over XGBoost for Phase 2** | In-context learning works with 100+ labels. XGBoost needs 500+. No hyperparameter tuning required. |
+| **Confidence-aware routing** | 85–90% of transactions complete in ~4ms. Only difficult cases invoke the slower specialist. Keeps P95 under 100ms. |
+| **SHAP over LIME** | TreeSHAP is exact for tree models. LIME is approximate and less stable. SHAP provides consistent, reproducible attributions. |
+| **FAISS for nearest neighbors** | Sub-millisecond similarity search across millions of transactions. Brute-force search would be too slow for real-time explainability. |
+| **Streamlit for dashboard** | Rapid prototyping with Python-native data science stack. Dark theme customization makes it feel like an enterprise console. |
+| **Docker Compose for local dev** | 12-service stack reproducible with a single command. No manual dependency management. |
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Architecture Notebook](FraudTrap_End_to_End_Notebook.ipynb) | 16-section architecture walkthrough with code |
+| [Technical Documentation](docs/FraudTrap_Technical_Documentation.md) | 24-section engineering deep-dive |
+| [API Documentation](API_DOCUMENTATION_v2.md) | Full API reference |
+| [OpenAPI Spec](openapi.yaml) | OpenAPI 3.0 specification |
+| [Postman Collection](FraudTrap_API.postman_collection.json) | 22 API requests |
+| [Study Guide](FraudTrap_Complete_Study_Guide.docx) | 11-chapter platform guide |
+| [Beginner Guide](docs/FraudTrap_Beginner_Guide.docx) | Getting started guide |
+| [Runbooks](docs/runbooks/) | 12 operational runbooks |
+
+---
+
+## Research Directions
+
+Features currently in production are marked with ✅. Future research directions are under investigation.
+
+### Implemented
+
+- ✅ Three-layer adaptive ML lifecycle (Cold Start → Adaptive Learning → Supervised)
+- ✅ Confidence-aware champion-specialist routing
+- ✅ Behavioural profiling (5 entity types, incremental updates)
+- ✅ SHAP + counterfactual explainability
+- ✅ Drift detection (PSI, KL divergence) with automated retrain
+- ✅ Champion-challenger evaluation with controlled promotion
+- ✅ Multi-tenant model isolation
+- ✅ Real-time scoring (<100ms P95)
+- ✅ Enterprise dashboard (9 pages)
+- ✅ Docker Compose stack (12 services)
+- ✅ CI/CD pipelines (GitHub Actions)
+
+### Research Directions
+
+| Direction | Description | Status |
+|-----------|-------------|--------|
+| **Graph Neural Networks** | Mule ring detection and collusion networks via transaction graph analysis | Experimental (`models/gnn/`) |
+| **Federated Learning** | Cross-tenant pattern sharing with privacy preservation | Planned |
+| **Continual Learning** | Model adaptation without full retraining | Planned |
+| **Online Learning** | Real-time model updates from streaming labels | Planned |
+| **Reinforcement Learning** | Adaptive decision thresholds based on analyst feedback | Planned |
+| **Causal AI** | Causal inference for fraud root cause analysis | Planned |
+| **Foundation Models** | Large-scale tabular foundation models for fraud | Planned |
+| **Agentic Investigation** | AI-assisted fraud case investigation and reporting | Planned |
 
 ---
 
@@ -915,7 +1021,7 @@ pre-commit install
 pytest tests/ -v
 
 # Run linting
-ruff check .
+black --check . --line-length 100
 
 # Run type checking
 mypy .
@@ -940,8 +1046,13 @@ FraudTrap's Adaptive Learning Layer uses **TabPFN** (by Prior Labs), which requi
 
 <div align="center">
 
-**FraudTrap** — Production-grade fraud detection for African banks and fintechs.
+**FraudTrap** — Adaptive fraud intelligence for banks and fintechs.
 
 Built with engineering rigor. Designed for scale. Ready for production.
+
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.111+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Docker](https://img.shields.io/badge/Docker-24+-2496ED?style=flat-square&logo=docker&logoColor=white)](https://docker.com)
+[![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
 </div>
