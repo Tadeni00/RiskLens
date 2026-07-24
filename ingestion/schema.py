@@ -32,9 +32,7 @@ class TransactionRequest(BaseModel):
 
     # Transaction core
     amount: float = Field(..., gt=0, description="Transaction amount in local currency")
-    currency: str = Field(
-        ..., min_length=3, max_length=3, description="ISO 4217 currency code"
-    )
+    currency: str = Field(..., min_length=3, max_length=3, description="ISO 4217 currency code")
     timestamp: datetime = Field(..., description="Transaction initiation time (UTC)")
     transaction_type: str = Field(
         ...,
@@ -43,9 +41,7 @@ class TransactionRequest(BaseModel):
     channel: str = Field(..., description="Channel: WEB, MOBILE, API, POS, ATM, USSD")
 
     # Counterparty (optional but high-signal)
-    merchant_id: Optional[str] = Field(
-        None, description="Tokenised merchant identifier"
-    )
+    merchant_id: Optional[str] = Field(None, description="Tokenised merchant identifier")
     merchant_category_code: Optional[str] = Field(None, description="MCC code")
     merchant_country: Optional[str] = Field(None, description="ISO 3166-1 alpha-2")
     counterparty_account_id: Optional[str] = Field(
@@ -54,12 +50,8 @@ class TransactionRequest(BaseModel):
 
     # Device / network (optional but high-signal for ATO)
     device_id: Optional[str] = Field(None, description="Tokenised device fingerprint")
-    device_type: Optional[str] = Field(
-        None, description="MOBILE, DESKTOP, TABLET, POS_TERMINAL"
-    )
-    ip_address_hash: Optional[str] = Field(
-        None, description="Hashed IP address (privacy-safe)"
-    )
+    device_type: Optional[str] = Field(None, description="MOBILE, DESKTOP, TABLET, POS_TERMINAL")
+    ip_address_hash: Optional[str] = Field(None, description="Hashed IP address (privacy-safe)")
     user_agent_hash: Optional[str] = Field(None, description="Hashed user-agent string")
 
     # Geolocation (optional)
@@ -72,9 +64,7 @@ class TransactionRequest(BaseModel):
         None, description="Mean inter-keystroke interval in ms"
     )
     session_duration_seconds: Optional[float] = Field(None)
-    field_visit_count: Optional[int] = Field(
-        None, description="Number of form fields visited"
-    )
+    field_visit_count: Optional[int] = Field(None, description="Number of form fields visited")
 
     # Client-specific extensions
     extra_fields: Optional[dict[str, Any]] = Field(
@@ -119,9 +109,7 @@ class FeatureContribution(BaseModel):
 
     feature: str = Field(description="Feature name")
     value: float = Field(description="Feature value for this transaction")
-    contribution: float = Field(
-        description="Contribution to risk score (can be negative)"
-    )
+    contribution: float = Field(description="Contribution to risk score (can be negative)")
     method: str = Field(
         description="Attribution method: shap, rule_weight, vae_recon, iforest_path, tail_zscore, calibration"
     )
@@ -136,7 +124,7 @@ class Explanation(BaseModel):
     """
 
     model_type: str = Field(
-        description="Model type: rules, cold_start, semi_supervised, supervised, champion, explainability"
+        description="Model type: rules, cold_start, adaptive_learning, supervised, champion, explainability"
     )
     base_value: float = Field(description="Model baseline (expected value)")
     prediction_value: float = Field(description="Final risk score")
@@ -169,13 +157,11 @@ class ScoringResponse(BaseModel):
     tenant_id: str
     risk_score: float = Field(ge=0.0, le=1.0, description="Fraud probability 0–1")
     decision: str = Field(description="APPROVE | REVIEW | BLOCK")
-    model_phase: str = Field(description="UNSUPERVISED | SEMI_SUPERVISED | SUPERVISED")
+    model_phase: str = Field(description="UNSUPERVISED | ADAPTIVE_LEARNING | SUPERVISED")
     model_version: str
     latency_ms: float
     explanation: Optional[Explanation] = None
-    explanation_type: Optional[str] = Field(
-        default=None, description="sync | async_pending | none"
-    )
+    explanation_type: Optional[str] = Field(default=None, description="sync | async_pending | none")
     triggered_rules: list[str] = Field(default_factory=list)
     trace_id: str = Field(description="Unique trace for audit log lookup")
     scored_at: datetime
@@ -190,9 +176,7 @@ class LabelPayload(BaseModel):
     transaction_id: str
     tenant_id: str
     label: int = Field(..., ge=0, le=1, description="1=fraud, 0=legitimate")
-    label_source: str = Field(
-        description="CHARGEBACK | MANUAL_REVIEW | DISPUTE_RESOLVED"
-    )
+    label_source: str = Field(description="CHARGEBACK | MANUAL_REVIEW | DISPUTE_RESOLVED")
     chargeback_reason_code: Optional[str] = Field(
         None, description="Visa/MC reason code — used to filter non-fraud chargebacks"
     )

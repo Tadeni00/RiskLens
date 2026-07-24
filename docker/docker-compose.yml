@@ -102,6 +102,7 @@ services:
       CLICKHOUSE_HOST: clickhouse
       POSTGRES_URL: postgresql://fraudtrap:fraudtrap@postgres:5432/fraudtrap
       MLFLOW_TRACKING_URI: http://mlflow:5000
+      TABPFN_TOKEN: ${TABPFN_TOKEN}
       PHASE1_MIN_FRAUD_LABELS: 5
       PHASE1_MIN_TRANSACTIONS: 20
       PHASE1_MIN_WEEKS: 0
@@ -179,6 +180,7 @@ services:
       CLICKHOUSE_HOST: clickhouse
       POSTGRES_URL: postgresql://fraudtrap:fraudtrap@postgres:5432/fraudtrap
       MLFLOW_TRACKING_URI: http://mlflow:5000
+      TABPFN_TOKEN: ${TABPFN_TOKEN}
       PHASE1_MIN_FRAUD_LABELS: 5
       PHASE1_MIN_TRANSACTIONS: 20
       PHASE1_MIN_WEEKS: 0
@@ -188,6 +190,7 @@ services:
       LABEL_LAG_DAYS: 0
     volumes:
       - ../artifacts:/app/artifacts
+      - tabpfn_cache:/root/.cache/huggingface
     depends_on:
       kafka: { condition: service_started }
       redis: { condition: service_healthy }
@@ -223,3 +226,4 @@ volumes:
   clickhouse_data:
   postgres_data:
   mlflow_artifacts:
+  tabpfn_cache:

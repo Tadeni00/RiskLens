@@ -83,22 +83,21 @@ class VersionManager:
         )
         self.register_version(tenant_id, "cold_start", info)
 
-    def register_semi_supervised(self, tenant_id: str, model) -> None:
-        """Register a semi-supervised model version."""
+    def register_adaptive_learner(self, tenant_id: str, model) -> None:
+        """Register an adaptive learner (TabPFN) model version."""
         info = ModelVersionInfo(
             tenant_id=tenant_id,
-            model_version=(
-                model.xgb.model_version
-                if hasattr(model.xgb, "model_version")
-                else "unknown"
-            ),
-            training_hash=model.cold_start.training_hash if model.cold_start else None,
-            feature_hash=model.cold_start.feature_hash if model.cold_start else None,
-            feature_names=model.cold_start.feature_names if model.cold_start else [],
-            active_phase="SEMI_SUPERVISED",
+            model_version=(model.model_version if hasattr(model, "model_version") else "unknown"),
+            training_hash=getattr(model, "training_hash", None),
+            feature_hash=getattr(model, "feature_hash", None),
+            feature_names=getattr(model, "feature_names", []),
+            active_phase="ADAPTIVE_LEARNING",
             load_status="loaded",
         )
-        self.register_version(tenant_id, "semi_supervised", info)
+        self.register_version(tenant_id, "adaptive_learning", info)
+
+    # Backwards-compatible alias
+    register_semi_supervised = register_adaptive_learner
 
     def register_supervised(self, tenant_id: str, model) -> None:
         """Register a supervised model version."""
@@ -130,23 +129,17 @@ class VersionManager:
             )
             self.register_version("_shared", "cold_start", info)
 
-        elif model_type == "semi_supervised" and model:
+        elif model_type in ("semi_supervised", "adaptive_learning") and model:
             info = ModelVersionInfo(
                 model_version=(
-                    model.xgb.model_version
-                    if hasattr(model.xgb, "model_version")
-                    else "unknown"
+                    model.model_version if hasattr(model, "model_version") else "unknown"
                 ),
-                feature_hash=(
-                    model.cold_start.feature_hash if model.cold_start else None
-                ),
-                feature_names=(
-                    model.cold_start.feature_names if model.cold_start else []
-                ),
-                active_phase="SEMI_SUPERVISED",
+                feature_hash=getattr(model, "feature_hash", None),
+                feature_names=getattr(model, "feature_names", []),
+                active_phase="ADAPTIVE_LEARNING",
                 load_status="loaded",
             )
-            self.register_version("_shared", "semi_supervised", info)
+            self.register_version("_shared", "adaptive_learning", info)
 
         elif model_type == "supervised" and model:
             info = ModelVersionInfo(
@@ -164,17 +157,13 @@ class VersionManager:
         elif model_type == "gnn" and model:
             info = ModelVersionInfo(
                 model_version=(
-                    model.model_version
-                    if hasattr(model, "model_version")
-                    else "unknown"
+                    model.model_version if hasattr(model, "model_version") else "unknown"
                 ),
                 load_status="loaded",
             )
             self.register_version("_shared", "gnn", info)
 
-    def get_version(
-        self, tenant_id: str, model_type: str
-    ) -> Optional[ModelVersionInfo]:
+    def get_version(self, tenant_id: str, model_type: str) -> Optional[ModelVersionInfo]:
         """Get version info for a tenant/model combination."""
         key = f"{tenant_id}:{model_type}"
         with self._lock:
@@ -208,8 +197,8 @@ class VersionManager:
             return "SUPERVISED"
         if "supervised" in versions:
             return "SUPERVISED"
-        if "semi_supervised" in versions:
-            return "SEMI_SUPERVISED"
+        if "adaptive_learning" in versions:
+            return "ADAPTIVE_LEARNING"
         if "cold_start" in versions:
             return "UNSUPERVISED"
 
@@ -217,8 +206,8 @@ class VersionManager:
         shared = self.get_tenant_versions("_shared")
         if "supervised" in shared:
             return "SUPERVISED"
-        if "semi_supervised" in shared:
-            return "SEMI_SUPERVISED"
+        if "adaptive_learning" in shared:
+            return "ADAPTIVE_LEARNING"
         if "cold_start" in shared:
             return "UNSUPERVISED"
 
@@ -313,9 +302,7 @@ class VersionManager:
     def clear_tenant(self, tenant_id: str) -> None:
         """Clear all versions for a tenant."""
         with self._lock:
-            keys_to_remove = [
-                k for k in self._versions if k.startswith(f"{tenant_id}:")
-            ]
+            keys_to_remove = [k for k in self._versions if k.startswith(f"{tenant_id}:")]
             for k in keys_to_remove:
                 del self._versions[k]
 

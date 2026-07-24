@@ -203,7 +203,7 @@ components:
           enum: [APPROVE, REVIEW, BLOCK]
         model_phase:
           type: string
-          enum: [UNSUPERVISED, SEMI_SUPERVISED, SUPERVISED, RULES]
+          enum: [UNSUPERVISED, ADAPTIVE_LEARNING, SUPERVISED, RULES]
         model_version:
           type: string
         latency_ms:
@@ -234,7 +234,7 @@ components:
       properties:
         model_type:
           type: string
-          enum: [rules, cold_start, semi_supervised, supervised, gnn]
+          enum: [rules, cold_start, adaptive_learning, supervised, gnn]
         base_value:
           type: number
         prediction_value:
@@ -315,7 +315,7 @@ components:
           enum: [APPROVE, REVIEW, BLOCK]
         model_phase:
           type: string
-          enum: [UNSUPERVISED, SEMI_SUPERVISED, SUPERVISED, RULES]
+          enum: [UNSUPERVISED, ADAPTIVE_LEARNING, SUPERVISED, RULES]
         model_version:
           type: string
         latency_ms:
@@ -346,7 +346,7 @@ components:
       properties:
         model_type:
           type: string
-          enum: [rules, cold_start, semi_supervised, supervised, gnn]
+          enum: [rules, cold_start, adaptive_learning, supervised, gnn]
         base_value:
           type: number
         prediction_value:
@@ -427,7 +427,7 @@ components:
           enum: [APPROVE, REVIEW, BLOCK]
         model_phase:
           type: string
-          enum: [UNSUPERVISED, SEMI_SUPERVISED, SUPERVISED, RULES]
+          enum: [UNSUPERVISED, ADAPTIVE_LEARNING, SUPERVISED, RULES]
         model_version:
           type: string
         latency_ms:
@@ -458,7 +458,7 @@ components:
       properties:
         model_type:
           type: string
-          enum: [rules, cold_start, semi_supervised, supervised, gnn]
+          enum: [rules, cold_start, adaptive_learning, supervised, gnn]
         base_value:
           type: number
         prediction_value:
@@ -640,7 +640,7 @@ components:
           properties:
             cold_start:
               type: boolean
-            semi_supervised:
+            adaptive_learning:
               type: boolean
             supervised:
               type: boolean

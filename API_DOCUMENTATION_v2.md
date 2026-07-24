@@ -1,6 +1,6 @@
 # FraudTrap API Documentation v2.0
 
-Production-grade fraud detection API for banks and fintechs, implementing a three-phase model lifecycle: Cold Start → Semi-Supervised → Supervised.
+Production-grade fraud detection API for banks and fintechs, implementing a three-layer model lifecycle: Cold Start → Adaptive Learning → Supervised.
 
 ---
 
@@ -395,7 +395,7 @@ Returns the current model phase and loaded models for a tenant.
   "model_version": "v2026.07.15",
   "loaded_models": {
     "cold_start": true,
-    "semi_supervised": true,
+    "adaptive_learning": true,
     "supervised": true,
     "simple_model": true
   },
@@ -506,7 +506,7 @@ Returns scoring history, label counts, transition readiness, and loaded models f
   },
   "loaded_models": {
     "cold_start": true,
-    "semi_supervised": true,
+    "adaptive_learning": true,
     "supervised": true,
     "simple_model": true
   },
@@ -585,7 +585,7 @@ Reloads models from disk for a specific tenant.
 {
   "status": "reloaded",
   "tenant_id": "bank_ng_gtb",
-  "models_loaded": ["cold_start", "semi_supervised", "supervised"],
+  "models_loaded": ["cold_start", "adaptive_learning", "supervised"],
   "model_version": "v2026.07.15"
 }
 ```
@@ -652,7 +652,7 @@ Kafka cluster: `kafka.fraudtrap.io:9092`, TLS required.
 
 - Initial release of FraudTrap API v2.
 - Scoring endpoints: single and batch.
-- Three-phase model lifecycle (Cold Start → Semi-Supervised → Supervised).
+- Three-layer model lifecycle (Cold Start → Adaptive Learning → Supervised).
 - SHAP-based explainability.
 - Drift monitoring (PSI, KL divergence).
 - Label ingestion pipeline.

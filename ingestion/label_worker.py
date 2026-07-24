@@ -90,8 +90,7 @@ class LabelWorker:
         self._write_label(label)
 
         logger.debug(
-            "Label processed: tenant={} txn={} label={} source={} "
-            "total_fraud_labels={}",
+            "Label processed: tenant={} txn={} label={} source={} " "total_fraud_labels={}",
             label.tenant_id,
             label.transaction_id,
             label.label,
@@ -166,17 +165,15 @@ class LabelWorker:
         if state.current_phase == ModelPhase.UNSUPERVISED:
             if state.confirmed_fraud_labels == phase1_gate:
                 logger.info(
-                    "Phase 1 fraud label threshold reached for tenant={}. "
-                    "Queueing retrain.",
+                    "Phase 1 fraud label threshold reached for tenant={}. " "Queueing retrain.",
                     state.tenant_id,
                 )
                 self._queue_retrain(state.tenant_id, "phase_gate")
 
-        elif state.current_phase == ModelPhase.SEMI_SUPERVISED:
+        elif state.current_phase == ModelPhase.ADAPTIVE_LEARNING:
             if state.confirmed_fraud_labels == phase2_gate:
                 logger.info(
-                    "Phase 2 fraud label threshold reached for tenant={}. "
-                    "Queueing retrain.",
+                    "Phase 2 fraud label threshold reached for tenant={}. " "Queueing retrain.",
                     state.tenant_id,
                 )
                 self._queue_retrain(state.tenant_id, "phase_gate")
@@ -206,8 +203,6 @@ if __name__ == "__main__":
         r.ping()
     except Exception:
         r = None
-        logger.warning(
-            "Redis unavailable — running label worker without state persistence"
-        )
+        logger.warning("Redis unavailable — running label worker without state persistence")
     worker = LabelWorker(redis_client=r)
     worker.start()

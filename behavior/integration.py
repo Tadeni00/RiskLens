@@ -102,12 +102,12 @@ class BehavioralIntelligenceIntegration:
             logger.warning("Cold-start behavioral feature enhancement failed: %s", e)
             return {}
 
-    def enhance_semi_supervised_features(self, transaction, features: dict) -> dict:
+    def enhance_adaptive_learning_features(self, transaction, features: dict) -> dict:
         """
-        Enhance Phase 2 (Semi-Supervised) features with behavioral features.
+        Enhance Layer 2 (Adaptive Learning) features with behavioral features.
 
         Uses pseudo-labels from Cold Start + behavioral features to train
-        the XGBoost model in the SemiSupervisedBridge.
+        the TabPFN adaptive learner.
         """
         # Generate behavioral features
         behavioral_features = self._generate_behavioral_features_for_transaction({})
@@ -158,6 +158,9 @@ class BehavioralIntelligenceIntegration:
         except Exception as e:
             logger.warning("Behavioral feature generation failed: %s", e)
             return {}
+
+    # Backwards-compatible alias
+    enhance_semi_supervised_features = enhance_adaptive_learning_features
 
 
 # Global instance

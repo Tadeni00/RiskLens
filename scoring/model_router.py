@@ -14,7 +14,7 @@ import numpy as np
 from loguru import logger
 
 from models.cold_start.ensemble import ColdStartEnsemble
-from models.semi_supervised.tabpfn import TabPFNModel
+from models.adaptive_learning.tabpfn_learner import TabPFNAdaptiveLearner
 from models.supervised.champion import ChampionModel
 from scoring.simple_model import SimpleFraudModel
 
@@ -24,7 +24,7 @@ class RoutingDecision:
     """Result of model routing."""
 
     model: object
-    model_type: str  # "simple", "cold_start", "semi_supervised", "supervised", "gnn"
+    model_type: str  # "simple", "cold_start", "adaptive_learning", "supervised", "gnn"
     model_version: str
     experiment_variant: str = "champion"
     tenant_phase: str = "UNSUPERVISED"
@@ -51,10 +51,10 @@ class ModelRouter:
         """
         self.simple_models = registry_models.get("simple_models", {})
         self.cold_start_models = registry_models.get("cold_start_models", {})
-        self.semi_supervised_models = registry_models.get("semi_supervised_models", {})
+        self.adaptive_learner_models = registry_models.get("adaptive_learner_models", {})
         self.champion_models = registry_models.get("champion_models", {})
         self.shared_cold_start = registry_models.get("cold_start")
-        self.shared_semi_supervised = registry_models.get("semi_supervised")
+        self.shared_adaptive_learner = registry_models.get("adaptive_learner")
         self.shared_champion = registry_models.get("champion")
 
         self.active_phase = registry_models.get("active_phase", "UNSUPERVISED")
@@ -66,19 +66,17 @@ class ModelRouter:
 
         self.logger = logger.bind(component="ModelRouter")
 
-    def get_model(
-        self, tenant_id: str, transaction_id: Optional[str] = None
-    ) -> RoutingDecision:
+    def get_model(self, tenant_id: str, transaction_id: Optional[str] = None) -> RoutingDecision:
         """
         Get the appropriate model for a tenant.
 
         Priority:
         1. Tenant-specific simple model (production)
         2. Tenant-specific champion model (CatBoost + specialist)
-        3. Tenant-specific semi-supervised (TabPFN)
+        3. Tenant-specific adaptive learner (TabPFN)
         4. Tenant-specific cold-start
         5. Shared champion
-        6. Shared semi-supervised
+        6. Shared adaptive learner
         7. Shared cold-start
         8. Heuristic fallback
         """
@@ -102,15 +100,15 @@ class ModelRouter:
                 tenant_phase="SUPERVISED",
             )
 
-        # 3. Tenant semi-supervised (TabPFN)
-        if tenant_id in self.semi_supervised_models:
-            variant = self._check_experiment(tenant_id, "semi_supervised")
+        # 3. Tenant adaptive learner (TabPFN)
+        if tenant_id in self.adaptive_learner_models:
+            variant = self._check_experiment(tenant_id, "adaptive_learning")
             return RoutingDecision(
-                model=self.semi_supervised_models[tenant_id],
-                model_type="semi_supervised",
-                model_version=self.semi_supervised_models[tenant_id].model_version,
+                model=self.adaptive_learner_models[tenant_id],
+                model_type="adaptive_learning",
+                model_version=self.adaptive_learner_models[tenant_id].model_version,
                 experiment_variant=variant,
-                tenant_phase="SEMI_SUPERVISED",
+                tenant_phase="ADAPTIVE_LEARNING",
             )
 
         # 4. Tenant cold-start
@@ -131,13 +129,13 @@ class ModelRouter:
                 tenant_phase="SUPERVISED",
             )
 
-        # 6. Shared semi-supervised
-        if self.shared_semi_supervised:
+        # 6. Shared adaptive learner
+        if self.shared_adaptive_learner:
             return RoutingDecision(
-                model=self.shared_semi_supervised,
-                model_type="semi_supervised",
+                model=self.shared_adaptive_learner,
+                model_type="adaptive_learning",
                 model_version=self.model_version,
-                tenant_phase="SEMI_SUPERVISED",
+                tenant_phase="ADAPTIVE_LEARNING",
             )
 
         # 7. Shared cold-start
@@ -150,9 +148,7 @@ class ModelRouter:
             )
 
         # 8. Fallback - no model available
-        self.logger.warning(
-            "No model available for tenant={}, using heuristic", tenant_id
-        )
+        self.logger.warning("No model available for tenant={}, using heuristic", tenant_id)
         return RoutingDecision(
             model=None,
             model_type="heuristic",
@@ -186,7 +182,7 @@ class ModelRouter:
         return {
             "simple": sorted(self.simple_models.keys()),
             "champion": sorted(self.champion_models.keys()),
-            "semi_supervised": sorted(self.semi_supervised_models.keys()),
+            "adaptive_learning": sorted(self.adaptive_learner_models.keys()),
             "cold_start": sorted(self.cold_start_models.keys()),
         }
 
@@ -194,8 +190,8 @@ class ModelRouter:
         """Get current phase for tenant."""
         if tenant_id in self.simple_models or tenant_id in self.champion_models:
             return "SUPERVISED"
-        if tenant_id in self.semi_supervised_models:
-            return "SEMI_SUPERVISED"
+        if tenant_id in self.adaptive_learner_models:
+            return "ADAPTIVE_LEARNING"
         if tenant_id in self.cold_start_models:
             return "UNSUPERVISED"
         return self.active_phase
@@ -219,8 +215,6 @@ class ModelRouter:
         )
 
 
-def create_router(
-    registry_models: dict, experiment_config: Optional[dict] = None
-) -> ModelRouter:
+def create_router(registry_models: dict, experiment_config: Optional[dict] = None) -> ModelRouter:
     """Factory function to create ModelRouter."""
     return ModelRouter(registry_models, experiment_config)

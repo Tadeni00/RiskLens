@@ -35,9 +35,7 @@ def _generate_synthetic_data():
 
     # Scoring volume over time
     dates = [now - timedelta(days=i) for i in range(30)][::-1]
-    scoring_volume = [
-        int(rng.poisson(12000 + 3000 * np.sin(i * np.pi / 15))) for i in range(30)
-    ]
+    scoring_volume = [int(rng.poisson(12000 + 3000 * np.sin(i * np.pi / 15))) for i in range(30)]
     avg_risk_scores = [float(rng.beta(2, 8)) for _ in range(30)]
 
     # Model registry
@@ -61,7 +59,7 @@ def _generate_synthetic_data():
             "Actions": "View",
         },
         {
-            "Model": "TabPFN",
+            "Model": "TabPFN (Adaptive Learner)",
             "Version": "1.4.3",
             "Status": "Specialist",
             "PR-AUC": 0.7654,
@@ -204,7 +202,7 @@ def render(tenant_id: str):
                 "transition": "Ready",
             },
             {
-                "name": "Phase 2 — Semi-supervised",
+                "name": "Layer 2 — Adaptive Learning",
                 "model": "TabPFN Foundation Model",
                 "min_labels": 500,
                 "current": 3847,
@@ -230,9 +228,7 @@ def render(tenant_id: str):
         phase_cols = st.columns(3)
         for i, (col, phase) in enumerate(zip(phase_cols, phases)):
             progress_pct = (
-                min(phase["current"] / phase["target"] * 100, 100)
-                if phase["target"] > 0
-                else 100
+                min(phase["current"] / phase["target"] * 100, 100) if phase["target"] > 0 else 100
             )
             ring_color = Colors.SUCCESS if progress_pct >= 100 else phase["color"]
 
@@ -355,11 +351,7 @@ def render(tenant_id: str):
                 else (
                     Colors.INFO
                     if row["Status"] == "Specialist"
-                    else (
-                        Colors.WARNING
-                        if row["Status"] == "Offline"
-                        else Colors.TEXT_MUTED
-                    )
+                    else (Colors.WARNING if row["Status"] == "Offline" else Colors.TEXT_MUTED)
                 )
             )
             registry_html_rows += f"""
@@ -519,9 +511,7 @@ def render(tenant_id: str):
                     showline=False,
                     zeroline=False,
                     tickfont=dict(color=Colors.TEXT_MUTED, size=10),
-                    title=dict(
-                        text="Count", font=dict(color=Colors.TEXT_MUTED, size=11)
-                    ),
+                    title=dict(text="Count", font=dict(color=Colors.TEXT_MUTED, size=11)),
                 ),
                 legend=dict(
                     font=dict(color=Colors.TEXT_SECONDARY, size=11),

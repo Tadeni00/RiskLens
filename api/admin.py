@@ -17,6 +17,7 @@ from scoring.rules_engine import (
     create_rules_engine,
     create_blocklist_manager,
 )
+from scoring.rules_config import RuleType
 from scoring.orchestrator import get_registry, ScoringOrchestrator
 from scoring.version_manager import get_version_manager, VersionManager
 from config.settings import get_settings
@@ -405,8 +406,8 @@ async def get_model_status(
         "loaded_models": {
             "simple": list(registry.simple_models.keys()),
             "cold_start": list(registry.cold_start_models.keys()),
-            "semi_supervised": list(registry.semi_supervised_models.keys()),
-            "supervised": list(registry.supervised_models.keys()),
+            "adaptive_learning": list(registry.adaptive_learner_models.keys()),
+            "supervised": list(registry.champion_models.keys()),
             "gnn": "loaded" if registry.gnn_scorer else "not_loaded",
         },
     }
@@ -421,9 +422,7 @@ async def validate_model_features(
 ):
     """Validate feature compatibility for a model."""
     feature_hash = hashlib.sha256("|".join(sorted(features)).encode()).hexdigest()[:16]
-    is_compatible, message = vm.validate_feature_compatibility(
-        tenant_id, model_type, feature_hash
-    )
+    is_compatible, message = vm.validate_feature_compatibility(tenant_id, model_type, feature_hash)
 
     return {
         "tenant_id": tenant_id,

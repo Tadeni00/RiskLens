@@ -68,7 +68,7 @@ ls -la artifacts/models/bank_ng_gtb/
 
 # Should have:
 # - phase1/ (cold start)
-# - phase2/ (semi-supervised)
+# - phase2/ (adaptive learning)
 # - phase3/ (supervised)
 # - simple_model.pkl (serving model)
 # - version.txt

@@ -28,9 +28,7 @@ class Settings(BaseSettings):
     api_workers: int = Field(4, env="API_WORKERS")
     scoring_timeout_ms: int = Field(90, env="SCORING_TIMEOUT_MS")  # hard wall
     model_dir: str = Field("artifacts/models", env="MODEL_DIR")
-    model_reload_interval_seconds: float = Field(
-        300.0, env="MODEL_RELOAD_INTERVAL_SECONDS"
-    )
+    model_reload_interval_seconds: float = Field(300.0, env="MODEL_RELOAD_INTERVAL_SECONDS")
 
     # ── Kafka ─────────────────────────────────────────────────────────────────
     kafka_brokers: str = Field("localhost:9092", env="KAFKA_BROKERS")
@@ -39,9 +37,7 @@ class Settings(BaseSettings):
     kafka_topic_labels: str = "fraudtrap.labels.incoming"
     kafka_topic_audit: str = "fraudtrap.audit.decisions"
     kafka_consumer_group: str = "fraudtrap-scoring-group"
-    kafka_schema_registry_url: str = Field(
-        "http://localhost:8081", env="KAFKA_SCHEMA_REGISTRY_URL"
-    )
+    kafka_schema_registry_url: str = Field("http://localhost:8081", env="KAFKA_SCHEMA_REGISTRY_URL")
 
     # ── Redis (online feature store) ──────────────────────────────────────────
     redis_host: str = Field("localhost", env="REDIS_HOST")
@@ -68,13 +64,13 @@ class Settings(BaseSettings):
     mlflow_experiment_name: str = "fraudtrap-production"
 
     # ── Model lifecycle thresholds ────────────────────────────────────────────
-    # Cold-start → semi-supervised gate
+    # Cold-start → adaptive learning gate
     phase1_min_fraud_labels: int = 500
     phase1_min_transactions: int = 500_000
     phase1_min_weeks: int = 8
     phase1_min_pr_auc: float = 0.65
 
-    # Semi-supervised → supervised gate
+    # Adaptive learning → supervised gate
     phase2_min_fraud_labels: int = 5_000
     phase2_min_pr_auc: float = 0.78
 
@@ -97,6 +93,9 @@ class Settings(BaseSettings):
     label_lag_days: int = 70  # buffer for chargeback arrival
     training_window_days: int = 180
     retrain_schedule_cron: str = "0 2 * * 1"  # every Monday 02:00 UTC
+
+    # ── TabPFN (Adaptive Learning) ─────────────────────────────────────────
+    tabpfn_token: str = Field("", env="TABPFN_TOKEN")
 
     # ── Feature windows ───────────────────────────────────────────────────────
     velocity_windows: list[int] = [1, 5, 60, 1_440, 10_080]  # minutes

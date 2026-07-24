@@ -19,7 +19,7 @@
 7. [Rules Engine](#7-rules-engine)
 8. [The Three-Phase ML Lifecycle](#8-the-three-phase-ml-lifecycle)
 9. [Phase 1: Cold Start](#9-phase-1-cold-start)
-10. [Phase 2: Semi-Supervised Learning](#10-phase-2-semi-supervised-learning)
+10. [Layer 2: Adaptive Learning](#10-layer-2-adaptive-learning)
 11. [Phase 3: Champion-Challenger Supervised Learning](#11-phase-3-champion-challenger-supervised-learning)
 12. [Dynamic Model Routing](#12-dynamic-model-routing)
 13. [The Scoring Orchestrator](#13-the-scoring-orchestrator)
@@ -51,7 +51,7 @@ FraudTrap is not a single machine learning model. It is a complete system that i
 
 Fraud detection has a fundamental cold-start problem. When a new bank joins your platform, you have zero fraud labels. You do not know which transactions are legitimate and which are fraudulent. Without labels, you cannot train a supervised model. Most ML fraud systems require thousands of labeled fraud cases before they become useful, which means a new bank is unprotected for weeks or months while labels accumulate from chargebacks and manual reviews.
 
-FraudTrap solves this with a three-stage machine learning lifecycle. On day one, with zero labels, the system uses unsupervised anomaly detection (a Variational Autoencoder, Isolation Forest, and statistical tail detector) to flag unusual transaction patterns. As labels accumulate from chargebacks and human reviews, the system automatically transitions to semi-supervised learning, using pseudo-labels to expand the training set. Once enough confirmed labels exist, it deploys a full supervised CatBoost model with a Champion-Challenger architecture for continuous improvement.
+FraudTrap solves this with a three-stage machine learning lifecycle. On day one, with zero labels, the system uses unsupervised anomaly detection (a Variational Autoencoder, Isolation Forest, and statistical tail detector) to flag unusual transaction patterns. As labels accumulate from chargebacks and human reviews, the system automatically transitions to adaptive learning, using pseudo-labels to expand the training set. Once enough confirmed labels exist, it deploys a full supervised CatBoost model with a Champion-Challenger architecture for continuous improvement.
 
 This means every tenant is protected from their first transaction, and the system automatically evolves its detection strategy as more information becomes available.
 
@@ -71,7 +71,7 @@ FraudTrap follows a layered architecture where each layer adds intelligence to t
 
 **Layer 1 — Ingestion**: A transaction arrives via the FastAPI scoring endpoint. The system validates the payload, extracts the tenant ID, and begins processing.
 
-**Layer 2 — Tenant Resolution**: The system looks up the tenant's current ML phase from Redis. Each tenant can be in a different phase (Cold Start, Semi-Supervised, or Supervised) depending on how many fraud labels they have accumulated.
+**Layer 2 — Tenant Resolution**: The system looks up the tenant's current ML phase from Redis. Each tenant can be in a different phase (Cold Start, Adaptive Learning, or Supervised) depending on how many fraud labels they have accumulated.
 
 **Layer 3 — Behavioral Intelligence**: The system loads behavioral profiles for the customer, merchant, device, beneficiary, and payment instrument associated with this transaction. These profiles contain historical patterns like average spending, known devices, typical channels, and trust scores. If a profile does not exist, the system falls back to the tenant baseline, and if that does not exist, to the global baseline.
 
@@ -230,7 +230,7 @@ The core innovation of FraudTrap is that it does not require labels to start pro
 
 **Phase 1 — Cold Start**: Used when a tenant has fewer than 500 fraud labels. Relies entirely on unsupervised anomaly detection. No labeled fraud data is needed.
 
-**Phase 2 — Semi-Supervised**: Used when a tenant has between 500 and 5,000 fraud labels. Uses TabPFN (Tabular Prior-data Fitted Network) for in-context learning with pseudo-labels from the cold-start ensemble.
+**Phase 2 — Adaptive Learning**: Used when a tenant has between 500 and 5,000 fraud labels. Uses TabPFN (Tabular Prior-data Fitted Network) for in-context learning with pseudo-labels from the cold-start ensemble.
 
 **Phase 3 — Supervised**: Used when a tenant has more than 5,000 fraud labels. Uses confidence-aware routing with CatBoost champion (100% of transactions) and FT-Transformer specialist (low-confidence cases, ~10-15%). Meta Fusion combines outputs for final score.
 
@@ -282,9 +282,11 @@ Each detector has blind spots. The VAE may miss sparse anomalies because it lear
 
 ---
 
-## 10. Phase 2: Semi-Supervised Learning
+## 10. Layer 2: Adaptive Learning
 
-When a tenant accumulates enough fraud labels (at least 500 confirmed cases from chargebacks and manual reviews), Phase 2 introduces TabPFN (Tabular Prior-data Fitted Network) for in-context learning while preserving the cold-start foundation.
+When a tenant accumulates enough fraud labels (at least 500 confirmed cases from chargebacks and manual reviews), Layer 2 introduces TabPFN (Tabular Prior-data Fitted Network) for in-context learning while preserving the cold-start foundation.
+
+TabPFN requires a commercial license key from [Prior Labs](https://priorlabs.ai), set via the `TABPFN_TOKEN` environment variable. For organizations that cannot use TabPFN, FraudTrap supports **NetPFN** as a fully permissive alternative — set `learner: netpfn` in `config/supervised.yaml`. The `AdaptiveLearner` abstraction (`models/adaptive_learning/learner.py`) ensures the surrounding pipeline works identically with either backend.
 
 ### Pseudo-Labeling
 
@@ -403,7 +405,7 @@ The routing logic is straightforward:
 
 1. Look up the tenant's current phase from Redis.
 2. If the tenant has fewer than 500 fraud labels, route to Phase 1 (Cold Start).
-3. If the tenant has between 500 and 5,000 fraud labels, route to Phase 2 (Semi-Supervised TabPFN).
+3. If the tenant has between 500 and 5,000 fraud labels, route to Layer 2 (Adaptive Learning TabPFN).
 4. If the tenant has more than 5,000 fraud labels, route to Phase 3 (Confidence-Aware Routing: CatBoost champion + FT-Transformer specialist).
 
 The phase is stored in Redis and updated automatically when the label count crosses a threshold. The routing check adds less than 1 millisecond to the scoring path.
@@ -887,6 +889,8 @@ FT-Transformer captures non-linear interactions that tree models miss, but it is
 ### Why TabPFN for Phase 2 instead of XGBoost?
 
 With only 500-5,000 labels, traditional supervised models like XGBoost overfit. TabPFN (Tabular Prior-data Fitted Network) uses in-context learning that generalizes better with limited data. It stores labeled examples and classifies new transactions via transformer attention. This approach is more robust than pseudo-labeling with XGBoost when labels are scarce.
+
+TabPFN is wrapped behind the `AdaptiveLearner` interface, so organizations requiring a fully permissive alternative can substitute NetPFN without changing the surrounding pipeline.
 
 ### Why Isotonic Regression for calibration?
 

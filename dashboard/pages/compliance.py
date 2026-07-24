@@ -33,16 +33,10 @@ def render(tenant_id: str):
         "FILE_TEXT",
     ):
         # ── Section 1: Compliance Overview ──────────────────────────────────
-        n_blocked = (
-            int((df["decision"] == "BLOCK").sum()) if "decision" in df.columns else 0
-        )
-        n_review = (
-            int((df["decision"] == "REVIEW").sum()) if "decision" in df.columns else 0
-        )
+        n_blocked = int((df["decision"] == "BLOCK").sum()) if "decision" in df.columns else 0
+        n_review = int((df["decision"] == "REVIEW").sum()) if "decision" in df.columns else 0
         fraud_prevented = (
-            float(df.loc[df["is_fraud"] == 1, "amount"].sum())
-            if "is_fraud" in df.columns
-            else 0.0
+            float(df.loc[df["is_fraud"] == 1, "amount"].sum()) if "is_fraud" in df.columns else 0.0
         )
         sar_count = int(rng.poisson(12))
         analyst_queue = int(rng.poisson(34))
@@ -162,9 +156,7 @@ def render(tenant_id: str):
 
         if not df.empty and "is_fraud" in df.columns and "decision" in df.columns:
             df_work = df.copy()
-            df_work["is_flagged"] = (
-                df_work["decision"].isin(["BLOCK", "REVIEW"]).astype(int)
-            )
+            df_work["is_flagged"] = df_work["decision"].isin(["BLOCK", "REVIEW"]).astype(int)
 
             # Geographic disparate impact
             col_geo, col_ch = st.columns(2)
@@ -186,9 +178,7 @@ def render(tenant_id: str):
                                 "region": row["country_code"],
                                 "ratio": round(float(ratio), 3),
                                 "color": (
-                                    Colors.SUCCESS
-                                    if 0.8 <= ratio <= 1.25
-                                    else Colors.CRITICAL
+                                    Colors.SUCCESS if 0.8 <= ratio <= 1.25 else Colors.CRITICAL
                                 ),
                             }
                         )
@@ -269,9 +259,7 @@ def render(tenant_id: str):
                                 "channel": row["channel"],
                                 "ratio": round(float(ratio), 3),
                                 "color": (
-                                    Colors.SUCCESS
-                                    if 0.8 <= ratio <= 1.25
-                                    else Colors.CRITICAL
+                                    Colors.SUCCESS if 0.8 <= ratio <= 1.25 else Colors.CRITICAL
                                 ),
                             }
                         )
@@ -424,7 +412,7 @@ def render(tenant_id: str):
 
         explanation_df = pd.DataFrame(
             {
-                "Model Phase": ["SUPERVISED", "SEMI_SUPERVISED", "UNSUPERVISED"],
+                "Model Phase": ["SUPERVISED", "ADAPTIVE_LEARNING", "UNSUPERVISED"],
                 "Decisions Explained": [
                     str(int(rng.integers(8500, 9500))),
                     str(int(rng.integers(1800, 2400))),

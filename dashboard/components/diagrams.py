@@ -22,7 +22,7 @@ def pipeline_diagram(active_step: int = None, completed_steps: list = None):
         ("Feature Store", "DATABASE", "Redis-backed feature assembly"),
         ("Behavior Engine", "ACTIVITY", "5 entity profiles updated"),
         ("Cold Start Layer", "SHIELD", "VAE + Isolation Forest + Tail"),
-        ("Semi-supervised", "LAYERS", "TabPFN foundation model"),
+        ("Adaptive Learning", "LAYERS", "TabPFN foundation model"),
         ("Supervised Layer", "BRAIN", "CatBoost Champion + FT-Transformer"),
         ("Confidence Check", "TARGET", "Route to specialist if needed"),
         ("Explainability", "EYE", "SHAP + Counterfactual"),
@@ -226,7 +226,9 @@ def lifecycle_timeline(current_stage: int = 5):
 
         connector = ""
         if i < len(stages) - 1:
-            connector = f'<div style="width:40px;height:2px;background:{line_color};margin:0 4px"></div>'
+            connector = (
+                f'<div style="width:40px;height:2px;background:{line_color};margin:0 4px"></div>'
+            )
 
         items_html += f"""
 <div style="display:flex;align-items:center">

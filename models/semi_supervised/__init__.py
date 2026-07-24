@@ -1,21 +1,26 @@
 """
-FraudTrap — Phase 2: Semi-Supervised Learning (TabPFN)
+FraudTrap — Semi-Supervised Learning (Legacy Re-exports)
 
-Uses Prior Labs TabPFN — a pretrained tabular foundation model — as the
-core of the semi-supervised learning layer.  TabPFN performs in-context
-prediction on small-to-medium labelled datasets without gradient training.
-
-Reference:
-  Hollmann et al., "Accurate predictions on small data with a tabular
-  foundation model", Nature (2025).
+This package is maintained for backwards compatibility only.
+All new code should import from ``models.adaptive_learning`` instead.
 """
 
-from models.semi_supervised.prediction import SemiSupervisedPrediction
-from models.semi_supervised.tabpfn import TabPFNModel
-from models.semi_supervised.trainer import SemiSupervisedTrainer
+from models.adaptive_learning.prediction import AdaptivePrediction as SemiSupervisedPrediction
+from models.adaptive_learning.prediction import PseudoLabelResult
+from models.adaptive_learning.tabpfn_learner import TabPFNAdaptiveLearner as TabPFNModel
+from models.adaptive_learning.trainer import AdaptiveTrainer as SemiSupervisedTrainer
+from models.adaptive_learning.trainer import AdaptiveConfig as SemiSupervisedConfig
+from models.adaptive_learning.trainer import AdaptiveTrainingResult as SemiSupervisedTrainingResult
+from models.adaptive_learning.monitoring import AdaptiveMonitor as SemiSupervisedMonitor
+from models.adaptive_learning.monitoring import AdaptiveMetrics as SemiSupervisedMetrics
 
 __all__ = [
     "SemiSupervisedPrediction",
     "TabPFNModel",
     "SemiSupervisedTrainer",
+    "SemiSupervisedConfig",
+    "SemiSupervisedTrainingResult",
+    "SemiSupervisedMonitor",
+    "SemiSupervisedMetrics",
+    "PseudoLabelResult",
 ]

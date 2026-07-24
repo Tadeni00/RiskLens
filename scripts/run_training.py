@@ -114,9 +114,7 @@ def run_training_for_tenant(tenant_id: str, r: redis.Redis | None) -> None:
 def main():
     parser = argparse.ArgumentParser(description="FraudTrap Training Runner")
     parser.add_argument("--tenant", type=str, help="Train a specific tenant")
-    parser.add_argument(
-        "--all-tenants", action="store_true", help="Train all known tenants"
-    )
+    parser.add_argument("--all-tenants", action="store_true", help="Train all known tenants")
     parser.add_argument(
         "--generate-sample-data",
         action="store_true",
@@ -125,7 +123,7 @@ def main():
     parser.add_argument(
         "--force-phase",
         type=str,
-        choices=["UNSUPERVISED", "SEMI_SUPERVISED", "SUPERVISED"],
+        choices=["UNSUPERVISED", "ADAPTIVE_LEARNING", "SUPERVISED"],
         help="Force a specific phase (for testing)",
     )
     args = parser.parse_args()
@@ -172,14 +170,12 @@ def main():
                 state = load_phase_state(tenant_id, r)
                 state.current_phase = ModelPhase(args.force_phase)
                 # Seed labels so gates pass
-                if args.force_phase == "SEMI_SUPERVISED":
+                if args.force_phase == "ADAPTIVE_LEARNING":
                     state.confirmed_fraud_labels = settings.phase1_min_fraud_labels + 1
                 elif args.force_phase == "SUPERVISED":
                     state.confirmed_fraud_labels = settings.phase2_min_fraud_labels + 1
                 save_phase_state(state, r)
-                logger.info(
-                    "Forced phase={} for tenant={}", args.force_phase, tenant_id
-                )
+                logger.info("Forced phase={} for tenant={}", args.force_phase, tenant_id)
 
             run_training_for_tenant(tenant_id, r)
         except Exception as exc:

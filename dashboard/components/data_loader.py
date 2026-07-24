@@ -62,9 +62,7 @@ def make_transactions(n: int = 5000, fraud_rate: float = 0.015) -> pd.DataFrame:
                 "amount": float(rng.lognormal(9.5 if is_fraud else 8.5, 1.2)),
                 "currency": COUNTRY_CURRENCY.get(country, "USD"),
                 "timestamp": ts,
-                "transaction_type": rng.choice(
-                    ["PAYMENT", "TRANSFER", "WITHDRAWAL", "TOP_UP"]
-                ),
+                "transaction_type": rng.choice(["PAYMENT", "TRANSFER", "WITHDRAWAL", "TOP_UP"]),
                 "channel": rng.choice(["MOBILE", "WEB", "POS", "ATM"]),
                 "country_code": country,
                 "is_fraud": int(is_fraud),
@@ -82,7 +80,7 @@ def make_transactions(n: int = 5000, fraud_rate: float = 0.015) -> pd.DataFrame:
                 "typing_zscore": float(rng.normal(2.5 if is_fraud else 0.0, 1.0)),
                 "latency_ms": float(rng.normal(72, 12)),
                 "model_phase": rng.choice(
-                    ["UNSUPERVISED", "SEMI_SUPERVISED", "SUPERVISED"],
+                    ["UNSUPERVISED", "ADAPTIVE_LEARNING", "SUPERVISED"],
                     p=[0.15, 0.25, 0.60],
                 ),
             }
@@ -194,9 +192,7 @@ def make_pr_curve() -> pd.DataFrame:
     thresholds = np.linspace(0, 1, 100)
     precision = 0.05 + 0.90 * thresholds**0.4
     recall = 1.0 - thresholds**0.6
-    return pd.DataFrame(
-        {"threshold": thresholds, "precision": precision, "recall": recall}
-    )
+    return pd.DataFrame({"threshold": thresholds, "precision": precision, "recall": recall})
 
 
 def make_confusion_matrix() -> dict:
@@ -210,16 +206,12 @@ def make_score_distribution(n: int = 2000) -> pd.DataFrame:
     return pd.DataFrame(
         {
             "score": np.concatenate([fraud_scores, legit_scores]),
-            "label": np.concatenate(
-                [np.ones(len(fraud_scores)), np.zeros(len(legit_scores))]
-            ),
+            "label": np.concatenate([np.ones(len(fraud_scores)), np.zeros(len(legit_scores))]),
         }
     )
 
 
-def _fetch_recent(
-    tenant_id: str = "all_tenants", limit: int = 1000
-) -> tuple[pd.DataFrame, bool]:
+def _fetch_recent(tenant_id: str = "all_tenants", limit: int = 1000) -> tuple[pd.DataFrame, bool]:
     """Fetch recent transactions from ClickHouse. Returns (df, is_live)."""
     try:
         from clickhouse_driver import Client
@@ -337,9 +329,7 @@ def compute_kpis(df: pd.DataFrame) -> dict:
 
     total = len(df)
     n_block = int((df["decision"] == "BLOCK").sum()) if "decision" in df.columns else 0
-    n_review = (
-        int((df["decision"] == "REVIEW").sum()) if "decision" in df.columns else 0
-    )
+    n_review = int((df["decision"] == "REVIEW").sum()) if "decision" in df.columns else 0
     fraud_rate = float(df["is_fraud"].mean() * 100) if "is_fraud" in df.columns else 0.0
     avg_lat = float(df["latency_ms"].mean()) if "latency_ms" in df.columns else 0.0
 

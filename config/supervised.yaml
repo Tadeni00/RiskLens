@@ -1,8 +1,11 @@
 # FraudTrap — Supervised Learning Configuration
-# Phase 2 & 3 Architecture Settings
+# Layer 2 & 3 Architecture Settings
 
-# Phase 2: Semi-Supervised Configuration
-semi_supervised:
+# Layer 2: Adaptive Learning Configuration
+adaptive_learning:
+  # Learner backend (tabpfn or netpfn)
+  learner: tabpfn
+
   # TabPFN (Tabular Prior-data Fitted Network by Prior Labs)
   # A pretrained tabular foundation model that uses in-context learning
   # for prediction on small-to-medium labelled datasets.
@@ -15,6 +18,8 @@ semi_supervised:
     
     # Pseudo-labeling
     confidence_threshold: 0.8
+    pseudo_label_threshold: 0.97
+    active_learning_threshold: 0.70
     max_pseudo_ratio: 3.0
     
     # Calibration
@@ -23,7 +28,7 @@ semi_supervised:
   
   # Training pipeline
   training:
-    # Minimum labeled samples to activate semi-supervised
+    # Minimum labeled samples to activate adaptive learning
     min_labeled_samples: 100
     
     # Maximum labeled samples before graduating to supervised

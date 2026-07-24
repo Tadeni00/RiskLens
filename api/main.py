@@ -177,10 +177,10 @@ async def get_phase_status(tenant_id: str):
     """Returns the current model phase and version for a tenant."""
     registry = _orchestrator.registry
     tenant_phase = registry.active_phase
-    if tenant_id in registry.supervised_models:
+    if tenant_id in registry.champion_models:
         tenant_phase = "SUPERVISED"
-    elif tenant_id in registry.semi_supervised_models:
-        tenant_phase = "SEMI_SUPERVISED"
+    elif tenant_id in registry.adaptive_learner_models:
+        tenant_phase = "ADAPTIVE_LEARNING"
     elif tenant_id in registry.cold_start_models:
         tenant_phase = "UNSUPERVISED"
     elif tenant_id in registry.simple_models:
@@ -193,16 +193,15 @@ async def get_phase_status(tenant_id: str):
         "loaded_models": {
             "cold_start": tenant_id in registry.cold_start_models
             or registry.cold_start is not None,
-            "semi_supervised": tenant_id in registry.semi_supervised_models
-            or registry.semi_supervised is not None,
-            "supervised": tenant_id in registry.supervised_models
-            or registry.supervised is not None,
+            "adaptive_learning": tenant_id in registry.adaptive_learner_models
+            or registry.adaptive_learner is not None,
+            "supervised": tenant_id in registry.champion_models or registry.champion is not None,
             "simple_model": tenant_id in registry.simple_models,
         },
         "available_model_tenants": {
             "cold_start": sorted(registry.cold_start_models),
-            "semi_supervised": sorted(registry.semi_supervised_models),
-            "supervised": sorted(registry.supervised_models),
+            "adaptive_learning": sorted(registry.adaptive_learner_models),
+            "supervised": sorted(registry.champion_models),
             "simple_model": sorted(registry.simple_models),
         },
     }
@@ -287,12 +286,8 @@ async def get_drift(tenant_id: str):
     drift_data = {}
 
     for feat in features_to_monitor:
-        base_vals = [
-            float(s.get(feat, 0.0)) for s in baseline if s.get(feat) is not None
-        ]
-        curr_vals = [
-            float(s.get(feat, 0.0)) for s in current if s.get(feat) is not None
-        ]
+        base_vals = [float(s.get(feat, 0.0)) for s in baseline if s.get(feat) is not None]
+        curr_vals = [float(s.get(feat, 0.0)) for s in current if s.get(feat) is not None]
 
         if not base_vals or not curr_vals:
             continue
@@ -392,11 +387,7 @@ async def get_lifecycle(tenant_id: str):
             # Trapezoidal AUC
             pr_auc = 0.0
             for i in range(1, len(recalls)):
-                pr_auc += (
-                    (recalls[i] - recalls[i - 1])
-                    * (precisions[i] + precisions[i - 1])
-                    / 2
-                )
+                pr_auc += (recalls[i] - recalls[i - 1]) * (precisions[i] + precisions[i - 1]) / 2
             pr_auc = max(0.0, min(1.0, pr_auc))
         except Exception:
             pr_auc = 0.0
@@ -437,21 +428,15 @@ async def get_lifecycle(tenant_id: str):
                     "date": day,
                     "transactions": b["count"],
                     "fraud_labels": b["fraud"],
-                    "avg_score": (
-                        round(b["total_score"] / b["count"], 4) if b["count"] else 0.0
-                    ),
+                    "avg_score": (round(b["total_score"] / b["count"], 4) if b["count"] else 0.0),
                 }
             )
 
     # Transition readiness gates
     phase2_label_target = settings.phase2_min_fraud_labels  # 5000
     phase2_pr_auc_target = settings.phase2_min_pr_auc  # 0.78
-    label_pct = (
-        min(fraud_labels / phase2_label_target * 100, 100) if phase2_label_target else 0
-    )
-    pr_auc_pct = (
-        min(pr_auc / phase2_pr_auc_target * 100, 100) if phase2_pr_auc_target else 0
-    )
+    label_pct = min(fraud_labels / phase2_label_target * 100, 100) if phase2_label_target else 0
+    pr_auc_pct = min(pr_auc / phase2_pr_auc_target * 100, 100) if phase2_pr_auc_target else 0
     champion_pct = 100.0 if current_phase == "SUPERVISED" and has_simple else 0.0
 
     return {
@@ -489,7 +474,7 @@ async def get_lifecycle(tenant_id: str):
         },
         "loaded_models": {
             "cold_start": registry.cold_start is not None,
-            "semi_supervised": registry.semi_supervised is not None,
+            "adaptive_learning": registry.adaptive_learner is not None,
             "supervised": registry.supervised is not None,
             "simple_model": has_simple,
         },

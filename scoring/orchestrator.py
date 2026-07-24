@@ -2,7 +2,7 @@
 FraudTrap — Scoring Orchestrator
 Wires Tier 1 (rules) → Tier 2 (gradient boost ensemble) → Tier 3 (GNN, if needed)
 into a single real-time decision within the 100ms SLA.
-Manages model phase lifecycle (UNSUPERVISED → SEMI_SUPERVISED → SUPERVISED).
+Manages model phase lifecycle (UNSUPERVISED → ADAPTIVE_LEARNING → SUPERVISED).
 
 Key improvements:
 - Async GNN scoring (offloaded from critical path)
@@ -54,10 +54,10 @@ except Exception as exc:
     logger.warning("Cold-start ensemble unavailable: {}", exc)
 
 try:
-    from models.semi_supervised.tabpfn import TabPFNModel
+    from models.adaptive_learning.tabpfn_learner import TabPFNAdaptiveLearner
 except Exception as exc:
-    TabPFNModel = None
-    logger.warning("TabPFN semi-supervised model package unavailable: {}", exc)
+    TabPFNAdaptiveLearner = None
+    logger.warning("Adaptive learner (TabPFN) package unavailable: {}", exc)
 
 try:
     from models.supervised.champion import ChampionModel
@@ -89,9 +89,7 @@ settings = get_settings()
 _GNN_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="gnn-scorer")
 
 # Thread pool for async explanation (cold-start, semi-supervised)
-_EXPLANATION_EXECUTOR = ThreadPoolExecutor(
-    max_workers=2, thread_name_prefix="explanation"
-)
+_EXPLANATION_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="explanation")
 
 
 class _ModelFileHandler:
@@ -129,7 +127,7 @@ class ModelRegistry:
 
     def __init__(self):
         self.cold_start: Optional[ColdStartEnsemble] = None
-        self.semi_supervised: Optional[TabPFNModel] = None
+        self.adaptive_learner: Optional[TabPFNAdaptiveLearner] = None
         self.champion: Optional[ChampionModel] = None
         self.gnn_scorer: Optional[GNNScorer] = None
         self.active_phase: str = "UNSUPERVISED"
@@ -141,9 +139,12 @@ class ModelRegistry:
         self.trained_at: Optional[str] = None
 
         self.champion_models: dict[str, ChampionModel] = {}
-        self.semi_supervised_models: dict[str, TabPFNModel] = {}
+        self.adaptive_learner_models: dict[str, TabPFNAdaptiveLearner] = {}
         self.cold_start_models: dict[str, ColdStartEnsemble] = {}
         self.simple_models: dict[str, SimpleFraudModel] = {}
+
+        # Backwards compatibility aliases
+        self.semi_supervised_models = self.adaptive_learner_models
 
         # Double-buffered state for atomic swap
         self._staging = {}
@@ -165,7 +166,7 @@ class ModelRegistry:
         staging = {}
         staging["simple_models"] = self._load_simple_models(model_dir)
         staging["cold_start_models"] = self._load_cold_start_models(model_dir)
-        staging["semi_supervised_models"] = self._load_semi_supervised_models(
+        staging["adaptive_learner_models"] = self._load_adaptive_learner_models(
             model_dir, staging.get("cold_start_models", {})
         )
         staging["champion_models"] = self._load_supervised_models(model_dir)
@@ -178,13 +179,13 @@ class ModelRegistry:
             logger.info("Cold-start model loaded (version={})", self.model_version)
 
         semi_path = model_dir / "semi_supervised"
-        if semi_path.exists() and TabPFNModel:
+        if semi_path.exists() and TabPFNAdaptiveLearner:
             try:
-                staging["semi_supervised"] = TabPFNModel.load(semi_path)
-                staging["active_phase"] = "SEMI_SUPERVISED"
-                logger.info("Semi-supervised TabPFN model loaded")
+                staging["adaptive_learner"] = TabPFNAdaptiveLearner.load(semi_path)
+                staging["active_phase"] = "ADAPTIVE_LEARNING"
+                logger.info("Adaptive learner (TabPFN) loaded")
             except Exception as exc:
-                logger.warning("Failed to load shared semi-supervised model: {}", exc)
+                logger.warning("Failed to load adaptive learner model: {}", exc)
 
         sup_path = model_dir / "supervised"
         if sup_path.exists() and ChampionModel:
@@ -218,7 +219,7 @@ class ModelRegistry:
         if (
             not staging.get("simple_models")
             and not staging.get("supervised")
-            and not staging.get("semi_supervised")
+            and not staging.get("adaptive_learner")
             and not staging.get("cold_start")
         ):
             version_file = model_dir / "version.txt"
@@ -248,11 +249,14 @@ class ModelRegistry:
         s = self._staging
         self.simple_models = s.get("simple_models", {})
         self.cold_start_models = s.get("cold_start_models", {})
-        self.semi_supervised_models = s.get("semi_supervised_models", {})
+        self.adaptive_learner_models = s.get("adaptive_learner_models", {})
         self.champion_models = s.get("champion_models", {})
 
+        # Backwards compatibility alias
+        self.semi_supervised_models = self.adaptive_learner_models
+
         self.cold_start = s.get("cold_start")
-        self.semi_supervised = s.get("semi_supervised")
+        self.adaptive_learner = s.get("adaptive_learner")
         self.champion = s.get("champion")
         self.gnn_scorer = s.get("gnn_scorer")
         self.active_phase = s.get("active_phase", "UNSUPERVISED")
@@ -300,8 +304,8 @@ class ModelRegistry:
         try:
             if self.cold_start:
                 _ = self.cold_start.score(dummy_features)
-            if self.semi_supervised:
-                _ = self.semi_supervised.score(dummy_features)
+            if self.adaptive_learner:
+                _ = self.adaptive_learner.predict_proba(dummy_features)
             if self.champion:
                 _ = self.champion.score(dummy_features)
             elif self.supervised:
@@ -320,8 +324,8 @@ class ModelRegistry:
         try:
             if staging.get("cold_start"):
                 _ = staging["cold_start"].score(dummy)
-            if staging.get("semi_supervised"):
-                _ = staging["semi_supervised"].score(dummy)
+            if staging.get("adaptive_learner"):
+                _ = staging["adaptive_learner"].predict_proba(dummy)
             if staging.get("champion"):
                 _ = staging["champion"].score(dummy)
             elif staging.get("supervised"):
@@ -336,9 +340,7 @@ class ModelRegistry:
             try:
                 loaded[tenant_id] = SimpleFraudModel.load(model_path)
             except Exception as exc:
-                logger.warning(
-                    "Could not load simple model for tenant {}: {}", tenant_id, exc
-                )
+                logger.warning("Could not load simple model for tenant {}: {}", tenant_id, exc)
         if loaded:
             logger.info(
                 "Loaded {} tenant simple model(s): {}",
@@ -355,9 +357,7 @@ class ModelRegistry:
                 if ColdStartEnsemble:
                     loaded[tenant_id] = ColdStartEnsemble.load(p1_dir)
             except Exception as exc:
-                logger.warning(
-                    "Could not load cold start model for tenant {}: {}", tenant_id, exc
-                )
+                logger.warning("Could not load cold start model for tenant {}: {}", tenant_id, exc)
         if loaded:
             logger.info(
                 "Loaded {} tenant cold-start model(s): {}",
@@ -366,22 +366,20 @@ class ModelRegistry:
             )
         return loaded
 
-    def _load_semi_supervised_models(
+    def _load_adaptive_learner_models(
         self, model_dir: Path, cold_models: dict
-    ) -> dict[str, TabPFNModel]:
-        loaded: dict[str, TabPFNModel] = {}
+    ) -> dict[str, TabPFNAdaptiveLearner]:
+        loaded: dict[str, TabPFNAdaptiveLearner] = {}
         for p2_dir in sorted(model_dir.glob("*/phase2")):
             tenant_id = p2_dir.parent.name
             try:
-                if TabPFNModel:
-                    loaded[tenant_id] = TabPFNModel.load(p2_dir)
+                if TabPFNAdaptiveLearner:
+                    loaded[tenant_id] = TabPFNAdaptiveLearner.load(p2_dir)
             except Exception as exc:
-                logger.warning(
-                    "Could not load TabPFN for tenant {}: {}", tenant_id, exc
-                )
+                logger.warning("Could not load adaptive learner for tenant {}: {}", tenant_id, exc)
         if loaded:
             logger.info(
-                "Loaded {} tenant semi-supervised model(s): {}",
+                "Loaded {} tenant adaptive learner model(s): {}",
                 len(loaded),
                 ", ".join(sorted(loaded)),
             )
@@ -395,9 +393,7 @@ class ModelRegistry:
                 if ChampionModel:
                     loaded[tenant_id] = ChampionModel.load(p3_dir)
             except Exception as exc:
-                logger.warning(
-                    "Could not load champion model for tenant {}: {}", tenant_id, exc
-                )
+                logger.warning("Could not load champion model for tenant {}: {}", tenant_id, exc)
         if loaded:
             logger.info(
                 "Loaded {} tenant champion model(s): {}",
@@ -412,8 +408,8 @@ class ModelRegistry:
             if tenant_id:
                 if tenant_id in self.champion_models:
                     return self.champion_models[tenant_id]
-                if tenant_id in self.semi_supervised_models:
-                    return self.semi_supervised_models[tenant_id]
+                if tenant_id in self.adaptive_learner_models:
+                    return self.adaptive_learner_models[tenant_id]
                 if tenant_id in self.cold_start_models:
                     return self.cold_start_models[tenant_id]
                 if tenant_id in self.simple_models:
@@ -423,8 +419,8 @@ class ModelRegistry:
             if self.active_phase == "SUPERVISED":
                 if self.champion:
                     return self.champion
-            if self.active_phase == "SEMI_SUPERVISED" and self.semi_supervised:
-                return self.semi_supervised
+            if self.active_phase == "ADAPTIVE_LEARNING" and self.adaptive_learner:
+                return self.adaptive_learner
             if self.cold_start:
                 return self.cold_start
             return None
@@ -434,8 +430,8 @@ class ModelRegistry:
             if tenant_id:
                 if tenant_id in self.champion_models:
                     return "supervised-ensemble"
-                if tenant_id in self.semi_supervised_models:
-                    return "semi-supervised-bridge"
+                if tenant_id in self.adaptive_learner_models:
+                    return "adaptive-learning-tabpfn"
                 if tenant_id in self.cold_start_models:
                     return "cold-start-ensemble"
                 if tenant_id in self.simple_models:
@@ -547,9 +543,7 @@ class ScoringOrchestrator:
         feature_array = self._features_to_array(features, model)
 
         # ── Step 2: Tier 1 — rules engine (<1ms) ─────────────────────────────
-        rule_result = (
-            self.rules_engine.evaluate(txn, features) if self.rules_engine else None
-        )
+        rule_result = self.rules_engine.evaluate(txn, features) if self.rules_engine else None
 
         if rule_result and rule_result.hard_block:
             latency = (time.monotonic() - t_start) * 1000
@@ -579,9 +573,7 @@ class ScoringOrchestrator:
                 X = feature_array.reshape(1, -1)
 
                 # Cold-start model: anomaly scoring
-                if ColdStartEnsemble is not None and isinstance(
-                    model, ColdStartEnsemble
-                ):
+                if ColdStartEnsemble is not None and isinstance(model, ColdStartEnsemble):
                     risk_score = float(model.score(X)[0])
                     confidence_info = (
                         ConfidenceInfo(
@@ -599,9 +591,7 @@ class ScoringOrchestrator:
                     risk_score = pred.probability
                     confidence_info = (
                         ConfidenceInfo(
-                            expert_used=(
-                                "FTTransformer" if pred.ft_invoked else "CatBoost"
-                            ),
+                            expert_used=("FTTransformer" if pred.ft_invoked else "CatBoost"),
                             confidence=pred.confidence,
                             ft_invoked=pred.ft_invoked,
                             fusion_output=pred.fusion_output,
@@ -619,8 +609,8 @@ class ScoringOrchestrator:
                             pred.fusion_output or 0.0,
                         )
 
-                # TabPFN semi-supervised model
-                elif TabPFNModel is not None and isinstance(model, TabPFNModel):
+                # TabPFN adaptive learner
+                elif TabPFNAdaptiveLearner is not None and isinstance(model, TabPFNAdaptiveLearner):
                     preds = model.predict_with_uncertainty(X)
                     pred = preds[0]
                     risk_score = pred.probability
@@ -654,9 +644,7 @@ class ScoringOrchestrator:
 
                 # Fallback: legacy explanation methods
                 if explanation is None:
-                    explanation = self._explain_legacy(
-                        txn, features, model, X, risk_score
-                    )
+                    explanation = self._explain_legacy(txn, features, model, X, risk_score)
 
                 # MC Dropout uncertainty for GNN (async, non-blocking)
                 if (
@@ -675,9 +663,7 @@ class ScoringOrchestrator:
         latency = (time.monotonic() - t_start) * 1000
 
         if latency > settings.scoring_timeout_ms:
-            logger.warning(
-                "SLA breach: txn={} latency={}ms", txn.transaction_id, round(latency, 1)
-            )
+            logger.warning("SLA breach: txn={} latency={}ms", txn.transaction_id, round(latency, 1))
 
         response = ScoringResponse(
             transaction_id=txn.transaction_id,
@@ -705,9 +691,7 @@ class ScoringOrchestrator:
                 return False
         return True
 
-    def _score_gnn_async(
-        self, account_id: str, tenant_id: str
-    ) -> Optional[tuple[float, float]]:
+    def _score_gnn_async(self, account_id: str, tenant_id: str) -> Optional[tuple[float, float]]:
         """Async GNN scoring with MC Dropout uncertainty. Returns (score, uncertainty)."""
         try:
             r = self._get_redis()
@@ -751,8 +735,8 @@ class ScoringOrchestrator:
             logger.warning("Cold-start explanation failed: {}", exc)
             return None
 
-    def _explain_semi_supervised(self, model, X: np.ndarray) -> Explanation:
-        """Semi-supervised explanation (TabPFN permutation importance)."""
+    def _explain_adaptive_learner(self, model, X: np.ndarray) -> Explanation:
+        """Adaptive learning explanation (TabPFN permutation importance)."""
         try:
             explanations = model.explain(X, top_n=8)
             exp = explanations[0]
@@ -766,7 +750,7 @@ class ScoringOrchestrator:
                 for ft in exp.get("top_features", [])
             ]
             return Explanation(
-                model_type="semi_supervised",
+                model_type="adaptive_learning",
                 base_value=exp.get("base_value", 0.0),
                 prediction_value=exp["prediction_value"],
                 top_features=top_feats,
@@ -774,7 +758,7 @@ class ScoringOrchestrator:
                 latency_ms=5.0,
             )
         except Exception as exc:
-            logger.warning("Semi-supervised explanation failed: {}", exc)
+            logger.warning("Adaptive learning explanation failed: {}", exc)
             return None
 
     def _explain_tabpfn(self, model, X: np.ndarray) -> Explanation:
@@ -803,9 +787,7 @@ class ScoringOrchestrator:
             logger.warning("TabPFN explanation failed: {}", exc)
             return None
 
-    def _explain_rules(
-        self, txn: TransactionRequest, features: dict[str, float]
-    ) -> Explanation:
+    def _explain_rules(self, txn: TransactionRequest, features: dict[str, float]) -> Explanation:
         """Rules explanation (sync - very fast)."""
         try:
             result = self.rules_engine.explain(txn, features)
@@ -897,16 +879,14 @@ class ScoringOrchestrator:
         except Exception as exc:
             logger.warning("Async cold-start explanation failed: {}", exc)
 
-    def _explain_semi_supervised_async(
-        self, model, X: np.ndarray, trace_id: str
-    ) -> None:
-        """Async semi-supervised explanation."""
+    def _explain_adaptive_learner_async(self, model, X: np.ndarray, trace_id: str) -> None:
+        """Async adaptive learning explanation."""
         try:
-            explanation = self._explain_semi_supervised(model, X)
+            explanation = self._explain_adaptive_learner(model, X)
             if explanation:
                 self._cache_explanation(trace_id, explanation)
         except Exception as exc:
-            logger.warning("Async semi-supervised explanation failed: {}", exc)
+            logger.warning("Async adaptive learning explanation failed: {}", exc)
 
     def _explain_supervised_async(self, model, X: np.ndarray, trace_id: str) -> None:
         """Async supervised explanation."""
@@ -989,13 +969,9 @@ class ScoringOrchestrator:
                     else None
                 ),
                 counterfactual=(
-                    full_exp.counterfactual.__dict__
-                    if full_exp.counterfactual
-                    else None
+                    full_exp.counterfactual.__dict__ if full_exp.counterfactual else None
                 ),
-                formatted_report=(
-                    full_exp.formatted.to_dict() if full_exp.formatted else None
-                ),
+                formatted_report=(full_exp.formatted.to_dict() if full_exp.formatted else None),
             )
 
         except Exception as exc:
@@ -1049,8 +1025,8 @@ class ScoringOrchestrator:
         if ChampionModel is not None and isinstance(model, ChampionModel):
             explanation = self._explain_champion(model, X)
 
-        # TabPFN
-        elif TabPFNModel is not None and isinstance(model, TabPFNModel):
+        # TabPFN adaptive learner
+        elif TabPFNAdaptiveLearner is not None and isinstance(model, TabPFNAdaptiveLearner):
             explanation = self._explain_tabpfn(model, X)
 
         # Rules fallback
@@ -1082,13 +1058,9 @@ class ScoringOrchestrator:
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
-    def _features_to_array(
-        self, features: dict[str, float], model=None
-    ) -> Optional[np.ndarray]:
+    def _features_to_array(self, features: dict[str, float], model=None) -> Optional[np.ndarray]:
         """Convert feature dict to numpy array aligned with model's feature order."""
-        feature_names = (
-            getattr(model, "feature_names", None) or self.registry.feature_names
-        )
+        feature_names = getattr(model, "feature_names", None) or self.registry.feature_names
         if not feature_names:
             logger.warning(
                 "Model has no persisted feature_names; falling back to sorted live feature keys"
@@ -1103,9 +1075,7 @@ class ScoringOrchestrator:
                     len(missing),
                     missing[:10],
                 )
-            values = np.array(
-                [features.get(f, 0.0) for f in feature_names], dtype=np.float32
-            )
+            values = np.array([features.get(f, 0.0) for f in feature_names], dtype=np.float32)
             if not np.all(np.isfinite(values)):
                 logger.warning(
                     "Non-finite feature value detected; replacing NaN/Inf before scoring"

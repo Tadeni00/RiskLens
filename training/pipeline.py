@@ -1,7 +1,7 @@
 """
 FraudTrap — Training Pipeline
 Manages the full model lifecycle:
-  Phase 1 (unsupervised) → Phase 2 (semi-supervised TabPFN) → Phase 3 (supervised CatBoost + FT-Transformer)
+  Layer 1 (Cold Start Ensemble) → Layer 2 (Adaptive Learning / TabPFN) → Layer 3 (Supervised CatBoost + FT-Transformer)
 Includes dataset construction with point-in-time correct feature joins,
 delayed label handling, and automated phase transition gating.
 """
@@ -23,8 +23,8 @@ from sklearn.metrics import average_precision_score, f1_score
 
 from config.settings import get_settings
 from models.cold_start.ensemble import ColdStartEnsemble
-from models.semi_supervised.tabpfn import TabPFNModel
-from models.semi_supervised.trainer import SemiSupervisedTrainer, SemiSupervisedConfig
+from models.adaptive_learning.tabpfn_learner import TabPFNAdaptiveLearner
+from models.adaptive_learning.trainer import AdaptiveTrainer, AdaptiveConfig
 from models.supervised.champion import ChampionModel
 from models.supervised.ft_transformer import FTTransformerPredictor
 from models.supervised.meta_fusion import MetaFusionLayer
@@ -40,8 +40,11 @@ DATA_DIR = Path("./artifacts/data")
 
 class ModelPhase(str, Enum):
     UNSUPERVISED = "UNSUPERVISED"
-    SEMI_SUPERVISED = "SEMI_SUPERVISED"
+    ADAPTIVE_LEARNING = "ADAPTIVE_LEARNING"
     SUPERVISED = "SUPERVISED"
+
+    # Backwards compatibility alias
+    SEMI_SUPERVISED = "ADAPTIVE_LEARNING"
 
 
 # ── Phase state (persisted between runs) ──────────────────────────────────────
@@ -70,7 +73,11 @@ class PhaseState:
     @classmethod
     def from_json(cls, s: str) -> "PhaseState":
         d = json.loads(s)
-        d["current_phase"] = ModelPhase(d["current_phase"])
+        raw_phase = d["current_phase"]
+        # Backwards compatibility: map old phase names to new ones
+        _PHASE_MAP = {"SEMI_SUPERVISED": "ADAPTIVE_LEARNING"}
+        raw_phase = _PHASE_MAP.get(raw_phase, raw_phase)
+        d["current_phase"] = ModelPhase(raw_phase)
         return cls(**d)
 
     def weeks_since_first_transaction(self) -> float:
@@ -143,10 +150,7 @@ class DatasetBuilder:
         # Filter non-fraud chargebacks (bad reason codes)
         if "chargeback_reason_code" in df.columns:
             non_fraud_codes = {"4853", "4855", "4859"}  # Visa: item not received, etc.
-            mask = ~(
-                (df["label"] == 1)
-                & (df["chargeback_reason_code"].isin(non_fraud_codes))
-            )
+            mask = ~((df["label"] == 1) & (df["chargeback_reason_code"].isin(non_fraud_codes)))
             df = df[mask]
 
         feature_cols = [
@@ -182,9 +186,7 @@ class DatasetBuilder:
             return df
 
         # Return synthetic data for testing when no real data available
-        logger.warning(
-            "No data found for tenant={}; generating synthetic data", tenant_id
-        )
+        logger.warning("No data found for tenant={}; generating synthetic data", tenant_id)
         return _generate_synthetic_data(n=10_000)
 
 
@@ -199,10 +201,8 @@ class PhaseTransitionEvaluator:
 
     def should_transition_to_semi(self, state: PhaseState) -> tuple[bool, dict]:
         checks = {
-            "fraud_labels": state.confirmed_fraud_labels
-            >= settings.phase1_min_fraud_labels,
-            "transactions": state.total_transactions
-            >= settings.phase1_min_transactions,
+            "fraud_labels": state.confirmed_fraud_labels >= settings.phase1_min_fraud_labels,
+            "transactions": state.total_transactions >= settings.phase1_min_transactions,
             "weeks": state.weeks_since_first_transaction() >= settings.phase1_min_weeks,
             "pr_auc": state.metrics.get("pr_auc", 0.0) >= settings.phase1_min_pr_auc,
         }
@@ -210,8 +210,7 @@ class PhaseTransitionEvaluator:
 
     def should_transition_to_supervised(self, state: PhaseState) -> tuple[bool, dict]:
         checks = {
-            "fraud_labels": state.confirmed_fraud_labels
-            >= settings.phase2_min_fraud_labels,
+            "fraud_labels": state.confirmed_fraud_labels >= settings.phase2_min_fraud_labels,
             "pr_auc": state.metrics.get("pr_auc", 0.0) >= settings.phase2_min_pr_auc,
         }
         return all(checks.values()), checks
@@ -258,14 +257,12 @@ class TrainingPipeline:
             if state.current_phase == ModelPhase.UNSUPERVISED:
                 state = self._train_phase1(tenant_id, state)
                 ready, checks = self.evaluator.should_transition_to_semi(state)
-                logger.info("Phase1→2 transition check: {}", checks)
+                logger.info("Layer 1→2 transition check: {}", checks)
                 if ready:
-                    logger.info(
-                        "✓ Transitioning tenant={} to SEMI_SUPERVISED", tenant_id
-                    )
-                    state.current_phase = ModelPhase.SEMI_SUPERVISED
+                    logger.info("✓ Transitioning tenant={} to ADAPTIVE_LEARNING", tenant_id)
+                    state.current_phase = ModelPhase.ADAPTIVE_LEARNING
 
-            elif state.current_phase == ModelPhase.SEMI_SUPERVISED:
+            elif state.current_phase == ModelPhase.ADAPTIVE_LEARNING:
                 state = self._train_phase2(tenant_id, state)
                 ready, checks = self.evaluator.should_transition_to_supervised(state)
                 logger.info("Phase2→3 transition check: {}", checks)
@@ -311,7 +308,7 @@ class TrainingPipeline:
         return state
 
     def _train_phase2(self, tenant_id: str, state: PhaseState) -> PhaseState:
-        """Train Phase 2: TabPFN semi-supervised model."""
+        """Train Layer 2: Adaptive Learning (TabPFN)."""
         try:
             X, y = self.dataset_builder.build_supervised_dataset(tenant_id)
         except ValueError as e:
@@ -337,12 +334,12 @@ class TrainingPipeline:
         except Exception:
             pass
 
-        # Train TabPFN
-        config = SemiSupervisedConfig(
+        # Train TabPFN (Adaptive Learning Layer)
+        config = AdaptiveConfig(
             n_estimators=4,
             ignore_pretraining_limits=True,
         )
-        trainer = SemiSupervisedTrainer(config)
+        trainer = AdaptiveTrainer(config)
 
         X_combined, y_combined, weights, pseudo_result = trainer.prepare_dataset(
             X_confirmed=X_values,
@@ -350,6 +347,28 @@ class TrainingPipeline:
             X_unlabelled=X_unlabelled,
             cold_start=cold_start,
         )
+
+        # TabPFN is an in-context learning model — subsample to keep it fast.
+        # It excels on small datasets (≤1024 samples) and gets very slow on larger ones.
+        MAX_TABPFN_SAMPLES = 1024
+        if len(X_combined) > MAX_TABPFN_SAMPLES:
+            rng = np.random.default_rng(42)
+            fraud_idx = np.where(y_combined == 1)[0]
+            non_fraud_idx = np.where(y_combined == 0)[0]
+            n_non_fraud_keep = MAX_TABPFN_SAMPLES - len(fraud_idx)
+            if n_non_fraud_keep > 0 and len(non_fraud_idx) > n_non_fraud_keep:
+                keep_non_fraud = rng.choice(non_fraud_idx, n_non_fraud_keep, replace=False)
+                keep = np.concatenate([fraud_idx, keep_non_fraud])
+            else:
+                keep = rng.choice(len(X_combined), MAX_TABPFN_SAMPLES, replace=False)
+            X_combined = X_combined[keep]
+            y_combined = y_combined[keep]
+            weights = weights[keep] if weights is not None else None
+            logger.info(
+                "Subsampled to %d samples (%d fraud) for TabPFN",
+                len(y_combined),
+                int(y_combined.sum()),
+            )
 
         wrapper, result = trainer.train(
             X=X_combined,
@@ -370,7 +389,7 @@ class TrainingPipeline:
         state.current_model_version = result.model_version
         state.pseudo_label_count = result.n_pseudo
         logger.info(
-            "Phase 2 TabPFN saved → {} | metrics={}",
+            "Layer 2 Adaptive Learning model saved → {} | metrics={}",
             save_path,
             state.metrics,
         )
@@ -461,10 +480,7 @@ class TrainingPipeline:
 
         ft_calibrator = ProbabilityCalibrator(method="isotonic")
         ft_raw_probs = (
-            ft_transformer.model(torch.FloatTensor(X_cal_scaled))
-            .detach()
-            .numpy()
-            .ravel()
+            ft_transformer.model(torch.FloatTensor(X_cal_scaled)).detach().numpy().ravel()
         )
         ft_calibrator.fit(ft_raw_probs, y_cal)
         ft_transformer.calibrator = ft_calibrator
@@ -514,9 +530,7 @@ class TrainingPipeline:
 # ── Synthetic data generator (for testing / demo) ────────────────────────────
 
 
-def _generate_synthetic_data(
-    n: int = 10_000, fraud_rate: float = 0.015
-) -> pd.DataFrame:
+def _generate_synthetic_data(n: int = 10_000, fraud_rate: float = 0.015) -> pd.DataFrame:
     """
     Generates realistic-looking transaction feature data for testing.
     Fraud rate defaults to ~1.5%.
@@ -532,32 +546,16 @@ def _generate_synthetic_data(
             "amount_zscore": rng.normal(3.0 if is_fraud else 0.0, 1.0, size),
             "hour_sin": rng.uniform(-1, 1, size),
             "hour_cos": rng.uniform(-1, 1, size),
-            "is_weekend": rng.binomial(1, 0.35 if is_fraud else 0.28, size).astype(
-                float
-            ),
+            "is_weekend": rng.binomial(1, 0.35 if is_fraud else 0.28, size).astype(float),
             "is_night": rng.binomial(1, 0.45 if is_fraud else 0.15, size).astype(float),
-            "is_round_amount": rng.binomial(1, 0.4 if is_fraud else 0.1, size).astype(
-                float
-            ),
-            "is_new_merchant": rng.binomial(1, 0.7 if is_fraud else 0.1, size).astype(
-                float
-            ),
-            "is_new_device": rng.binomial(1, 0.6 if is_fraud else 0.05, size).astype(
-                float
-            ),
-            "device_shared_flag": rng.binomial(
-                1, 0.5 if is_fraud else 0.02, size
-            ).astype(float),
-            "device_account_count": rng.integers(1, 20 if is_fraud else 3, size).astype(
-                float
-            ),
+            "is_round_amount": rng.binomial(1, 0.4 if is_fraud else 0.1, size).astype(float),
+            "is_new_merchant": rng.binomial(1, 0.7 if is_fraud else 0.1, size).astype(float),
+            "is_new_device": rng.binomial(1, 0.6 if is_fraud else 0.05, size).astype(float),
+            "device_shared_flag": rng.binomial(1, 0.5 if is_fraud else 0.02, size).astype(float),
+            "device_account_count": rng.integers(1, 20 if is_fraud else 3, size).astype(float),
             "geo_speed_kmh": rng.exponential(800 if is_fraud else 30, size),
-            "impossible_travel": rng.binomial(
-                1, 0.3 if is_fraud else 0.001, size
-            ).astype(float),
-            "cross_country_flag": rng.binomial(
-                1, 0.4 if is_fraud else 0.05, size
-            ).astype(float),
+            "impossible_travel": rng.binomial(1, 0.3 if is_fraud else 0.001, size).astype(float),
+            "cross_country_flag": rng.binomial(1, 0.4 if is_fraud else 0.05, size).astype(float),
             "acct_v_1m_count": rng.poisson(5 if is_fraud else 1, size).astype(float),
             "acct_v_1h_count": rng.poisson(20 if is_fraud else 3, size).astype(float),
             "acct_v_24h_count": rng.poisson(50 if is_fraud else 10, size).astype(float),
@@ -567,10 +565,7 @@ def _generate_synthetic_data(
             "txn_type_enc": rng.integers(0, 6, size).astype(float),
             "label": np.full(size, 1 if is_fraud else 0),
             "transaction_timestamp": [
-                (
-                    datetime.now(timezone.utc)
-                    - timedelta(days=int(rng.integers(1, 180)))
-                ).isoformat()
+                (datetime.now(timezone.utc) - timedelta(days=int(rng.integers(1, 180)))).isoformat()
                 for _ in range(size)
             ],
         }

@@ -169,6 +169,7 @@
  streamlit                           1.35.0           Apache Software License                                  https://streamlit.io                                                                                
  sympy                               1.14.0           BSD License                                              https://sympy.org                                                                                   
  tabulate                            0.10.0           MIT                                                      https://github.com/astanin/python-tabulate                                                          
+ tabpfn                              0.1.0            Prior Labs Commercial License (requires license key)       https://github.com/PriorLabs/TabPFN                                                                
  tbb                                 2021.13.1        Other/Proprietary License                                https://www.intel.com/content/www/us/en/developer/tools/oneapi/onetbb.html                          
  tenacity                            8.3.0            Apache Software License                                  https://github.com/jd/tenacity                                                                      
  termcolor                           3.3.0            MIT                                                      https://github.com/termcolor/termcolor                                                              

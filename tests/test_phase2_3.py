@@ -1,6 +1,6 @@
 """
-FraudTrap — Phase 2 & 3 Architecture Tests
-Covers: TabPFNModel, SemiSupervisedTrainer, ConfidenceEstimator, FTTransformer,
+FraudTrap — Layer 2 & 3 Architecture Tests
+Covers: TabPFNAdaptiveLearner, AdaptiveTrainer, ConfidenceEstimator, FTTransformer,
 MetaFusionLayer, ChampionModel confidence-aware routing.
 """
 
@@ -15,11 +15,15 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from models.semi_supervised.prediction import (
-    SemiSupervisedPrediction,
+from models.adaptive_learning.prediction import (
+    AdaptivePrediction,
     PseudoLabelResult,
 )
-from models.semi_supervised.monitoring import SemiSupervisedMonitor
+from models.adaptive_learning.monitoring import AdaptiveMonitor
+from models.semi_supervised import (
+    SemiSupervisedPrediction,
+    SemiSupervisedMonitor,
+)
 from models.supervised.prediction import SupervisedPrediction
 from models.supervised.monitoring import SupervisedMonitor
 
@@ -67,7 +71,7 @@ def fitted_cold_start(synthetic_labeled_data):
 @pytest.fixture
 def fitted_tabpfn(synthetic_labeled_data):
     """Fit a TabPFN model for testing."""
-    from models.semi_supervised.tabpfn import TabPFNModel
+    from models.adaptive_learning.tabpfn_learner import TabPFNAdaptiveLearner
 
     X, y = synthetic_labeled_data
     model = TabPFNModel(input_dim=X.shape[1])

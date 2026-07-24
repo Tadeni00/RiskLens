@@ -72,7 +72,7 @@ graph TD
     RE --> MR[ML Model Router<br/>Phase Detection]
     
     MR --> CS[Cold Start Layer<br/>VAE + IF + Tail]
-    MR --> SS[Semi-Supervised Layer<br/>TabPFN]
+    MR --> AL[Adaptive Learning Layer<br/>TabPFN]
     MR --> SV[Supervised Layer<br/>CatBoost Champion]
     
     SV --> CE{Confidence<br/>Check}
@@ -82,7 +82,7 @@ graph TD
     MF --> DEC
     
     CS --> DEC
-    SS --> DEC
+    AL --> DEC
     
     DEC --> APPROVE[APPROVE]
     DEC --> REVIEW[REVIEW]
@@ -93,7 +93,7 @@ graph TD
     DEC --> CH[(ClickHouse<br/>Analytics)]
     
     KAFKA --> LABELS[Label Worker]
-    LABELS --> SS
+    LABELS --> AL
     LABELS --> SV
     
     CH --> DRIFT[Drift Monitor]
@@ -110,7 +110,7 @@ graph TD
 | **Rules** | Rules Engine | Python | Sub-millisecond deterministic checks |
 | **Behaviour** | Profile Engine | Redis + Python | Real-time entity profiling |
 | **ML Phase 1** | Cold Start | VAE + IF + Tail | Zero-label anomaly detection |
-| **ML Phase 2** | Semi-Supervised | TabPFN | Foundation model for limited labels |
+| **ML Layer 2** | Adaptive Learning | TabPFN | Foundation model for limited labels |
 | **ML Phase 3** | Champion | CatBoost | Production fraud classifier |
 | **ML Phase 3** | Specialist | FT-Transformer | Low-confidence edge cases |
 | **ML Phase 3** | Meta Fusion | Logistic Regression | Combines champion + specialist |
@@ -130,7 +130,7 @@ FraudTrap implements a **gated progression** from unsupervised to supervised lea
 ```mermaid
 graph LR
     A["New Tenant<br/>0 Labels"] -->|"Phase 1"| B["Cold Start<br/>VAE + IF + Tail"]
-    B -->|"100+ Labels"| C["Semi-Supervised<br/>TabPFN"]
+    B -->|"100+ Labels"| C["Adaptive Learning<br/>TabPFN"]
     C -->|"5000+ Labels"| D["Supervised<br/>CatBoost + FT-Transformer"]
 
     style A fill:#D69E2E,color:#000
@@ -142,7 +142,7 @@ graph LR
 | Phase | Name | Models | Labels Required | Latency |
 |-------|------|--------|-----------------|---------|
 | 1 | Cold Start | VAE + Isolation Forest + Empirical Tail Detector | 0 | ~15ms |
-| 2 | Semi-Supervised | TabPFN (Prior Labs) | 100+ | ~10ms |
+| 2 | Adaptive Learning | TabPFN (Prior Labs) | 100+ | ~10ms |
 | 3 | Supervised | CatBoost Champion + FT-Transformer Specialist | 5,000+ | ~4ms |
 
 ---
@@ -186,11 +186,45 @@ risk_score = 0.55 × VAE_reconstruction_error
 
 ---
 
-## Layer 2: Semi-Supervised Intelligence
+## Layer 2: Adaptive Learning Intelligence
 
 **Purpose**: Bridge the gap between zero-label cold start and fully supervised learning.
 
-As fraud labels accumulate from analyst reviews, chargebacks, and customer reports, the semi-supervised layer activates. It uses **TabPFN** (Tabular Prior-data Fitted Network) — a pretrained tabular foundation model by Prior Labs that excels on small-to-medium labelled datasets.
+FraudTrap uses **TabPFN** as the default scarce-label learner due to its excellent performance on small tabular datasets.
+
+The Adaptive Learning Layer combines weak supervision, analyst feedback, behavioral intelligence, confidence estimation, and pseudo-label generation to continuously improve training data quality during the transition from unsupervised detection to mature supervised learning.
+
+### TabPFN Responsibilities
+
+TabPFN is responsible for:
+
+- Learning effectively from limited labelled data
+- Generating calibrated fraud probabilities
+- Producing high-confidence pseudo-labels
+- Estimating prediction confidence
+- Identifying informative samples for analyst review (active learning)
+
+TabPFN is **not** part of the real-time production inference path.
+
+Instead, it serves as the platform's adaptive learner for early-stage tenants and evolving datasets.
+
+### AdaptiveLearner Abstraction
+
+Because TabPFN has commercial licensing considerations, FraudTrap abstracts the scarce-label learner behind the `AdaptiveLearner` interface.
+
+Organizations requiring a fully permissive alternative can substitute **NetPFN** without changing the surrounding pipeline.
+
+This architecture keeps FraudTrap modular, vendor-independent, and future-proof.
+
+> **Note:** TabPFN requires a license key (`TABPFN_TOKEN`). Set it in `docker/.env` for local development or as a secret in your CI/CD environment. Obtain a key at [priorlabs.ai](https://priorlabs.ai).
+
+```yaml
+adaptive_learning:
+    learner: tabpfn  # or netpfn
+    confidence_threshold: 0.92
+    pseudo_label_threshold: 0.97
+    active_learning_threshold: 0.70
+```
 
 ### Architecture
 
@@ -237,6 +271,28 @@ Transaction Features
 | Uncertainty | Not naturally available | Entropy-based uncertainty |
 | Calibration | Requires post-hoc calibration | Naturally well-calibrated |
 | Adaptability | Retrain from scratch | Add new data to context |
+
+### Why TabPFN
+
+TabPFN (Tabular Prior-data Fitted Network) is a pretrained foundation model for tabular data developed by [Prior Labs](https://github.com/PriorLabs/TabPFN) and published in *Nature* (2025).
+
+FraudTrap uses TabPFN as its semi-supervised layer for three reasons:
+
+1. **Label scarcity** — Fraud labels are scarce. Most tenants enter Phase 2 with 100–5,000 confirmed labels. TabPFN was designed for exactly this regime: small-to-medium tabular datasets where traditional supervised models overfit.
+
+2. **No training from scratch** — TabPFN is pretrained on synthetic tabular tasks. At prediction time it stores the labelled dataset and runs a single forward pass through its transformer architecture. There are no gradients, no learning rates, no epochs. This eliminates an entire class of hyperparameter tuning.
+
+3. **Natural uncertainty** — TabPFN produces well-calibrated class probabilities. Uncertainty is derived from prediction entropy, giving FraudTrap a reliable signal for routing low-confidence transactions to manual review without any additional calibration infrastructure.
+
+```python
+from models.adaptive_learning.tabpfn_learner import TabPFNAdaptiveLearner
+
+model = TabPFNModel()
+model.fit(X_train, y_train)
+
+probas = model.predict_proba(X_test)          # calibrated fraud probabilities
+preds  = model.predict_with_uncertainty(X_test) # + uncertainty estimates
+```
 
 ---
 
@@ -413,7 +469,7 @@ Phase 1: Cold Start
     │  No labels required
     │
     ▼  (100+ fraud labels)
-Phase 2: Semi-Supervised
+Phase 2: Adaptive Learning
     │  TabPFN (Prior Labs foundation model)
     │  Pseudo-labels + confidence-aware routing
     │
@@ -628,7 +684,7 @@ fraudtrap/
 ├── ingestion/              # Kafka producer/consumer, schemas
 ├── models/
 │   ├── cold_start/         # VAE + Isolation Forest + Tail Detector
-│   ├── semi_supervised/    # TabPFN (Prior Labs tabular foundation model)
+│   ├── adaptive_learning/  # Adaptive Learning Layer (TabPFN)
 │   ├── supervised/         # Champion, FT-Transformer, Meta Fusion, Challengers
 │   └── explainability/     # SHAP, Counterfactual, Formatter, Cache
 ├── monitoring/             # Drift, metrics, alerts, rollup
@@ -675,7 +731,7 @@ fraudtrap/
 
 ### Implemented
 
-- ✅ Three-phase ML lifecycle (Cold Start → Semi-Supervised → Supervised)
+- ✅ Three-layer ML lifecycle (Cold Start → Adaptive Learning → Supervised)
 - ✅ CatBoost champion with FT-Transformer specialist
 - ✅ TabPFN semi-supervised learning
 - ✅ Behavioural profiling (5 entity types)
@@ -871,6 +927,14 @@ mypy .
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 Third-party dependencies and their licenses are listed in [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt).
+
+### TabPFN Licensing
+
+FraudTrap's Adaptive Learning Layer uses **TabPFN** (by Prior Labs), which requires a commercial license key for production use. TabPFN is free for research and evaluation.
+
+- Set your license key via the `TABPFN_TOKEN` environment variable
+- The license key is **not** included in this repository — obtain one at [priorlabs.ai](https://priorlabs.ai)
+- For organizations that cannot use TabPFN, FraudTrap supports **NetPFN** as a fully permissive alternative — set `learner: netpfn` in `config/supervised.yaml`
 
 ---
 

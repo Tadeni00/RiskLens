@@ -11,7 +11,7 @@ SET allow_experimental_object_type = 1;
 CREATE TABLE IF NOT EXISTS model_performance_daily (
     tenant_id           String,
     model_version       String,
-    model_phase         String,           -- 'UNSUPERVISED', 'SEMI_SUPERVISED', 'SUPERVISED'
+    model_phase         String,           -- 'UNSUPERVISED', 'ADAPTIVE_LEARNING', 'SUPERVISED'
     bucket_date         Date,
     -- Discrimination metrics
     auc_pr              Float64,
