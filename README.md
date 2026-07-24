@@ -26,8 +26,7 @@ patterns, and evolves through three stages of ML maturity as labelled data accum
 
 <br/>
 
-![Dashboard Preview](docs/images/dashboard-preview.png)
-![Architecture Overview](docs/images/architecture-overview.png)
+![Dashboard Overview](docs/images/dashboard-overview.png)
 
 </div>
 
@@ -676,7 +675,7 @@ Latency > 100ms → Specialist invocation rate reduced
 
 ## Dashboard
 
-A **12-page enterprise operations console** built with Streamlit.
+A **9-page enterprise operations console** built with Streamlit.
 
 > **Design philosophy**: The dashboard should not look like a Streamlit application. It should feel like a polished enterprise operations console that a major bank or fintech could deploy today.
 
@@ -694,14 +693,11 @@ A **12-page enterprise operations console** built with Streamlit.
 | **Risk Intelligence** | Geographic fraud map, hourly timeline, merchant/customer leaderboards |
 | **Behaviour Profiles** | 5 entity profiles, velocity analysis, feature importance |
 | **Models** | Architecture diagram, champion metrics, model leaderboard, confusion matrix |
-| **Model Performance** | Detailed model evaluation metrics, precision-recall curves |
 | **Explainability** | SHAP waterfall, counterfactual flow, similar transactions |
 | **Drift Monitoring** | PSI bars, KL divergence, concept drift timeline |
 | **Live Monitoring** | Real-time metrics, latency, throughput, infrastructure health |
 | **Compliance** | Regulatory checklist, bias monitoring, audit trail |
-| **Lifecycle** | Model timeline, phase progression, registry, promotion readiness |
-| **Monitoring** | System health, alert history, SLA compliance |
-| **EDA** | Exploratory data analysis, feature distributions
+| **Model Lifecycle** | Model timeline, phase progression, registry, promotion readiness |
 
 ### Design System
 
