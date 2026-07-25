@@ -183,7 +183,7 @@ graph TB
         TXN --> KAFKA
     end
 
-    subgraph "Real-Time Scoring — RiskLens Detect"
+    subgraph "Real-Time Scoring: RiskLens Detect"
         API[FastAPI<br/>Scoring API]
         KAFKA --> API
 
@@ -200,7 +200,7 @@ graph TB
         RE --> MR
     end
 
-    subgraph "ML Lifecycle — RiskLens Adaptive"
+    subgraph "ML Lifecycle: RiskLens Adaptive"
         CS[Cold Start<br/>VAE + IF + Tail]
         AL[Adaptive Learning<br/>TabPFN]
         CB[CatBoost<br/>Champion]
@@ -219,7 +219,7 @@ graph TB
         AL --> DEC
     end
 
-    subgraph "Storage & Monitoring — RiskLens Monitor"
+    subgraph "Storage and Monitoring: RiskLens Monitor"
         DEC --> REDIS[(Redis<br/>Score Cache)]
         DEC --> KAFKA2[Kafka<br/>Audit Events]
         DEC --> CH[(ClickHouse<br/>Analytics)]
@@ -230,7 +230,7 @@ graph TB
         DRIFT --> RETRAIN[Retrain<br/>Trigger]
     end
 
-    subgraph "Operations — RiskLens Console"
+    subgraph "Operations: RiskLens Console"
         DASH[Dashboard<br/>Streamlit]
         MLFLOW[MLflow<br/>Registry]
         PG[(PostgreSQL<br/>Metadata)]
@@ -803,8 +803,8 @@ risklens/
 
 ```bash
 # Clone the repository
-git clone https://github.com/Tadeni00/FraudTrap.git
-cd FraudTrap
+git clone https://github.com/Tadeni00/RiskLens.git
+cd RiskLens
 
 # Start the full stack (12 services)
 docker compose -f docker/docker-compose.yml up -d

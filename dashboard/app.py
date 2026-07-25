@@ -22,7 +22,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
     menu_items={
         "About": "RiskLens Intelligence — Adaptive AI Platform for Fraud & Financial Risk",
-        "Report a bug": "https://github.com/Tadeni00/FraudTrap/issues",
+        "Report a bug": "https://github.com/Tadeni00/RiskLens/issues",
     },
 )
 
