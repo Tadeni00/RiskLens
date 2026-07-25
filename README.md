@@ -29,6 +29,9 @@ identify suspicious activity in real time.
 
 ![Dashboard Overview](docs/images/dashboard-overview.png)
 
+
+![Dashboard Overview](docs/images/dashboard-transaction-simulator.png)
+
 </div>
 
 ---
@@ -154,8 +157,8 @@ graph LR
     L3 --> L4[ML Model<br/>Router]
     L4 --> L5[Confidence<br/>Check]
     L5 --> L6[Decision<br/>Engine]
-    L6 --> L7[Audit &<br/>Profiles]
-    L7 --> L8[Dashboard &<br/>Monitoring]
+    L6 --> L7[Audit and<br/>Profiles]
+    L7 --> L8[Dashboard and<br/>Monitoring]
 ```
 
 | Layer | Component | Latency | Purpose |
@@ -201,10 +204,10 @@ graph TB
     end
 
     subgraph "ML Lifecycle: RiskLens Adaptive"
-        CS[Cold Start<br/>VAE + IF + Tail]
+        CS[Cold Start<br/>VAE IF Tail]
         AL[Adaptive Learning<br/>TabPFN]
         CB[CatBoost<br/>Champion]
-        FT[FT-Transformer<br/>Specialist]
+        FT["FT-Transformer<br/>Specialist"]
         MF[Meta Fusion]
 
         MR --> CS
@@ -251,7 +254,7 @@ sequenceDiagram
     participant Rules as Rules Engine
     participant Router as ML Router
     participant CatBoost as CatBoost Champion
-    participant FT as FT-Transformer
+    participant FT as "FT-Transformer"
     participant Decision as Decision Engine
     participant Kafka as Kafka
 
@@ -293,9 +296,9 @@ RiskLens Intelligence implements a **gated progression** from zero labels to ful
 
 ```mermaid
 graph LR
-    A["New Tenant<br/>0 Labels"] -->|"Gate 1"| B["Cold Start<br/>VAE + IF + Tail"]
+    A["New Tenant<br/>0 Labels"] -->|"Gate 1"| B["Cold Start<br/>VAE IF Tail"]
     B -->|"Gate 2"| C["RiskLens Adaptive<br/>TabPFN"]
-    C -->|"Gate 3"| D["Supervised<br/>CatBoost + FT-Transformer"]
+    C -->|"Gate 3"| D["Supervised<br/>CatBoost and FT-Transformer"]
 
     style A fill:#D69E2E,color:#000
     style B fill:#D69E2E,color:#000
@@ -495,7 +498,7 @@ graph TD
     CB --> CONF{Confidence<br/>Check}
 
     CONF -->|"> 0.85 confidence"| DEC[Decision<br/>Engine]
-    CONF -->|"< 0.85 confidence"| FT[FT-Transformer<br/>Specialist]
+    CONF -->|"< 0.85 confidence"| FT["FT-Transformer<br/>Specialist"]
 
     FT --> MF[Meta Fusion<br/>Logistic Regression]
     MF --> DEC
