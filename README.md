@@ -688,7 +688,7 @@ A **10-page enterprise operations console** built with Streamlit.
 
 > **Design philosophy**: The console should not look like a Streamlit application. It should feel like a polished enterprise operations console that a major bank or fintech could deploy today.
 
-![Dashboard Overview](docs/images/dashboard-overview.png)
+![Dashboard Overview](docs/images/dashboard-models.png)
 
 ![Dashboard Overview](docs/images/dashboard-live-monitoring.png)
 
