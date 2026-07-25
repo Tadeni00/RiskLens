@@ -102,6 +102,10 @@ CatBoost handles 85–90% of transactions at ~4ms. FT-Transformer specialist is 
 
 Five real-time entity profiles — customer, merchant, device, beneficiary, payment instrument — updated incrementally with every transaction.
 
+**Transaction Simulator**
+
+Enterprise demo console that visualizes the complete inference pipeline — from transaction ingestion to final fraud decision — in under five minutes. Designed for stakeholder presentations and compliance demonstrations.
+
 </td>
 <td width="50%">
 
@@ -130,7 +134,8 @@ Drift detection (PSI, KL divergence), SLA monitoring, champion-challenger evalua
 | SHAP + counterfactual explainability | ✅ Production |
 | Drift detection + auto-retrain | ✅ Production |
 | Champion-challenger evaluation | ✅ Production |
-| 12-page enterprise dashboard | ✅ Production |
+| 10-page enterprise dashboard | ✅ Production |
+| Transaction Simulator (demo console) | ✅ Production |
 | 12-service Docker Compose stack | ✅ Production |
 | CI/CD pipelines (GitHub Actions) | ✅ Production |
 
@@ -675,7 +680,7 @@ Latency > 100ms → Specialist invocation rate reduced
 
 ## Dashboard
 
-A **9-page enterprise operations console** built with Streamlit.
+A **10-page enterprise operations console** built with Streamlit.
 
 > **Design philosophy**: The dashboard should not look like a Streamlit application. It should feel like a polished enterprise operations console that a major bank or fintech could deploy today.
 
@@ -690,6 +695,7 @@ A **9-page enterprise operations console** built with Streamlit.
 | Page | Purpose |
 |------|---------|
 | **Overview** | 8 KPIs, operational health, 24h timeline, decision distribution |
+| **Transaction Simulator** | Enterprise demo console — run synthetic transactions through the full pipeline, visualize model routing, behavior engine, explainability, and decisions step by step |
 | **Risk Intelligence** | Geographic fraud map, hourly timeline, merchant/customer leaderboards |
 | **Behaviour Profiles** | 5 entity profiles, velocity analysis, feature importance |
 | **Models** | Architecture diagram, champion metrics, model leaderboard, confusion matrix |
@@ -698,6 +704,21 @@ A **9-page enterprise operations console** built with Streamlit.
 | **Live Monitoring** | Real-time metrics, latency, throughput, infrastructure health |
 | **Compliance** | Regulatory checklist, bias monitoring, audit trail |
 | **Model Lifecycle** | Model timeline, phase progression, registry, promotion readiness |
+
+### Transaction Simulator
+
+The **Transaction Simulator** is the flagship demo page for stakeholder presentations, executive reviews, and compliance demonstrations. It allows a user to submit a synthetic transaction and watch the entire FraudTrap pipeline execute step by step.
+
+**Features:**
+- **9 pre-built scenarios**: Normal Customer, New Device, Velocity Attack, Account Takeover, Mule Account, Card Testing, High Value Transfer, Cold Start Tenant, Adaptive Tenant, Mature Tenant
+- **Three-column layout**: Transaction payload → Animated pipeline → Results with KPIs
+- **Model routing visualization**: Shows exactly why a model was selected (Phase 1/2/3) with label counts and routing reasons
+- **Behavior intelligence card**: Customer trust, device recognition, velocity, merchant risk, beneficiary novelty, impossible travel detection
+- **Phase-specific visualizations**: Cold Start gauges (VAE/Isolation Forest/Tail), TabPFN probability and confidence, CatBoost with FT-Transformer consultation and Meta Fusion weights
+- **Explainability**: SHAP waterfall, counterfactual explanations, natural language reports
+- **Execution timeline**: Step-by-step latency breakdown
+- **Infrastructure status**: Redis, Kafka, ClickHouse, MLflow, Model Registry health
+- **Demo Mode**: Deterministic outputs for repeatable presentations — same scenario always produces same results
 
 ### Design System
 
@@ -727,9 +748,9 @@ fraudtrap/
 ├── config/                     # Environment-driven settings (Pydantic)
 │   ├── settings.py             # Central configuration
 │   └── supervised.yaml         # ML pipeline configuration
-├── dashboard/                  # Enterprise operations console (9 pages)
+├── dashboard/                  # Enterprise operations console (10 pages)
 │   ├── app.py                  # Streamlit entry point
-│   ├── pages/                  # Dashboard pages (overview, risk, models, ...)
+│   ├── pages/                  # Dashboard pages (overview, simulator, models, ...)
 │   ├── components/             # Reusable UI components
 │   ├── theme/                  # Design system (colors, typography, CSS)
 │   └── config/                 # Dashboard configuration

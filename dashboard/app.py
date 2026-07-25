@@ -62,6 +62,7 @@ with st.sidebar:
 
     PAGES = {
         "📊 Overview": "overview",
+        "🧪 Transaction Simulator": "simulator",
         "🔍 Risk Intelligence": "intelligence",
         "🧠 Behavior Profiles": "behavior",
         "🤖 Models": "models",
@@ -117,6 +118,10 @@ page_module = PAGES[selected_page]
 try:
     if page_module == "overview":
         from dashboard.pages.overview import render
+
+        render(selected_tenant)
+    elif page_module == "simulator":
+        from dashboard.pages.transaction_simulator import render
 
         render(selected_tenant)
     elif page_module == "intelligence":
