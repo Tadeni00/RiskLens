@@ -1,5 +1,5 @@
 """
-FraudTrap — Rules Engine (Tier 1)
+RiskLens — Rules Engine (Tier 1)
 Evaluates declarative rules from YAML/JSON configuration.
 Supports blocklists, thresholds, expressions, velocity, and geo rules.
 """

@@ -1,5 +1,5 @@
 """
-FraudTrap — Phase 2: Semi-Supervised Bridge
+RiskLens — Phase 2: Semi-Supervised Bridge
 Pseudo-labelling + label propagation via transaction graph.
 Transitions when readiness gates are met.
 

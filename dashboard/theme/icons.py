@@ -1,5 +1,5 @@
 """
-FraudTrap Design System — Icons (Lucide-style SVG)
+RiskLens Design System — Icons (Lucide-style SVG)
 Minimal, professional icon set for the enterprise dashboard.
 """
 

@@ -1,5 +1,5 @@
 """
-FraudTrap — Feature Schema Registry
+RiskLens — Feature Schema Registry
 Manages feature schemas per tenant with versioning and validation.
 """
 

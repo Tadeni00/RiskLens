@@ -1,5 +1,5 @@
 """
-FraudTrap — Adaptive Learning Monitoring
+RiskLens — Adaptive Learning Monitoring
 
 Tracks uncertainty distribution, pseudo-label acceptance rate,
 calibration drift, and prediction confidence for the Adaptive Learning Layer.

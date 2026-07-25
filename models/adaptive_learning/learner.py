@@ -1,5 +1,5 @@
 """
-FraudTrap — AdaptiveLearner Interface
+RiskLens — AdaptiveLearner Interface
 
 Abstract base class for the Adaptive Learning Layer (Layer 2).
 All scarce-label learners must conform to this interface so the surrounding

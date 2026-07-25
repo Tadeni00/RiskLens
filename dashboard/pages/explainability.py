@@ -1,4 +1,4 @@
-"""FraudTrap Dashboard — Explainability Page
+"""RiskLens Console — Explainability Page
 SHAP attributions, counterfactual analysis, and decision explanations.
 """
 

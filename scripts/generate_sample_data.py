@@ -1,5 +1,5 @@
 """
-FraudTrap — Sample data generator (standalone script).
+RiskLens — Sample data generator (standalone script).
 Generates realistic synthetic transaction datasets for testing
 the full pipeline without real client data.
 
@@ -93,7 +93,7 @@ def _generate_synthetic_data(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate synthetic FraudTrap data")
+    parser = argparse.ArgumentParser(description="Generate synthetic RiskLens data")
     parser.add_argument("--rows", type=int, default=10_000, help="Rows per tenant")
     parser.add_argument(
         "--fraud-rate", type=float, default=0.015, help="Fraud rate (0–1)"

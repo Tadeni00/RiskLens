@@ -1,5 +1,5 @@
 """
-FraudTrap Dashboard — Layout Components
+RiskLens Console — Layout Components
 Page layout helpers for consistent structure.
 """
 

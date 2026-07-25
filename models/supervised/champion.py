@@ -1,5 +1,5 @@
 """
-FraudTrap — Champion Model (CatBoost) with Confidence-Aware Routing
+RiskLens — Champion Model (CatBoost) with Confidence-Aware Routing
 Single-model production fraud detector with native categorical handling.
 Includes optional FT-Transformer specialist consultation for low-confidence cases.
 

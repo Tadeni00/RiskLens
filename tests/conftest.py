@@ -1,5 +1,5 @@
 """
-FraudTrap — pytest configuration and shared fixtures.
+RiskLens — pytest configuration and shared fixtures.
 """
 
 import sys

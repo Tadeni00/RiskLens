@@ -1,5 +1,5 @@
 """
-FraudTrap — Champion Promotion Logic
+RiskLens — Champion Promotion Logic
 Handles the promotion of challenger models to champion status.
 Implements the Champion-Challenger promotion workflow.
 """

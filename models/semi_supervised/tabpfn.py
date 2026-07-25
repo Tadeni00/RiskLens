@@ -1,5 +1,5 @@
 """
-FraudTrap — Phase 2: TabPFN (Tabular Prior-data Fitted Network)
+RiskLens — Phase 2: TabPFN (Tabular Prior-data Fitted Network)
 
 A pretrained tabular foundation model by Prior Labs used as the core of
 the semi-supervised learning layer. TabPFN performs prediction via
@@ -68,7 +68,7 @@ def _entropy_uncertainty(probas: np.ndarray) -> np.ndarray:
 
 class TabPFNModel:
     """
-    Production wrapper around Prior Labs TabPFN for FraudTrap's semi-supervised
+    Production wrapper around Prior Labs TabPFN for RiskLens's semi-supervised
     layer.
 
     Interface:

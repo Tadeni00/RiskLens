@@ -1,4 +1,4 @@
-"""FraudTrap Dashboard — Compliance Page
+"""RiskLens Console — Compliance Page
 Regulatory compliance, bias monitoring, and audit trails.
 """
 

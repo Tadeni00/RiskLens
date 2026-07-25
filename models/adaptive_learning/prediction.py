@@ -1,5 +1,5 @@
 """
-FraudTrap — Adaptive Learning Prediction Types
+RiskLens — Adaptive Learning Prediction Types
 
 Strongly typed output for Adaptive Learning Layer predictions.
 """

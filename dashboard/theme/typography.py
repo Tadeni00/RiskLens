@@ -1,5 +1,5 @@
 """
-FraudTrap Design System — Typography
+RiskLens Design System — Typography
 Professional type scale using Inter / IBM Plex Sans.
 """
 

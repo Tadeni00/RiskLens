@@ -1,4 +1,4 @@
-# FraudTrap API Documentation v2.0
+# RiskLens Scoring API Documentation v2.0
 
 Production-grade fraud detection API for banks and fintechs, implementing a three-layer model lifecycle: Cold Start → Adaptive Learning → Supervised.
 
@@ -8,7 +8,7 @@ Production-grade fraud detection API for banks and fintechs, implementing a thre
 
 | Environment | URL |
 |-------------|-----|
-| Production  | `https://api.fraudtrap.io/v1` |
+| Production  | `https://api.risklens.io/v1` |
 | Development | `http://localhost:8000/v1` |
 
 ---
@@ -139,7 +139,7 @@ Scores a single transaction for fraud risk.
 **curl:**
 
 ```bash
-curl -X POST https://api.fraudtrap.io/v1/score \
+curl -X POST https://api.risklens.io/v1/score \
   -H "Content-Type: application/json" \
   -H "X-API-Key: ft_live_xxxxxxxxxxxx" \
   -d '{
@@ -226,7 +226,7 @@ Scores up to 1,000 transactions per request.
 **curl:**
 
 ```bash
-curl -X POST https://api.fraudtrap.io/v1/score/batch \
+curl -X POST https://api.risklens.io/v1/score/batch \
   -H "Content-Type: application/json" \
   -H "X-API-Key: ft_live_xxxxxxxxxxxx" \
   -d '{
@@ -289,7 +289,7 @@ Submits fraud/legitimate labels for the training pipeline. Accepted asynchronous
 **curl:**
 
 ```bash
-curl -X POST https://api.fraudtrap.io/v1/labels \
+curl -X POST https://api.risklens.io/v1/labels \
   -H "Content-Type: application/json" \
   -H "X-API-Key: ft_live_xxxxxxxxxxxx" \
   -d '{
@@ -323,7 +323,7 @@ curl -X POST https://api.fraudtrap.io/v1/labels \
 **curl:**
 
 ```bash
-curl https://api.fraudtrap.io/health
+curl https://api.risklens.io/health
 ```
 
 ---
@@ -335,7 +335,7 @@ Returns metrics in Prometheus exposition format (`text/plain`).
 **curl:**
 
 ```bash
-curl https://api.fraudtrap.io/metrics
+curl https://api.risklens.io/metrics
 ```
 
 ---
@@ -374,7 +374,7 @@ curl https://api.fraudtrap.io/metrics
 **curl:**
 
 ```bash
-curl "https://api.fraudtrap.io/v1/recent?limit=100&tenant_id=bank_ng_gtb" \
+curl "https://api.risklens.io/v1/recent?limit=100&tenant_id=bank_ng_gtb" \
   -H "X-API-Key: ft_live_xxxxxxxxxxxx"
 ```
 
@@ -410,7 +410,7 @@ Returns the current model phase and loaded models for a tenant.
 **curl:**
 
 ```bash
-curl https://api.fraudtrap.io/v1/phase/bank_ng_gtb \
+curl https://api.risklens.io/v1/phase/bank_ng_gtb \
   -H "X-API-Key: ft_live_xxxxxxxxxxxx"
 ```
 
@@ -455,7 +455,7 @@ Returns PSI, KL divergence, and other drift metrics for a tenant.
 **curl:**
 
 ```bash
-curl https://api.fraudtrap.io/v1/drift/bank_ng_gtb \
+curl https://api.risklens.io/v1/drift/bank_ng_gtb \
   -H "X-API-Key: ft_live_xxxxxxxxxxxx"
 ```
 
@@ -517,7 +517,7 @@ Returns scoring history, label counts, transition readiness, and loaded models f
 **curl:**
 
 ```bash
-curl https://api.fraudtrap.io/v1/lifecycle/bank_ng_gtb \
+curl https://api.risklens.io/v1/lifecycle/bank_ng_gtb \
   -H "X-API-Key: ft_live_xxxxxxxxxxxx"
 ```
 
@@ -558,7 +558,7 @@ Returns the SHAP explanation for a previously scored transaction.
 **curl:**
 
 ```bash
-curl https://api.fraudtrap.io/v1/explain/a1b2c3d4-e5f6-7890-abcd-ef1234567890 \
+curl https://api.risklens.io/v1/explain/a1b2c3d4-e5f6-7890-abcd-ef1234567890 \
   -H "X-API-Key: ft_live_xxxxxxxxxxxx"
 ```
 
@@ -593,7 +593,7 @@ Reloads models from disk for a specific tenant.
 **curl:**
 
 ```bash
-curl -X POST https://api.fraudtrap.io/v1/admin/models/reload \
+curl -X POST https://api.risklens.io/v1/admin/models/reload \
   -H "Content-Type: application/json" \
   -H "X-API-Key: ft_admin_xxxxxxxxxxxx" \
   -d '{"tenant_id": "bank_ng_gtb", "force": true}'
@@ -637,12 +637,12 @@ Planned Kafka topic events for async consumption:
 
 | Topic | Event | Description |
 |-------|-------|-------------|
-| `fraudtrap.score.completed` | `ScoreCompleted` | Fired after each scoring request |
-| `fraudtrap.labels.ingested` | `LabelIngested` | Fired after label acceptance |
-| `fraudtrap.model.transitioned` | `ModelTransitioned` | Fired on phase change |
-| `fraudtrap.drift.detected` | `DriftDetected` | Fired when PSI > threshold |
+| `risklens.score.completed` | `ScoreCompleted` | Fired after each scoring request |
+| `risklens.labels.ingested` | `LabelIngested` | Fired after label acceptance |
+| `risklens.model.transitioned` | `ModelTransitioned` | Fired on phase change |
+| `risklens.drift.detected` | `DriftDetected` | Fired when PSI > threshold |
 
-Kafka cluster: `kafka.fraudtrap.io:9092`, TLS required.
+Kafka cluster: `kafka.risklens.io:9092`, TLS required.
 
 ---
 
@@ -650,7 +650,7 @@ Kafka cluster: `kafka.fraudtrap.io:9092`, TLS required.
 
 ### v2.0.0 (2026-07-15)
 
-- Initial release of FraudTrap API v2.
+- Initial release of RiskLens Scoring API v2.
 - Scoring endpoints: single and batch.
 - Three-layer model lifecycle (Cold Start → Adaptive Learning → Supervised).
 - SHAP-based explainability.

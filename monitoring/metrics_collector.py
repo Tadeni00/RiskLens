@@ -1,5 +1,5 @@
 """
-FraudTrap — Metrics Collector & ClickHouse Rollup
+RiskLens — Metrics Collector & ClickHouse Rollup
 Collects daily model performance and drift metrics, persists to ClickHouse.
 """
 

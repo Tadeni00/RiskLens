@@ -122,7 +122,7 @@ def train_tenant(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Train lightweight FraudTrap serving models"
+        description="Train lightweight RiskLens serving models"
     )
     parser.add_argument("--tenant", action="append", help="Tenant to train; repeatable")
     parser.add_argument("--all-tenants", action="store_true")

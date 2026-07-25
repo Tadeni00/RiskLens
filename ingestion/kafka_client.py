@@ -1,5 +1,5 @@
 """
-FraudTrap — Kafka Ingestion Layer
+RiskLens — Kafka Ingestion Layer
 Handles producing scored events and consuming raw transactions.
 """
 

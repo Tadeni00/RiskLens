@@ -1,5 +1,5 @@
 """
-FraudTrap — Phase 3: Confidence Estimator
+RiskLens — Phase 3: Confidence Estimator
 Determines whether CatBoost's prediction is confident enough to return directly,
 or whether FT-Transformer consultation is needed.
 

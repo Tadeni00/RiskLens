@@ -1,5 +1,5 @@
 """
-FraudTrap — Alerting System
+RiskLens — Alerting System
 Multi-channel alerting with PagerDuty, Slack, custom webhooks, deduplication, and runbooks.
 """
 
@@ -253,7 +253,7 @@ class AlertManager:
                                 "short": True,
                             },
                         ],
-                        "footer": "FraudTrap Alerting",
+                        "footer": "RiskLens Alerting",
                         "ts": int(alert.created_at.timestamp()),
                     }
                 ]

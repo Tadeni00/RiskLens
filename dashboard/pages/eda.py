@@ -1,4 +1,4 @@
-"""FraudTrap Dashboard — EDA & Data Quality Page"""
+"""RiskLens Console — EDA & Data Quality Page"""
 
 import streamlit as st
 import plotly.graph_objects as go

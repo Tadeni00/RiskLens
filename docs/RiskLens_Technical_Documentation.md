@@ -1,4 +1,4 @@
-# FraudTrap — Technical Documentation
+# RiskLens Intelligence — Technical Documentation
 
 ## Enterprise Fraud Detection Platform
 
@@ -10,7 +10,7 @@
 
 ## Table of Contents
 
-1. [What FraudTrap Is](#1-what-fraudtrap-is)
+1. [What RiskLens Intelligence Is](#1-what-RiskLens Intelligence-is)
 2. [The Problem It Solves](#2-the-problem-it-solves)
 3. [High-Level Architecture](#3-high-level-architecture)
 4. [Multi-Tenant Design](#4-multi-tenant-design)
@@ -37,13 +37,13 @@
 
 ---
 
-## 1. What FraudTrap Is
+## 1. What RiskLens Intelligence Is
 
-FraudTrap is a real-time fraud detection platform built for banks and fintech companies. It scores incoming financial transactions and decides whether each one should be approved, reviewed by a human, or blocked entirely.
+RiskLens Intelligence is a real-time fraud detection platform built for banks and fintech companies. It scores incoming financial transactions and decides whether each one should be approved, reviewed by a human, or blocked entirely.
 
-The platform is designed to work across multiple banks simultaneously. Each bank (called a "tenant") gets its own learning pipeline, its own behavioral profiles, and its own model lifecycle — all running on shared infrastructure. A single FraudTrap deployment can protect Bank A with a mature supervised model while simultaneously protecting a brand-new fintech with zero fraud labels, using only unsupervised anomaly detection.
+The platform is designed to work across multiple banks simultaneously. Each bank (called a "tenant") gets its own learning pipeline, its own behavioral profiles, and its own model lifecycle — all running on shared infrastructure. A single RiskLens Intelligence deployment can protect Bank A with a mature supervised model while simultaneously protecting a brand-new fintech with zero fraud labels, using only unsupervised anomaly detection.
 
-FraudTrap is not a single machine learning model. It is a complete system that includes behavioral profiling, real-time feature engineering, deterministic rules, multiple stages of machine learning, probability calibration, explainability, and full MLOps infrastructure. The goal is to detect fraud accurately, explain why each decision was made, adapt to new patterns in real-time, and operate reliably in production with strict latency requirements.
+RiskLens Intelligence is not a single machine learning model. It is a complete system that includes behavioral profiling, real-time feature engineering, deterministic rules, multiple stages of machine learning, probability calibration, explainability, and full MLOps infrastructure. The goal is to detect fraud accurately, explain why each decision was made, adapt to new patterns in real-time, and operate reliably in production with strict latency requirements.
 
 ---
 
@@ -51,23 +51,23 @@ FraudTrap is not a single machine learning model. It is a complete system that i
 
 Fraud detection has a fundamental cold-start problem. When a new bank joins your platform, you have zero fraud labels. You do not know which transactions are legitimate and which are fraudulent. Without labels, you cannot train a supervised model. Most ML fraud systems require thousands of labeled fraud cases before they become useful, which means a new bank is unprotected for weeks or months while labels accumulate from chargebacks and manual reviews.
 
-FraudTrap solves this with a three-stage machine learning lifecycle. On day one, with zero labels, the system uses unsupervised anomaly detection (a Variational Autoencoder, Isolation Forest, and statistical tail detector) to flag unusual transaction patterns. As labels accumulate from chargebacks and human reviews, the system automatically transitions to adaptive learning, using pseudo-labels to expand the training set. Once enough confirmed labels exist, it deploys a full supervised CatBoost model with a Champion-Challenger architecture for continuous improvement.
+RiskLens Intelligence solves this with a three-stage machine learning lifecycle. On day one, with zero labels, the system uses unsupervised anomaly detection (a Variational Autoencoder, Isolation Forest, and statistical tail detector) to flag unusual transaction patterns. As labels accumulate from chargebacks and human reviews, the system automatically transitions to adaptive learning, using pseudo-labels to expand the training set. Once enough confirmed labels exist, it deploys a full supervised CatBoost model with a Champion-Challenger architecture for continuous improvement.
 
 This means every tenant is protected from their first transaction, and the system automatically evolves its detection strategy as more information becomes available.
 
-Beyond cold start, FraudTrap addresses several other critical problems:
+Beyond cold start, RiskLens Intelligence addresses several other critical problems:
 
-- **Scale**: A bank with millions of customers cannot have a dedicated model per customer. FraudTrap uses hierarchical profiling where one tenant model learns bank-wide patterns and individual customer profiles personalize inference.
-- **Latency**: Fraud decisions must happen in under 90 milliseconds. FraudTrap achieves this through Redis-cached features, efficient model inference, and parallel processing.
-- **Adaptability**: Fraud patterns change constantly. FraudTrap updates behavioral profiles on every transaction, so the system adapts in real-time without waiting for batch retraining.
-- **Explainability**: Regulators and customers demand reasons for fraud decisions. FraudTrap provides SHAP explanations, rule contributions, and human-readable reason codes for every score.
-- **Multi-tenancy**: Running multiple banks on one platform requires strict data isolation, per-tenant model lifecycle, and independent feature stores. FraudTrap handles all of this through tenant-scoped Redis keys, separate model directories, and isolated audit trails.
+- **Scale**: A bank with millions of customers cannot have a dedicated model per customer. RiskLens Intelligence uses hierarchical profiling where one tenant model learns bank-wide patterns and individual customer profiles personalize inference.
+- **Latency**: Fraud decisions must happen in under 90 milliseconds. RiskLens Intelligence achieves this through Redis-cached features, efficient model inference, and parallel processing.
+- **Adaptability**: Fraud patterns change constantly. RiskLens Intelligence updates behavioral profiles on every transaction, so the system adapts in real-time without waiting for batch retraining.
+- **Explainability**: Regulators and customers demand reasons for fraud decisions. RiskLens Intelligence provides SHAP explanations, rule contributions, and human-readable reason codes for every score.
+- **Multi-tenancy**: Running multiple banks on one platform requires strict data isolation, per-tenant model lifecycle, and independent feature stores. RiskLens Intelligence handles all of this through tenant-scoped Redis keys, separate model directories, and isolated audit trails.
 
 ---
 
 ## 3. High-Level Architecture
 
-FraudTrap follows a layered architecture where each layer adds intelligence to the scoring decision. Here is the complete request flow when a transaction arrives:
+RiskLens Intelligence follows a layered architecture where each layer adds intelligence to the scoring decision. Here is the complete request flow when a transaction arrives:
 
 **Layer 1 — Ingestion**: A transaction arrives via the FastAPI scoring endpoint. The system validates the payload, extracts the tenant ID, and begins processing.
 
@@ -91,7 +91,7 @@ The entire flow from ingestion to decision typically completes in 30 to 50 milli
 
 ## 4. Multi-Tenant Design
 
-FraudTrap does not train one model per customer. That would be unmanageable at scale. Instead, it uses a hierarchical learning strategy where intelligence flows from global to tenant to customer.
+RiskLens Intelligence does not train one model per customer. That would be unmanageable at scale. Instead, it uses a hierarchical learning strategy where intelligence flows from global to tenant to customer.
 
 **Global Level**: The platform learns patterns across all tenants. For example, it might learn that transactions over 500,000 NGN are 12 times more likely to be fraud, or that API channels have higher fraud rates than mobile channels. These global priors serve as the baseline when no tenant-specific or customer-specific data exists.
 
@@ -101,7 +101,7 @@ FraudTrap does not train one model per customer. That would be unmanageable at s
 
 Here is a concrete example using a fintech like Opay:
 
-Opay has millions of customers. FraudTrap does not create 5 million models. Instead, one tenant model learns Opay-specific fraud patterns. Each customer has a behavioral profile that tracks their individual patterns. When a transaction arrives, the system checks the customer profile first. If the customer is new (no profile), it falls back to the merchant profile. If the merchant is new, it falls back to the tenant baseline. If the tenant is new, it falls back to the global baseline.
+Opay has millions of customers. RiskLens Intelligence does not create 5 million models. Instead, one tenant model learns Opay-specific fraud patterns. Each customer has a behavioral profile that tracks their individual patterns. When a transaction arrives, the system checks the customer profile first. If the customer is new (no profile), it falls back to the merchant profile. If the merchant is new, it falls back to the tenant baseline. If the tenant is new, it falls back to the global baseline.
 
 This means every transaction gets scored, even with zero customer history, because there is always a fallback level of intelligence.
 
@@ -111,7 +111,7 @@ Multi-tenant isolation is enforced at every layer. Redis keys are namespaced by 
 
 ## 5. Behavioral Intelligence Layer
 
-The behavioral intelligence layer is the core competitive advantage of FraudTrap. It transforms raw transaction metadata into rich, context-aware features in real-time. Without this layer, the system would only see the transaction in isolation — an amount, a channel, a country. With this layer, the system sees the transaction in context: is this amount unusual for this customer? Is this device known? Has this customer transacted from this country before?
+The behavioral intelligence layer is the core competitive advantage of RiskLens Intelligence. It transforms raw transaction metadata into rich, context-aware features in real-time. Without this layer, the system would only see the transaction in isolation — an amount, a channel, a country. With this layer, the system sees the transaction in context: is this amount unusual for this customer? Is this device known? Has this customer transacted from this country before?
 
 ### The Five Profile Types
 
@@ -127,7 +127,7 @@ The behavioral intelligence layer is the core competitive advantage of FraudTrap
 
 ### Profile Hierarchy and Cold-Start Fallback
 
-When a profile does not exist, FraudTrap falls back up the hierarchy:
+When a profile does not exist, RiskLens Intelligence falls back up the hierarchy:
 
 1. Check if the customer profile exists. If yes, use it.
 2. If not, check if the merchant profile exists. If yes, use it.
@@ -146,7 +146,7 @@ This incremental update means profiles are always fresh. When a customer's spend
 
 ## 6. Feature Engineering
 
-FraudTrap computes approximately 40 features in real-time from Redis, organized into five families. The key design principle is that some features can always be computed (they depend only on the transaction payload) while others require Redis and default to zero when Redis is unavailable.
+RiskLens Intelligence computes approximately 40 features in real-time from Redis, organized into five families. The key design principle is that some features can always be computed (they depend only on the transaction payload) while others require Redis and default to zero when Redis is unavailable.
 
 ### Velocity Features
 
@@ -226,7 +226,7 @@ Rules are stored in Redis sets and YAML configuration files. Compliance teams ca
 
 ## 8. The Three-Phase ML Lifecycle
 
-The core innovation of FraudTrap is that it does not require labels to start protecting customers. It uses a three-phase machine learning lifecycle where each phase adds more sophistication as more data becomes available.
+The core innovation of RiskLens Intelligence is that it does not require labels to start protecting customers. It uses a three-phase machine learning lifecycle where each phase adds more sophistication as more data becomes available.
 
 **Phase 1 — Cold Start**: Used when a tenant has fewer than 500 fraud labels. Relies entirely on unsupervised anomaly detection. No labeled fraud data is needed.
 
@@ -234,7 +234,7 @@ The core innovation of FraudTrap is that it does not require labels to start pro
 
 **Phase 3 — Supervised**: Used when a tenant has more than 5,000 fraud labels. Uses confidence-aware routing with CatBoost champion (100% of transactions) and FT-Transformer specialist (low-confidence cases, ~10-15%). Meta Fusion combines outputs for final score.
 
-Each tenant is independently routed to the appropriate phase. A single FraudTrap deployment can run Phase 1 for a new fintech, Phase 2 for a growing bank, and Phase 3 for a mature bank simultaneously.
+Each tenant is independently routed to the appropriate phase. A single RiskLens Intelligence deployment can run Phase 1 for a new fintech, Phase 2 for a growing bank, and Phase 3 for a mature bank simultaneously.
 
 The transitions between phases are gated by specific criteria. Phase 1 to Phase 2 requires at least 500 confirmed fraud labels, at least 500,000 transactions, at least 8 weeks of data, and a minimum PR-AUC of 0.65. Phase 2 to Phase 3 requires at least 5,000 confirmed fraud labels and a minimum PR-AUC of 0.78. These gates prevent premature promotion — a tenant is not moved to a more complex model until the simpler model has been validated.
 
@@ -286,11 +286,11 @@ Each detector has blind spots. The VAE may miss sparse anomalies because it lear
 
 When a tenant accumulates enough fraud labels (at least 500 confirmed cases from chargebacks and manual reviews), Layer 2 introduces TabPFN (Tabular Prior-data Fitted Network) for in-context learning while preserving the cold-start foundation.
 
-TabPFN requires a commercial license key from [Prior Labs](https://priorlabs.ai), set via the `TABPFN_TOKEN` environment variable. For organizations that cannot use TabPFN, FraudTrap supports **NetPFN** as a fully permissive alternative — set `learner: netpfn` in `config/supervised.yaml`. The `AdaptiveLearner` abstraction (`models/adaptive_learning/learner.py`) ensures the surrounding pipeline works identically with either backend.
+TabPFN requires a commercial license key from [Prior Labs](https://priorlabs.ai), set via the `TABPFN_TOKEN` environment variable. For organizations that cannot use TabPFN, RiskLens Intelligence supports **NetPFN** as a fully permissive alternative — set `learner: netpfn` in `config/supervised.yaml`. The `AdaptiveLearner` abstraction (`models/adaptive_learning/learner.py`) ensures the surrounding pipeline works identically with either backend.
 
 ### Pseudo-Labeling
 
-The core challenge of Phase 2 is that 500 labels is not enough for a robust supervised model. FraudTrap addresses this with TabPFN (Tabular Prior-data Fitted Network), which uses in-context learning to classify between fraud and legitimate transactions. High-confidence predictions from the cold-start ensemble become pseudo-labels for training.
+The core challenge of Phase 2 is that 500 labels is not enough for a robust supervised model. RiskLens Intelligence addresses this with TabPFN (Tabular Prior-data Fitted Network), which uses in-context learning to classify between fraud and legitimate transactions. High-confidence predictions from the cold-start ensemble become pseudo-labels for training.
 
 The system maintains two thresholds that evolve as the label count grows:
 
@@ -302,7 +302,7 @@ Transactions scoring above the fraud threshold or below the legit threshold rece
 
 ### Label Propagation
 
-FraudTrap also uses graph-based label propagation. When a confirmed fraud case is identified, the system performs a breadth-first search (BFS) through the transaction graph — following links between accounts, devices, and counterparties. Each hop decays the label strength by a configurable factor (default 0.5). This means if Account A is confirmed fraud, and Account B shares a device with Account A, and Account C sends money to Account B, then Accounts B and C receive attenuated fraud labels.
+RiskLens Intelligence also uses graph-based label propagation. When a confirmed fraud case is identified, the system performs a breadth-first search (BFS) through the transaction graph — following links between accounts, devices, and counterparties. Each hop decays the label strength by a configurable factor (default 0.5). This means if Account A is confirmed fraud, and Account B shares a device with Account A, and Account C sends money to Account B, then Accounts B and C receive attenuated fraud labels.
 
 Label propagation helps spread limited labels across the graph, expanding the effective training set without requiring manual review of every connected transaction.
 
@@ -523,7 +523,7 @@ The REVIEW band is the most important. It catches transactions that are suspicio
 
 ## 15. Explainability
 
-Every fraud decision must be explainable. Regulators require it for compliance. Customer service needs it for dispute resolution. ML engineers need it for debugging. FraudTrap provides explainability at multiple levels.
+Every fraud decision must be explainable. Regulators require it for compliance. Customer service needs it for dispute resolution. ML engineers need it for debugging. RiskLens Intelligence provides explainability at multiple levels.
 
 ### Phase 1 Explanations
 
@@ -531,7 +531,7 @@ The cold-start ensemble provides per-component explanations. For each transactio
 
 ### Phase 2 and 3 Explanations
 
-For supervised models, FraudTrap uses SHAP (SHapley Additive exPlanations). SHAP computes the contribution of each feature to the prediction. For example, a transaction might have: impossible_travel contributing +0.31, acct_v_1m_count contributing +0.22, amount_zscore contributing +0.18, is_new_device contributing +0.11. The base value (average prediction) is 0.12, and the final prediction is 0.87.
+For supervised models, RiskLens Intelligence uses SHAP (SHapley Additive exPlanations). SHAP computes the contribution of each feature to the prediction. For example, a transaction might have: impossible_travel contributing +0.31, acct_v_1m_count contributing +0.22, amount_zscore contributing +0.18, is_new_device contributing +0.11. The base value (average prediction) is 0.12, and the final prediction is 0.87.
 
 SHAP values are theoretically grounded in game theory and provide locally accurate explanations. The contributions sum to the difference between the base value and the prediction.
 
@@ -556,7 +556,7 @@ These reason codes are displayed in the review queue and included in customer co
 
 ## 16. Online Learning and Profile Updates
 
-Every transaction makes FraudTrap smarter. This is not batch retraining — it is real-time profile evolution.
+Every transaction makes RiskLens Intelligence smarter. This is not batch retraining — it is real-time profile evolution.
 
 When a transaction is scored, the system updates the relevant profiles:
 
@@ -572,7 +572,7 @@ The update is incremental — it does not require reading the entire profile fro
 
 The consequence is that the next transaction for this customer is scored against fresher history. If a customer's spending pattern shifts — they travel to a new country, change their typical channel, or start transacting at unusual hours — the profile captures this shift immediately, and the next transaction reflects the updated baseline.
 
-This online learning loop is a significant competitive advantage over systems that retrain models weekly or monthly. Fraud patterns evolve daily, and FraudTrap adapts at the same speed.
+This online learning loop is a significant competitive advantage over systems that retrain models weekly or monthly. Fraud patterns evolve daily, and RiskLens Intelligence adapts at the same speed.
 
 ---
 
@@ -580,7 +580,7 @@ This online learning loop is a significant competitive advantage over systems th
 
 Raw model outputs are not true probabilities. A CatBoost model might output 0.7 for a transaction, but that does not mean there is a 70% chance the transaction is fraud. The raw output is a relative ranking — higher values mean higher risk, but the absolute values are not calibrated probabilities.
 
-FraudTrap calibrates probabilities using two methods:
+RiskLens Intelligence calibrates probabilities using two methods:
 
 ### Isotonic Regression
 
@@ -596,7 +596,7 @@ Platt scaling is available as an alternative calibration method for Phase 2 TabP
 
 ### Calibration Evaluation
 
-FraudTrap evaluates calibration quality using:
+RiskLens Intelligence evaluates calibration quality using:
 
 **Expected Calibration Error (ECE)**: The average absolute difference between predicted probabilities and actual fraud rates across probability bins. Lower is better. A perfectly calibrated model has ECE = 0.
 
@@ -625,10 +625,10 @@ The TTL for most keys is 86,400 seconds (24 hours). Velocity counters for the 7-
 ### Kafka
 
 Kafka is the event backbone. It carries four topics:
-- `fraudtrap.transactions`: Raw incoming transactions
-- `fraudtrap.scored`: Scored transactions with decisions
-- `fraudtrap.labels`: Fraud labels from chargebacks and reviews
-- `fraudtrap.audit`: Complete audit trail of all scoring decisions
+- `RiskLens Intelligence.transactions`: Raw incoming transactions
+- `RiskLens Intelligence.scored`: Scored transactions with decisions
+- `RiskLens Intelligence.labels`: Fraud labels from chargebacks and reviews
+- `RiskLens Intelligence.audit`: Complete audit trail of all scoring decisions
 
 Kafka provides durability, replay capability, and decoupling between components. If the audit consumer is temporarily unavailable, events are buffered in Kafka and processed when it recovers.
 
@@ -655,7 +655,7 @@ PostgreSQL stores metadata that requires relational queries: tenant configuratio
 
 ## 19. Failure Modes and Graceful Degradation
 
-Production systems fail. FraudTrap is designed to degrade gracefully, never catastrophically.
+Production systems fail. RiskLens Intelligence is designed to degrade gracefully, never catastrophically.
 
 ### Redis Unavailable
 
@@ -864,7 +864,7 @@ For production, the components should be deployed separately:
 
 ### Why unsupervised first, not supervised?
 
-Most fraud detection systems require labeled data before they can function. This creates a chicken-and-egg problem: you need fraud detection to identify fraud, but you need fraud labels to train the detector. FraudTrap breaks this cycle with unsupervised anomaly detection that works from day one.
+Most fraud detection systems require labeled data before they can function. This creates a chicken-and-egg problem: you need fraud detection to identify fraud, but you need fraud labels to train the detector. RiskLens Intelligence breaks this cycle with unsupervised anomaly detection that works from day one.
 
 ### Why hierarchical profiling, not per-customer models?
 
@@ -910,4 +910,4 @@ A fraud detection system that crashes when a dependency is unavailable leaves cu
 
 ---
 
-*Document generated from FraudTrap source code. Architecture reflects the production system with behavioral intelligence, multi-stage ML lifecycle, and Champion-Challenger supervised learning.*
+*Document generated from RiskLens Intelligence source code. Architecture reflects the production system with behavioral intelligence, multi-stage ML lifecycle, and Champion-Challenger supervised learning.*

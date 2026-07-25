@@ -1,5 +1,5 @@
 """
-FraudTrap — Phase 2: Semi-Supervised Monitoring
+RiskLens — Phase 2: Semi-Supervised Monitoring
 Tracks uncertainty distribution, pseudo-label acceptance rate,
 calibration drift, and prediction confidence for the TabPFN layer.
 """

@@ -1,5 +1,5 @@
 """
-FraudTrap — Semi-Supervised Learning (Legacy Re-exports)
+RiskLens — Semi-Supervised Learning (Legacy Re-exports)
 
 This package is maintained for backwards compatibility only.
 All new code should import from ``models.adaptive_learning`` instead.

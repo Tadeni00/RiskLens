@@ -1,5 +1,5 @@
 """
-FraudTrap — Offline Training Pipeline
+RiskLens — Offline Training Pipeline
 Trains champion and challenger models offline.
 Supports the Champion-Challenger supervised learning architecture.
 """

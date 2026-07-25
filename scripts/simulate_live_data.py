@@ -1,5 +1,5 @@
 """
-FraudTrap live traffic simulator.
+RiskLens live traffic simulator.
 
 Continuously posts realistic transaction payloads to /v1/score and sends
 ground-truth labels for sampled simulated fraud cases.
@@ -80,7 +80,7 @@ def emit_label(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Simulate live FraudTrap traffic")
+    parser = argparse.ArgumentParser(description="Simulate live RiskLens traffic")
     parser.add_argument("--api-url", default="http://localhost:8000")
     parser.add_argument(
         "--rate", type=float, default=1.0, help="Transactions per second"

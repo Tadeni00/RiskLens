@@ -1,5 +1,5 @@
 """
-FraudTrap — Training Runner
+RiskLens — Training Runner
 Called by the CronJob / Airflow DAG for scheduled retraining.
 Also used for manual retraining during development.
 
@@ -112,7 +112,7 @@ def run_training_for_tenant(tenant_id: str, r: redis.Redis | None) -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="FraudTrap Training Runner")
+    parser = argparse.ArgumentParser(description="RiskLens Training Runner")
     parser.add_argument("--tenant", type=str, help="Train a specific tenant")
     parser.add_argument("--all-tenants", action="store_true", help="Train all known tenants")
     parser.add_argument(

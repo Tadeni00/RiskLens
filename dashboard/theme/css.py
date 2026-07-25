@@ -1,5 +1,5 @@
 """
-FraudTrap Design System — Global CSS
+RiskLens Design System — Global CSS
 Injects the complete enterprise design language into Streamlit.
 """
 
@@ -14,7 +14,7 @@ def inject_global_css():
         f"""
 <style>
 /* ═══════════════════════════════════════════════════════════════════════════
-   FraudTrap Enterprise Design System
+   RiskLens Enterprise Design System
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ── Root Variables ─────────────────────────────────────────────────────── */

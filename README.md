@@ -1,8 +1,8 @@
 <div align="center">
 
-# FraudTrap
+# RiskLens Intelligence
 
-### Adaptive Fraud Intelligence Platform
+### Adaptive AI for Fraud & Financial Risk
 
 <br/>
 
@@ -18,11 +18,12 @@
 
 <br/>
 
-**Real-time fraud scoring. Adaptive ML lifecycle. Multi-tenant isolation. Production-grade.**
+**See Risk Before It Happens.**
 
-FraudTrap is not a model. It is not a notebook. It is an end-to-end fraud intelligence platform
-that scores transactions in under 100ms, explains every decision, adapts to each tenant's fraud
-patterns, and evolves through three stages of ML maturity as labelled data accumulates.
+RiskLens Intelligence is an adaptive AI platform for real-time fraud detection and financial risk intelligence.
+The platform combines behavioral analytics, adaptive machine learning, explainable AI,
+continuous model governance, and production-grade infrastructure to help banks and fintechs
+identify suspicious activity in real time.
 
 <br/>
 
@@ -34,7 +35,7 @@ patterns, and evolves through three stages of ML maturity as labelled data accum
 
 ## Table of Contents
 
-- [Why FraudTrap Exists](#why-fraudtrap-exists)
+- [Why RiskLens Exists](#why-risklens-exists)
 - [Key Engineering Highlights](#key-engineering-highlights)
 - [System Overview](#system-overview)
 - [End-to-End Architecture](#end-to-end-architecture)
@@ -45,7 +46,7 @@ patterns, and evolves through three stages of ML maturity as labelled data accum
 - [Explainability](#explainability)
 - [Model Governance](#model-governance)
 - [Drift Monitoring](#drift-monitoring)
-- [Dashboard](#dashboard)
+- [RiskLens Console](#risklens-console)
 - [Repository Structure](#repository-structure)
 - [Getting Started](#getting-started)
 - [API Examples](#api-examples)
@@ -55,7 +56,7 @@ patterns, and evolves through three stages of ML maturity as labelled data accum
 
 ---
 
-## Why FraudTrap Exists
+## Why RiskLens Exists
 
 Fraud detection in banking has a fundamental cold-start problem.
 
@@ -72,7 +73,7 @@ Even after labels arrive, the problem compounds:
 | **Latency requirements** | Real-time payments demand sub-100ms decisions. Batch inference is not an option. |
 | **Regulatory compliance** | Every decision must be explainable, auditable, and reversible. |
 
-FraudTrap solves this by **evolving its learning strategy per tenant** — not by deploying a single model, but by progressing through three stages of ML maturity as data accumulates.
+Unlike traditional fraud models, RiskLens Intelligence adapts as organizations mature, allowing each tenant to evolve from unsupervised anomaly detection to fully supervised production intelligence.
 
 ```
 Day 1:     Zero labels    →  Anomaly detection (unsupervised)
@@ -92,7 +93,7 @@ Every tenant is protected from their first transaction. The system automatically
 
 **Adaptive Three-Stage ML Lifecycle**
 
-Cold Start → Adaptive Learning → Supervised. Each tenant progresses independently based on accumulated labels and validated performance gates.
+Cold Start → RiskLens Adaptive → Supervised. Each tenant progresses independently based on accumulated labels and validated performance gates.
 
 **Confidence-Aware Inference**
 
@@ -109,7 +110,7 @@ Enterprise demo console that visualizes the complete inference pipeline — from
 </td>
 <td width="50%">
 
-**Explainable AI**
+**Explainable AI (RiskLens Explain)**
 
 SHAP attributions, counterfactual explanations, nearest-neighbor retrieval, and natural-language reports. Every decision is regulator-ready.
 
@@ -182,7 +183,7 @@ graph TB
         TXN --> KAFKA
     end
 
-    subgraph "Real-Time Scoring"
+    subgraph "Real-Time Scoring — RiskLens Detect"
         API[FastAPI<br/>Scoring API]
         KAFKA --> API
 
@@ -199,7 +200,7 @@ graph TB
         RE --> MR
     end
 
-    subgraph "ML Lifecycle"
+    subgraph "ML Lifecycle — RiskLens Adaptive"
         CS[Cold Start<br/>VAE + IF + Tail]
         AL[Adaptive Learning<br/>TabPFN]
         CB[CatBoost<br/>Champion]
@@ -218,7 +219,7 @@ graph TB
         AL --> DEC
     end
 
-    subgraph "Storage & Monitoring"
+    subgraph "Storage & Monitoring — RiskLens Monitor"
         DEC --> REDIS[(Redis<br/>Score Cache)]
         DEC --> KAFKA2[Kafka<br/>Audit Events]
         DEC --> CH[(ClickHouse<br/>Analytics)]
@@ -229,7 +230,7 @@ graph TB
         DRIFT --> RETRAIN[Retrain<br/>Trigger]
     end
 
-    subgraph "Operations"
+    subgraph "Operations — RiskLens Console"
         DASH[Dashboard<br/>Streamlit]
         MLFLOW[MLflow<br/>Registry]
         PG[(PostgreSQL<br/>Metadata)]
@@ -288,12 +289,12 @@ sequenceDiagram
 
 ## Adaptive ML Lifecycle
 
-FraudTrap implements a **gated progression** from zero labels to fully supervised learning. Each tenant advances independently based on accumulated labels and validated performance.
+RiskLens Intelligence implements a **gated progression** from zero labels to fully supervised learning. Each tenant advances independently based on accumulated labels and validated performance.
 
 ```mermaid
 graph LR
     A["New Tenant<br/>0 Labels"] -->|"Gate 1"| B["Cold Start<br/>VAE + IF + Tail"]
-    B -->|"Gate 2"| C["Adaptive Learning<br/>TabPFN"]
+    B -->|"Gate 2"| C["RiskLens Adaptive<br/>TabPFN"]
     C -->|"Gate 3"| D["Supervised<br/>CatBoost + FT-Transformer"]
 
     style A fill:#D69E2E,color:#000
@@ -306,14 +307,14 @@ graph LR
 
 | Transition | Minimum Labels | Min Transactions | Min Weeks | Min PR-AUC | Trigger |
 |------------|----------------|------------------|-----------|------------|---------|
-| Cold Start → Adaptive Learning | 500 | 500,000 | 8 | 0.65 | Automatic |
-| Adaptive Learning → Supervised | 5,000 | — | — | 0.78 | Automatic |
+| Cold Start → RiskLens Adaptive | 500 | 500,000 | 8 | 0.65 | Automatic |
+| RiskLens Adaptive → Supervised | 5,000 | — | — | 0.78 | Automatic |
 
 A tenant is **never promoted** to a more complex model until the simpler model has been validated. This prevents premature escalation and ensures each layer earns its place.
 
 ---
 
-### Layer 1: Cold Start
+### Layer 1: Cold Start (RiskLens Detect — Unsupervised)
 
 **Problem**: New tenants have zero fraud labels. Supervised learning is impossible.
 
@@ -337,7 +338,7 @@ risk_score = 0.55 × VAE_reconstruction_error
 
 ---
 
-### Layer 2: Adaptive Learning
+### Layer 2: RiskLens Adaptive (TabPFN)
 
 **Problem**: Tenants with 100–5,000 labels have too few for traditional supervised models but enough that anomaly detection alone is insufficient.
 
@@ -379,7 +380,7 @@ preds  = model.predict_with_uncertainty(X_test)      # + uncertainty estimates
 
 ---
 
-### Layer 3: Supervised
+### Layer 3: Supervised (RiskLens Detect — Production Classifier)
 
 **Problem**: Mature tenants with 5,000+ labels need maximum accuracy at production latency.
 
@@ -520,11 +521,11 @@ graph TD
 
 ### Why Not an Ensemble?
 
-Ensembles process every transaction through multiple models, increasing latency linearly. FraudTrap's selective inference approach achieves similar accuracy gains while keeping P95 latency under 100ms. The confidence gate ensures specialist consultation only when it matters.
+Ensembles process every transaction through multiple models, increasing latency linearly. RiskLens Intelligence's selective inference approach achieves similar accuracy gains while keeping P95 latency under 100ms. The confidence gate ensures specialist consultation only when it matters.
 
 ---
 
-## Explainability
+## Explainability (RiskLens Explain)
 
 **Problem**: Black-box fraud decisions erode analyst trust and fail regulatory requirements.
 
@@ -589,8 +590,8 @@ graph TB
 
 ### Regulatory Compliance
 
-| Requirement | FraudTrap Implementation |
-|-------------|--------------------------|
+| Requirement | RiskLens Implementation |
+|-------------|-------------------------|
 | Audit trail | Every score logged with `trace_id`, `model_version`, features |
 | Reason codes | Human-readable explanations for each decision |
 | Model versioning | `training_hash`, `feature_hash`, `dataset_hash` for reproducibility |
@@ -604,7 +605,7 @@ graph TB
 
 **Solution**: A complete model lifecycle with version tracking, automated evaluation, and controlled promotion.
 
-### Model Registry
+### RiskLens Registry
 
 | Operation | Description |
 |-----------|-------------|
@@ -640,7 +641,7 @@ Offline challenger models (LightGBM, XGBoost) are trained continuously and evalu
 
 ---
 
-## Drift Monitoring
+## Drift Monitoring (RiskLens Monitor)
 
 **Problem**: Fraud patterns evolve. A model trained on last quarter's patterns misses this quarter's attacks.
 
@@ -678,11 +679,11 @@ Latency > 100ms → Specialist invocation rate reduced
 
 ---
 
-## Dashboard
+## RiskLens Console
 
 A **10-page enterprise operations console** built with Streamlit.
 
-> **Design philosophy**: The dashboard should not look like a Streamlit application. It should feel like a polished enterprise operations console that a major bank or fintech could deploy today.
+> **Design philosophy**: The console should not look like a Streamlit application. It should feel like a polished enterprise operations console that a major bank or fintech could deploy today.
 
 ![Dashboard Overview](docs/images/dashboard-overview.png)
 
@@ -707,7 +708,7 @@ A **10-page enterprise operations console** built with Streamlit.
 
 ### Transaction Simulator
 
-The **Transaction Simulator** is the flagship demo page for stakeholder presentations, executive reviews, and compliance demonstrations. It allows a user to submit a synthetic transaction and watch the entire FraudTrap pipeline execute step by step.
+The **Transaction Simulator** is the flagship demo page for stakeholder presentations, executive reviews, and compliance demonstrations. It allows a user to submit a synthetic transaction and watch the entire RiskLens pipeline execute step by step.
 
 **Features:**
 - **9 pre-built scenarios**: Normal Customer, New Device, Velocity Attack, Account Takeover, Mule Account, Card Testing, High Value Transfer, Cold Start Tenant, Adaptive Tenant, Mature Tenant
@@ -735,7 +736,7 @@ The **Transaction Simulator** is the flagship demo page for stakeholder presenta
 ## Repository Structure
 
 ```
-fraudtrap/
+risklens/
 ├── api/                        # FastAPI app and HTTP endpoints
 │   ├── main.py                 # Scoring API, phase, explain, drift endpoints
 │   └── admin.py                # Admin API: rules, blocklists, model management
@@ -748,7 +749,7 @@ fraudtrap/
 ├── config/                     # Environment-driven settings (Pydantic)
 │   ├── settings.py             # Central configuration
 │   └── supervised.yaml         # ML pipeline configuration
-├── dashboard/                  # Enterprise operations console (10 pages)
+├── dashboard/                  # RiskLens Console (10 pages)
 │   ├── app.py                  # Streamlit entry point
 │   ├── pages/                  # Dashboard pages (overview, simulator, models, ...)
 │   ├── components/             # Reusable UI components
@@ -763,7 +764,7 @@ fraudtrap/
 ├── ingestion/                  # Kafka producer/consumer, schemas
 ├── models/
 │   ├── cold_start/             # VAE + Isolation Forest + Tail Detector
-│   ├── adaptive_learning/      # Adaptive Learning Layer (TabPFN, AdaptiveLearner)
+│   ├── adaptive_learning/      # RiskLens Adaptive (TabPFN, AdaptiveLearner)
 │   ├── supervised/             # Champion, FT-Transformer, Meta Fusion, Challengers
 │   ├── explainability/         # SHAP, Counterfactual, Formatter, Cache
 │   └── gnn/                    # Graph Neural Network (experimental)
@@ -777,14 +778,14 @@ fraudtrap/
 ├── scripts/                    # Data gen, training, simulation
 ├── tests/                      # Unit, integration, load tests
 ├── docs/
-│   ├── FraudTrap_Technical_Documentation.md
+│   ├── RiskLens_Technical_Documentation.md
 │   └── runbooks/               # 12 operational runbooks
 ├── .github/workflows/          # CI/CD pipelines
 │   ├── model-ci.yml
 │   ├── drift-monitor.yml
 │   └── retrain-scheduler.yml
-├── FraudTrap_End_to_End_Notebook.ipynb    # Architecture walkthrough
-├── FraudTrap_Complete_Study_Guide.docx    # 11-chapter platform guide
+├── RiskLens_Intelligence_Architecture.ipynb   # Architecture walkthrough
+├── RiskLens_Complete_Study_Guide.docx         # 11-chapter platform guide
 ├── openapi.yaml                # OpenAPI specification
 └── requirements.txt            # Core dependencies
 ```
@@ -814,9 +815,9 @@ docker compose -f docker/docker-compose.yml ps
 
 | Service | URL | Purpose |
 |---------|-----|---------|
-| **API** | http://localhost:8000 | Scoring API |
+| **RiskLens Scoring API** | http://localhost:8000 | Scoring API |
 | **API Docs** | http://localhost:8000/docs | Swagger documentation |
-| **Dashboard** | http://localhost:8501 | Operations console |
+| **RiskLens Console** | http://localhost:8501 | Operations console |
 | **MLflow** | http://localhost:5000 | Experiment tracking |
 
 ### Generate Sample Data
@@ -938,7 +939,7 @@ curl -X POST http://localhost:8000/v1/admin/rules/reload
 | `POSTGRES_URL` | `postgresql://...` | PostgreSQL connection |
 | `MLFLOW_TRACKING_URI` | `http://localhost:5000` | MLflow endpoint |
 | `MODEL_DIR` | `artifacts/models` | Model artifact path |
-| `TABPFN_TOKEN` | — | TabPFN license key (required for Adaptive Learning) |
+| `TABPFN_TOKEN` | — | TabPFN license key (required for RiskLens Adaptive) |
 
 ---
 
@@ -966,7 +967,7 @@ curl -X POST http://localhost:8000/v1/admin/rules/reload
 | **Confidence-aware routing** | 85–90% of transactions complete in ~4ms. Only difficult cases invoke the slower specialist. Keeps P95 under 100ms. |
 | **SHAP over LIME** | TreeSHAP is exact for tree models. LIME is approximate and less stable. SHAP provides consistent, reproducible attributions. |
 | **FAISS for nearest neighbors** | Sub-millisecond similarity search across millions of transactions. Brute-force search would be too slow for real-time explainability. |
-| **Streamlit for dashboard** | Rapid prototyping with Python-native data science stack. Dark theme customization makes it feel like an enterprise console. |
+| **Streamlit for console** | Rapid prototyping with Python-native data science stack. Dark theme customization makes it feel like an enterprise console. |
 | **Docker Compose for local dev** | 12-service stack reproducible with a single command. No manual dependency management. |
 
 ---
@@ -975,13 +976,13 @@ curl -X POST http://localhost:8000/v1/admin/rules/reload
 
 | Document | Description |
 |----------|-------------|
-| [Architecture Notebook](FraudTrap_End_to_End_Notebook.ipynb) | 16-section architecture walkthrough with code |
-| [Technical Documentation](docs/FraudTrap_Technical_Documentation.md) | 24-section engineering deep-dive |
+| [Architecture Notebook](RiskLens_Intelligence_Architecture.ipynb) | 16-section architecture walkthrough with code |
+| [Technical Documentation](docs/RiskLens_Technical_Documentation.md) | 24-section engineering deep-dive |
 | [API Documentation](API_DOCUMENTATION_v2.md) | Full API reference |
 | [OpenAPI Spec](openapi.yaml) | OpenAPI 3.0 specification |
-| [Postman Collection](FraudTrap_API.postman_collection.json) | 22 API requests |
-| [Study Guide](FraudTrap_Complete_Study_Guide.docx) | 11-chapter platform guide |
-| [Beginner Guide](docs/FraudTrap_Beginner_Guide.docx) | Getting started guide |
+| [Postman Collection](RiskLens_API.postman_collection.json) | 22 API requests |
+| [Study Guide](RiskLens_Complete_Study_Guide.docx) | 11-chapter platform guide |
+| [Beginner Guide](docs/RiskLens_Beginner_Guide.docx) | Getting started guide |
 | [Runbooks](docs/runbooks/) | 12 operational runbooks |
 
 ---
@@ -992,7 +993,7 @@ Features currently in production are marked with ✅. Future research directions
 
 ### Implemented
 
-- ✅ Three-layer adaptive ML lifecycle (Cold Start → Adaptive Learning → Supervised)
+- ✅ Three-layer adaptive ML lifecycle (Cold Start → RiskLens Adaptive → Supervised)
 - ✅ Confidence-aware champion-specialist routing
 - ✅ Behavioural profiling (5 entity types, incremental updates)
 - ✅ SHAP + counterfactual explainability
@@ -1000,7 +1001,7 @@ Features currently in production are marked with ✅. Future research directions
 - ✅ Champion-challenger evaluation with controlled promotion
 - ✅ Multi-tenant model isolation
 - ✅ Real-time scoring (<100ms P95)
-- ✅ Enterprise dashboard (9 pages)
+- ✅ Enterprise dashboard (10 pages)
 - ✅ Docker Compose stack (12 services)
 - ✅ CI/CD pipelines (GitHub Actions)
 
@@ -1053,17 +1054,19 @@ Third-party dependencies and their licenses are listed in [THIRD_PARTY_LICENSES.
 
 ### TabPFN Licensing
 
-FraudTrap's Adaptive Learning Layer uses **TabPFN** (by Prior Labs), which requires a commercial license key for production use. TabPFN is free for research and evaluation.
+RiskLens Intelligence's Adaptive Learning Layer uses **TabPFN** (by Prior Labs), which requires a commercial license key for production use. TabPFN is free for research and evaluation.
 
 - Set your license key via the `TABPFN_TOKEN` environment variable
 - The license key is **not** included in this repository — obtain one at [priorlabs.ai](https://priorlabs.ai)
-- For organizations that cannot use TabPFN, FraudTrap supports **NetPFN** as a fully permissive alternative — set `learner: netpfn` in `config/supervised.yaml`
+- For organizations that cannot use TabPFN, RiskLens Intelligence supports **NetPFN** as a fully permissive alternative — set `learner: netpfn` in `config/supervised.yaml`
 
 ---
 
 <div align="center">
 
-**FraudTrap** — Adaptive fraud intelligence for banks and fintechs.
+**RiskLens Intelligence** — Adaptive AI for Fraud & Financial Risk
+
+See Risk Before It Happens.
 
 Built with engineering rigor. Designed for scale. Ready for production.
 

@@ -1,5 +1,5 @@
 """
-FraudTrap — Chaos Testing
+RiskLens — Chaos Testing
 Validates system resilience under adverse conditions.
 """
 

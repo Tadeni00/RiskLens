@@ -1,5 +1,5 @@
 """
-FraudTrap — Probability Calibration
+RiskLens — Probability Calibration
 Isotonic Regression and Platt Scaling for probability calibration.
 Supports the Champion-Challenger model architecture.
 """

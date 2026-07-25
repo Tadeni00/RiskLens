@@ -1,5 +1,5 @@
 """
-FraudTrap — A/B Testing Framework
+RiskLens — A/B Testing Framework
 Champion/Challenger model routing with statistical significance testing.
 """
 

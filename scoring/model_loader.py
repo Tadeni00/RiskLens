@@ -1,5 +1,5 @@
 """
-FraudTrap — Model Loader
+RiskLens — Model Loader
 Handles loading models from disk with validation and warmup.
 """
 

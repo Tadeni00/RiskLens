@@ -1,5 +1,5 @@
 """
-FraudTrap Dashboard — Risk Intelligence Page
+RiskLens Console — Risk Intelligence Page
 Fraud pattern analysis, geographic risk mapping, and entity-level risk leaderboards.
 """
 

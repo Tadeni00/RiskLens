@@ -1,5 +1,5 @@
 """
-FraudTrap — Adaptive Learning Layer
+RiskLens — Adaptive Learning Layer
 
 The Adaptive Learning Layer (Layer 2) combines weak supervision, analyst feedback,
 behavioral intelligence, confidence estimation, and pseudo-label generation to

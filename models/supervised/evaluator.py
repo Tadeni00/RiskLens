@@ -1,5 +1,5 @@
 """
-FraudTrap — Model Evaluation Framework
+RiskLens — Model Evaluation Framework
 Comprehensive evaluation and comparison of challenger models.
 Supports the Champion-Challenger architecture.
 """

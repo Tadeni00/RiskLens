@@ -1,4 +1,4 @@
-"""FraudTrap Dashboard — Extended Integration Tests (pytest-compatible)"""
+"""RiskLens Console — Extended Integration Tests (pytest-compatible)"""
 
 import pytest
 import requests

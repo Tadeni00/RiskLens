@@ -1,5 +1,5 @@
 """
-FraudTrap — Explainability Engine
+RiskLens — Explainability Engine
 Orchestrates SHAP attributions, counterfactual explanations, and analyst-friendly formatting.
 Integrates with the scoring pipeline to provide real-time, regulator-friendly explanations.
 """
@@ -60,7 +60,7 @@ class ExplainabilityConfig:
 
 class ExplainabilityEngine:
     """
-    Production explainability engine for FraudTrap.
+    Production explainability engine for RiskLens.
 
     Orchestrates:
     - SHAP feature attribution (primary)

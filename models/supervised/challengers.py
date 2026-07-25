@@ -1,5 +1,5 @@
 """
-FraudTrap — Challenger Framework (Offline Benchmark Models)
+RiskLens — Challenger Framework (Offline Benchmark Models)
 Offline-only challenger models for regression testing and performance comparison.
 These models NEVER participate in production inference.
 

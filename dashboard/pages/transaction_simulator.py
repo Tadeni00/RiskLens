@@ -1,6 +1,6 @@
 """
-FraudTrap Dashboard — Transaction Simulator
-Enterprise console for demonstrating the complete FraudTrap inference pipeline.
+RiskLens Console — Transaction Simulator
+Enterprise console for demonstrating the complete RiskLens inference pipeline.
 Designed for stakeholder demos, executive presentations, and compliance reviews.
 """
 
@@ -405,7 +405,7 @@ def _hash_seed(text: str) -> int:
 
 
 def simulate_transaction(params: dict, scenario_name: str) -> SimulationResult:
-    """Run a deterministic mock simulation of the FraudTrap pipeline."""
+    """Run a deterministic mock simulation of the RiskLens pipeline."""
     seed = _hash_seed(json.dumps(params, sort_keys=True, default=str))
     rng = random.Random(seed)
     np_rng = np.random.RandomState(seed)
@@ -1415,7 +1415,7 @@ def render(tenant_id: str):
         f"""
 <div class="page-header">
     <h1>{Icons.html('ZAP', 28, Colors.ACCENT)}&nbsp;Transaction Simulator</h1>
-    <p>Enterprise console for demonstrating the complete FraudTrap inference pipeline</p>
+    <p>Enterprise console for demonstrating the complete RiskLens inference pipeline</p>
 </div>
 """,
         unsafe_allow_html=True,
@@ -1595,7 +1595,7 @@ def render(tenant_id: str):
 <div style="text-align:center;padding:80px 24px;color:{Colors.TEXT_MUTED}">
     {Icons.html('ZAP', 48, Colors.TEXT_MUTED)}
     <div style="font-size:{Typography.TEXT_XL};font-weight:{Typography.WEIGHT_SEMIBOLD};color:{Colors.TEXT_SECONDARY};margin-top:16px;margin-bottom:8px">Ready to Simulate</div>
-    <div style="font-size:{Typography.TEXT_BASE}">Select a scenario and click <strong>Run Simulation</strong> to visualize the complete FraudTrap inference pipeline.</div>
+    <div style="font-size:{Typography.TEXT_BASE}">Select a scenario and click <strong>Run Simulation</strong> to visualize the complete RiskLens inference pipeline.</div>
 </div>
 """,
             unsafe_allow_html=True,

@@ -1,8 +1,8 @@
 {
   "info": {
-    "name": "FraudTrap API",
-    "description": "Production-grade fraud detection API for banks and fintechs",
-    "_postman_id": "fraudtrap-api-collection",
+    "name": "RiskLens Scoring API",
+    "description": "Real-time transaction scoring and explainability platform",
+    "_postman_id": "risklens-api-collection",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {

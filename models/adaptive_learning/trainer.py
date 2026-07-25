@@ -1,5 +1,5 @@
 """
-FraudTrap — Adaptive Learning Training Pipeline
+RiskLens — Adaptive Learning Training Pipeline
 
 Manages the full training lifecycle for the Adaptive Learning Layer:
   Pseudo-label generation -> Dataset construction -> TabPFN fit -> Calibration -> Validation

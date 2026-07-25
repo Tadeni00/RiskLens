@@ -1,5 +1,5 @@
 """
-FraudTrap — Drift Detection
+RiskLens — Drift Detection
 Computes population stability, KL divergence, embedding drift, and concept drift.
 """
 

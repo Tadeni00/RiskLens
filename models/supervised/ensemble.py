@@ -1,5 +1,5 @@
 """
-FraudTrap — Phase 3: Supervised Stacking Ensemble
+RiskLens — Phase 3: Supervised Stacking Ensemble
 XGBoost + LightGBM + CatBoost base learners → Logistic Regression meta-learner.
 Includes SHAP explainability, Platt calibration, and class imbalance handling.
 

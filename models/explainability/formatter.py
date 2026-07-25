@@ -1,5 +1,5 @@
 """
-FraudTrap — Explanation Formatter
+RiskLens — Explanation Formatter
 Converts raw SHAP and counterfactual outputs into analyst-friendly language.
 """
 

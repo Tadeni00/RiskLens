@@ -1,5 +1,5 @@
 """
-FraudTrap — Label Ingestion Worker
+RiskLens — Label Ingestion Worker
 Consumes the labels Kafka topic, validates label quality,
 updates phase state counters, and writes to ClickHouse for training.
 Runs as a long-lived background process alongside the API.

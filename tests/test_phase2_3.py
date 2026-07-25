@@ -1,5 +1,5 @@
 """
-FraudTrap — Layer 2 & 3 Architecture Tests
+RiskLens — Layer 2 & 3 Architecture Tests
 Covers: TabPFNAdaptiveLearner, AdaptiveTrainer, ConfidenceEstimator, FTTransformer,
 MetaFusionLayer, ChampionModel confidence-aware routing.
 """

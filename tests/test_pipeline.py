@@ -1,5 +1,5 @@
 """
-FraudTrap — Test Suite
+RiskLens — Test Suite
 Covers: feature engineering, model scoring, API contract, rules engine,
 phase transitions, and latency budget validation.
 """

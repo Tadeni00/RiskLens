@@ -1,5 +1,5 @@
 """
-FraudTrap — Admin API Endpoints
+RiskLens — Admin API Endpoints
 Management endpoints for rules, blocklists, and model operations.
 """
 

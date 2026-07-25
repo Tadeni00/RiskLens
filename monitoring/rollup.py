@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FraudTrap — Daily Metrics Rollup Job
+RiskLens — Daily Metrics Rollup Job
 Runs at 02:00 UTC to compute and persist daily model performance and drift metrics.
 """
 

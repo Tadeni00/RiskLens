@@ -1,5 +1,5 @@
 """
-FraudTrap — FastAPI Scoring API
+RiskLens Scoring API — FastAPI Integration Point
 Primary integration point for banks and fintechs.
 Enforces 90ms scoring SLA. Emits audit events to Kafka.
 
@@ -46,19 +46,19 @@ _orchestrator: Optional[ScoringOrchestrator] = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _orchestrator
-    logger.info("FraudTrap API starting up …")
+    logger.info("RiskLens Scoring API starting up …")
     _orchestrator = ScoringOrchestrator()
     _orchestrator.registry.load_from_disk(Path(settings.model_dir))
     _orchestrator._get_redis()  # warm up Redis connection
     logger.info("ScoringOrchestrator ready")
     yield
-    logger.info("FraudTrap API shutting down …")
+    logger.info("RiskLens Scoring API shutting down …")
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(
-    title="FraudTrap API",
-    description="Real-time fraud detection for banks and fintechs.",
+    title="RiskLens Scoring API",
+    description="Real-time transaction scoring and explainability platform.",
     version=settings.app_version,
     lifespan=lifespan,
 )

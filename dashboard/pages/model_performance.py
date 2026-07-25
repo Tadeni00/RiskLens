@@ -1,4 +1,4 @@
-"""FraudTrap Dashboard — Model Performance Page (Live-Wired)"""
+"""RiskLens Console — Model Performance Page (Live-Wired)"""
 
 import streamlit as st
 import plotly.graph_objects as go

@@ -1,5 +1,5 @@
 """
-FraudTrap Dashboard — Behavior Intelligence Page
+RiskLens Console — Behavior Intelligence Page
 Entity profiles and behavioral pattern analysis for fraud detection.
 """
 

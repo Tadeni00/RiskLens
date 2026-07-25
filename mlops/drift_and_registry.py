@@ -1,5 +1,5 @@
 """
-FraudTrap — MLOps Layer
+RiskLens — MLOps Layer
 Drift detection (PSI + performance), model registry wrapper,
 and automated retraining trigger.
 """

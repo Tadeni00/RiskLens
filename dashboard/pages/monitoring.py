@@ -1,5 +1,5 @@
 """
-FraudTrap Dashboard — Live Monitoring Page
+RiskLens Console — Live Monitoring Page
 Real-time system health and performance metrics.
 """
 

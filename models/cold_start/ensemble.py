@@ -1,5 +1,5 @@
 """
-FraudTrap — Phase 1: Unsupervised Cold-Start Models
+RiskLens — Phase 1: Unsupervised Cold-Start Models
 Ensemble of VAE + Isolation Forest + One-Class SVM.
 No labels required. Trained on "normal" transaction flow.
 """

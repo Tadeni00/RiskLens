@@ -1,5 +1,5 @@
 """
-FraudTrap Dashboard — Table Components
+RiskLens Console — Table Components
 Professional data tables with sorting, filtering, and status indicators.
 """
 

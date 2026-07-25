@@ -45,7 +45,7 @@ def text(ax, x, y, s, **kw):
 # ── 1. Dashboard Preview ──────────────────────────────────────────────────────
 def gen_dashboard():
     fig, ax = plt.subplots(figsize=(12, 6.75), dpi=150)
-    style_ax(ax, "FraudTrap — Operations Console")
+    style_ax(ax, "RiskLens — Operations Console")
 
     # Top KPI cards
     kpis = [("Transactions", "1.2M", GREEN), ("Fraud Rate", "1.47%", YELLOW), ("Blocked", "342", RED), ("P95 Latency", "87ms", GREEN)]
@@ -79,7 +79,7 @@ def gen_dashboard():
 # ── 2. Architecture Overview ──────────────────────────────────────────────────
 def gen_architecture():
     fig, ax = plt.subplots(figsize=(12, 6.75), dpi=150)
-    style_ax(ax, "FraudTrap — System Architecture")
+    style_ax(ax, "RiskLens — System Architecture")
 
     layers = [
         (0.5, 4.8, "Transaction", ACCENT),
@@ -133,7 +133,7 @@ def gen_architecture():
 # ── 3. Dashboard Overview ─────────────────────────────────────────────────────
 def gen_dashboard_overview():
     fig, ax = plt.subplots(figsize=(12, 6.75), dpi=150)
-    style_ax(ax, "FraudTrap — Dashboard Pages")
+    style_ax(ax, "RiskLens — Dashboard Pages")
 
     pages = [
         ("Overview", "8 KPIs, health, timeline"),

@@ -1,5 +1,5 @@
 """
-FraudTrap Dashboard — Architecture Diagram Components
+RiskLens Console — Architecture Diagram Components
 SVG-based architecture visualizations for the ML pipeline.
 """
 
@@ -75,7 +75,7 @@ def architecture_diagram():
     <rect width="900" height="600" fill="{Colors.BG_CARD}" rx="12"/>
 
     <!-- Title -->
-    <text x="450" y="36" text-anchor="middle" fill="{Colors.TEXT_PRIMARY}" font-size="18" font-weight="700">FraudTrap Production Architecture</text>
+    <text x="450" y="36" text-anchor="middle" fill="{Colors.TEXT_PRIMARY}" font-size="18" font-weight="700">RiskLens Production Architecture</text>
 
     <!-- Input -->
     <rect x="350" y="56" width="200" height="40" rx="8" fill="{Colors.BG_SECONDARY}" stroke="{Colors.BORDER_DEFAULT}"/>

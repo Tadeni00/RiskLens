@@ -1,5 +1,5 @@
 """
-FraudTrap — Champion-Challenger Architecture Tests
+RiskLens — Champion-Challenger Architecture Tests
 Unit and integration tests for the Champion-Challenger supervised learning architecture.
 """
 

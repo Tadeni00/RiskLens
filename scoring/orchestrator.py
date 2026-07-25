@@ -1,5 +1,5 @@
 """
-FraudTrap — Scoring Orchestrator
+RiskLens — Scoring Orchestrator
 Wires Tier 1 (rules) → Tier 2 (gradient boost ensemble) → Tier 3 (GNN, if needed)
 into a single real-time decision within the 100ms SLA.
 Manages model phase lifecycle (UNSUPERVISED → ADAPTIVE_LEARNING → SUPERVISED).

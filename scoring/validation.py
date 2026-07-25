@@ -1,5 +1,5 @@
 """
-FraudTrap — Feature Schema Validation
+RiskLens — Feature Schema Validation
 Validates incoming feature vectors against registered schemas.
 """
 

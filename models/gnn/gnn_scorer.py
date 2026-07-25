@@ -1,5 +1,5 @@
 """
-FraudTrap — Graph Neural Network (Tier 3)
+RiskLens — Graph Neural Network (Tier 3)
 Fraud ring detection via entity relationship graphs.
 Architecture: GraphSAGE with temporal edge features.
 Uses Lambda architecture: pre-computed embeddings for known entities (fast path)

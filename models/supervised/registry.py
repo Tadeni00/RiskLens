@@ -1,5 +1,5 @@
 """
-FraudTrap — Model Registry for Champion-Challenger Architecture
+RiskLens — Model Registry for Champion-Challenger Architecture
 Manages model registration, versioning, promotion, rollback, and archival.
 Supports the Champion-Challenger supervised learning architecture.
 """

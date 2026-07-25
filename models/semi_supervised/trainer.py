@@ -1,5 +1,5 @@
 """
-FraudTrap — Phase 2: Semi-Supervised Training Pipeline
+RiskLens — Phase 2: Semi-Supervised Training Pipeline
 
 Manages the full training lifecycle for the TabPFN-based semi-supervised model:
   Pseudo-label generation → Dataset construction → TabPFN fit → Calibration → Validation

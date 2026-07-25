@@ -1,5 +1,5 @@
 """
-FraudTrap — Enterprise Fraud Intelligence Platform
+RiskLens Console — Enterprise Risk Intelligence Platform
 Main application entry point with professional sidebar navigation.
 """
 
@@ -16,13 +16,13 @@ import streamlit as st
 
 # ── Page Config ──────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="FraudTrap — Enterprise Fraud Intelligence",
-    page_icon="🛡️",
+    page_title="RiskLens Console — Adaptive AI for Fraud & Financial Risk",
+    page_icon="🔵",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
-        "About": "FraudTrap — Enterprise Fraud Intelligence Platform",
-        "Report a bug": "https://github.com/fraudtrap/issues",
+        "About": "RiskLens Intelligence — Adaptive AI Platform for Fraud & Financial Risk",
+        "Report a bug": "https://github.com/Tadeni00/FraudTrap/issues",
     },
 )
 

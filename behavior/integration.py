@@ -1,5 +1,5 @@
 """
-FraudTrap Behavioral Intelligence Layer - Integration with Existing Components
+RiskLens Behavioral Intelligence Layer - Integration with Existing Components
 """
 
 from __future__ import annotations
@@ -25,10 +25,10 @@ logger = logging.getLogger(__name__)
 
 class BehavioralIntelligenceIntegration:
     """
-    Integration layer between Behavioral Intelligence Layer and existing FraudTrap components.
+    Integration layer between Behavioral Intelligence Layer and existing RiskLens components.
 
     This module handles the integration points between the Behavioral Intelligence Layer
-    and the existing FraudTrap components:
+    and the existing RiskLens components:
     - Cold Start (Phase 1)
     - Semi-Supervised (Phase 2)
     - Supervised (Phase 3)

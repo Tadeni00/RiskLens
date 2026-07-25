@@ -1,5 +1,5 @@
 """
-FraudTrap — Feature Store Client (Abstraction Layer)
+RiskLens — Feature Store Client (Abstraction Layer)
 Provides a clean interface for feature operations, decoupled from Redis.
 Supports multiple backends (Redis, In-Memory, Mock) for testing and deployment.
 """

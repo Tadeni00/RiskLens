@@ -1,5 +1,5 @@
 """
-FraudTrap Dashboard — Metric Display Components
+RiskLens Console — Metric Display Components
 Specialized metric rendering for fraud detection context.
 """
 

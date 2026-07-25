@@ -1,5 +1,5 @@
 """
-FraudTrap — Phase 3: FT-Transformer Specialist Model
+RiskLens — Phase 3: FT-Transformer Specialist Model
 A tabular transformer that provides second opinions on difficult transactions
 where CatBoost lacks confidence.
 

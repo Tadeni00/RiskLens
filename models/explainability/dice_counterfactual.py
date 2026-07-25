@@ -1,5 +1,5 @@
 """
-FraudTrap — DiCE Counterfactual Engine
+RiskLens — DiCE Counterfactual Engine
 Advanced optimization-based counterfactuals for analyst investigations ONLY.
 Never used during production inference.
 """

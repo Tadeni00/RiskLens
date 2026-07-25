@@ -1,5 +1,5 @@
 """
-FraudTrap — Training Pipeline
+RiskLens — Training Pipeline
 Manages the full model lifecycle:
   Layer 1 (Cold Start Ensemble) → Layer 2 (Adaptive Learning / TabPFN) → Layer 3 (Supervised CatBoost + FT-Transformer)
 Includes dataset construction with point-in-time correct feature joins,

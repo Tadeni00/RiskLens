@@ -1,4 +1,4 @@
-"""FraudTrap Dashboard — Live Monitoring Page"""
+"""RiskLens Console — Live Monitoring Page"""
 
 import time
 import streamlit as st

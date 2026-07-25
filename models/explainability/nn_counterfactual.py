@@ -1,5 +1,5 @@
 """
-FraudTrap — Nearest Neighbor Counterfactual Engine
+RiskLens — Nearest Neighbor Counterfactual Engine
 Retrieves the nearest legitimate transaction as a production counterfactual.
 Uses FAISS for approximate nearest neighbor search with tenant isolation.
 """

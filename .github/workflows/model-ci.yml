@@ -1,4 +1,4 @@
-name: FraudTrap Model CI/CD Pipeline
+name: RiskLens Model CI/CD Pipeline
 
 on:
   push:
@@ -223,7 +223,7 @@ jobs:
         with:
           channel-id: ${{ secrets.SLACK_DEPLOY_CHANNEL }}
           slack-message: |
-            *FraudTrap Model Deployed* 🚀
+            *RiskLens Model Deployed* 🚀
             Version: `${{ github.sha }}`
             Status: ${{ job.status }}
             <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>

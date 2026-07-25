@@ -1,5 +1,5 @@
 """
-FraudTrap — SHAP Explainer
+RiskLens — SHAP Explainer
 Computes local and global feature attributions for CatBoost models.
 Uses TreeExplainer for exact Shapley values in O(TLD) time.
 """

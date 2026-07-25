@@ -1,5 +1,5 @@
 """
-FraudTrap — Explainability Types
+RiskLens — Explainability Types
 Strongly typed dataclasses for the explainability framework.
 Every output is immutable, validated, and tenant-scoped.
 """

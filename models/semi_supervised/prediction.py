@@ -1,5 +1,5 @@
 """
-FraudTrap — Semi-Supervised Prediction Types
+RiskLens — Semi-Supervised Prediction Types
 Strongly typed output for Phase 2 TabPFN predictions.
 """
 

@@ -1,5 +1,5 @@
 """
-FraudTrap — Version Manager
+RiskLens — Version Manager
 Manages model versioning, feature hashes, and artifact metadata.
 Single Responsibility: Version tracking and validation.
 """

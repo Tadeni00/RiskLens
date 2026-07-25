@@ -1,5 +1,5 @@
 """
-FraudTrap — Alerting
+RiskLens — Alerting
 Structured alerting with PagerDuty, Slack, and deduplication.
 """
 
@@ -248,7 +248,7 @@ class AlertManager:
                                 "short": True,
                             },
                         ],
-                        "footer": "FraudTrap Alerting",
+                        "footer": "RiskLens Alerting",
                         "ts": int(alert.created_at.timestamp()),
                     }
                 ]

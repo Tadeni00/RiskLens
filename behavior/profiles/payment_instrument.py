@@ -1,5 +1,5 @@
 """
-FraudTrap Behavioral Intelligence Layer
+RiskLens Behavioral Intelligence Layer
 Payment Instrument Profile
 """
 

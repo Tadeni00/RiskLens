@@ -1,5 +1,5 @@
 """
-FraudTrap — Phase 3: Supervised Monitoring
+RiskLens — Phase 3: Supervised Monitoring
 Tracks CatBoost confidence distribution, FT-Transformer invocation rate,
 fusion model performance, latency impact, and calibration drift.
 """

@@ -1,5 +1,5 @@
 """
-FraudTrap Dashboard — Drift Monitoring Page
+RiskLens Console — Drift Monitoring Page
 Data drift detection, PSI analysis, and model stability.
 """
 

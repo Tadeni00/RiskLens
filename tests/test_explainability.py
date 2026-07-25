@@ -1,5 +1,5 @@
 """
-FraudTrap — Explainability Framework Tests
+RiskLens — Explainability Framework Tests
 Unit, integration, and performance tests for the explainability layer.
 """
 

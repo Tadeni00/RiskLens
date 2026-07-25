@@ -1,5 +1,5 @@
 """
-FraudTrap — Phase 3: Supervised Prediction Types
+RiskLens — Phase 3: Supervised Prediction Types
 Strongly typed output for the confidence-aware CatBoost + FT-Transformer architecture.
 """
 

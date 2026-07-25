@@ -1,5 +1,5 @@
 """
-FraudTrap — Phase 3: Meta Fusion Layer
+RiskLens — Phase 3: Meta Fusion Layer
 Combines CatBoost and FT-Transformer predictions when FT-Transformer
 is invoked for low-confidence transactions.
 

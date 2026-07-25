@@ -1,4 +1,4 @@
-"""FraudTrap Dashboard — Model Architecture Page"""
+"""RiskLens Console — Model Architecture Page"""
 
 import streamlit as st
 import pandas as pd

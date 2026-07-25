@@ -1,5 +1,5 @@
 """
-FraudTrap — Explainability Framework
+RiskLens — Explainability Framework
 Production-grade feature attribution and counterfactual explanations.
 """
 

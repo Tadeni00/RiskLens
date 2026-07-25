@@ -1,5 +1,5 @@
 """
-FraudTrap — Feature Engineering
+RiskLens — Feature Engineering
 Computes all feature families from raw transaction payloads.
 Features are read from Redis (online) or computed on-the-fly.
 Results are written back to Redis for the scoring path.

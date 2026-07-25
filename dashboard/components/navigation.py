@@ -1,5 +1,5 @@
 """
-FraudTrap Dashboard — Navigation Components
+RiskLens Console — Navigation Components
 Professional sidebar and header navigation.
 """
 
@@ -15,8 +15,8 @@ def sidebar_header():
     st.markdown(
         f"""
 <div class="sidebar-logo">
-    <h2>FraudTrap</h2>
-    <p>Enterprise Fraud Intelligence</p>
+    <h2>RiskLens</h2>
+    <p>Adaptive AI for Financial Risk</p>
 </div>
 """,
         unsafe_allow_html=True,
@@ -68,7 +68,7 @@ def global_header(
 <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:{Colors.BG_SECONDARY};border-bottom:1px solid {Colors.BORDER_SUBTLE};margin:-60px -60px 24px -60px">
     <div style="display:flex;align-items:center;gap:24px">
         <div style="display:flex;align-items:center;gap:8px">
-            <span style="color:{Colors.ACCENT};font-weight:{Typography.WEIGHT_BOLD};font-size:{Typography.TEXT_LG};letter-spacing:-0.02em">{Icons.html('SHIELD', 20, Colors.ACCENT)} FraudTrap</span>
+            <span style="color:{Colors.ACCENT};font-weight:{Typography.WEIGHT_BOLD};font-size:{Typography.TEXT_LG};letter-spacing:-0.02em">{Icons.html('SHIELD', 20, Colors.ACCENT)} RiskLens Intelligence</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;padding:6px 12px;background:{Colors.BG_CARD};border-radius:8px;border:1px solid {Colors.BORDER_DEFAULT}">
             <span style="font-size:{Typography.TEXT_SM};color:{Colors.TEXT_MUTED}">Tenant</span>

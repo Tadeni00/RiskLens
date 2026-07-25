@@ -1,5 +1,5 @@
 """
-FraudTrap — Explanation Cache
+RiskLens — Explanation Cache
 Caches explanations and SHAP values to reduce latency.
 Supports TTL-based expiration and tenant isolation.
 """

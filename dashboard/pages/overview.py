@@ -1,5 +1,5 @@
 """
-FraudTrap Dashboard — Overview Page
+RiskLens Console — Overview Page
 Real-time fraud monitoring command center.
 """
 

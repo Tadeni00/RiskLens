@@ -1,5 +1,5 @@
 """
-FraudTrap — TabPFN Adaptive Learner
+RiskLens — TabPFN Adaptive Learner
 
 Implements the AdaptiveLearner interface using Prior Labs TabPFN.
 TabPFN performs in-context learning on small-to-medium labelled datasets

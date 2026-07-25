@@ -1,5 +1,5 @@
 """
-FraudTrap — Model Router
+RiskLens — Model Router
 Routes tenants to appropriate models based on phase, availability, and experiments.
 Single Responsibility: Model selection and routing logic.
 """

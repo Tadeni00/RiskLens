@@ -1,18 +1,18 @@
 openapi: 3.0.3
 info:
-  title: FraudTrap API
+  title: RiskLens Scoring API
   version: 2.0.0
   description: |
-    Production-grade fraud detection API for banks and fintechs.
-    Implements a three-phase model lifecycle: Cold Start → Semi-Supervised → Supervised.
+    Real-time transaction scoring and explainability platform.
+    Implements a three-phase model lifecycle: Cold Start → Adaptive Learning → Supervised.
   contact:
-    name: FraudTrap API Team
-    email: api-support@fraudtrap.io
+    name: RiskLens API Team
+    email: api-support@risklens.io
   license:
     name: Proprietary
-    url: https://fraudtrap.io/license
+    url: https://risklens.io/license
 servers:
-  - url: https://api.fraudtrap.io/v1
+  - url: https://api.risklens.io/v1
     description: Production server
   - url: http://localhost:8000/v1
     description: Local development server

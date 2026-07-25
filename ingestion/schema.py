@@ -1,5 +1,5 @@
 """
-FraudTrap — Transaction Schema
+RiskLens — Transaction Schema
 Flexible Pydantic schema that accepts any client payload.
 Mandatory fields are the minimum required to compute velocity features.
 All other fields enrich the feature vector but are optional.

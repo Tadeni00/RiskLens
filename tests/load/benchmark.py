@@ -1,5 +1,5 @@
 """
-FraudTrap — Benchmark Script
+RiskLens — Benchmark Script
 Standalone performance benchmark without Locust.
 Usage: python tests/load/benchmark.py --host http://localhost:8000 --duration 60 --concurrency 50
 """
@@ -59,7 +59,7 @@ class BenchmarkResult:
 
 
 class BenchmarkRunner:
-    """Async benchmark runner for FraudTrap API."""
+    """Async benchmark runner for RiskLens API."""
 
     def __init__(
         self,
@@ -354,7 +354,7 @@ async def run_benchmark(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="FraudTrap API Benchmark")
+    parser = argparse.ArgumentParser(description="RiskLens API Benchmark")
     parser.add_argument("--host", default="http://localhost:8000", help="API host URL")
     parser.add_argument(
         "-c", "--concurrency", type=int, default=50, help="Concurrent workers"

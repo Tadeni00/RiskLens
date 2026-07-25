@@ -1,5 +1,5 @@
 """
-FraudTrap Dashboard — Alert Components
+RiskLens Console — Alert Components
 Professional alert and notification display components.
 """
 

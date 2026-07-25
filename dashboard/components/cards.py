@@ -1,5 +1,5 @@
 """
-FraudTrap Dashboard — Reusable Card Components
+RiskLens Console — Reusable Card Components
 Enterprise-grade card components for KPIs, status, and information display.
 """
 

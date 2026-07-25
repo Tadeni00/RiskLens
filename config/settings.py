@@ -1,5 +1,5 @@
 """
-FraudTrap — Central Configuration
+RiskLens Intelligence — Central Configuration
 All environment-driven settings with safe defaults for local development.
 """
 
@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     )
 
     # ── App ───────────────────────────────────────────────────────────────────
-    app_name: str = "FraudTrap"
+    app_name: str = "RiskLens Intelligence"
     app_version: str = "1.0.0"
     environment: str = Field("development", env="ENVIRONMENT")
     log_level: str = Field("INFO", env="LOG_LEVEL")
@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     # ── ClickHouse (offline feature store + analytics) ────────────────────────
     clickhouse_host: str = Field("localhost", env="CLICKHOUSE_HOST")
     clickhouse_port: int = Field(9000, env="CLICKHOUSE_PORT")
-    clickhouse_database: str = Field("fraudtrap", env="CLICKHOUSE_DATABASE")
+    clickhouse_database: str = Field("RiskLens Intelligence", env="CLICKHOUSE_DATABASE")
     clickhouse_user: str = Field("default", env="CLICKHOUSE_USER")
     clickhouse_password: str = Field("", env="CLICKHOUSE_PASSWORD")
 

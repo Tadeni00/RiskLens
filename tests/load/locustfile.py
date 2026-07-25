@@ -1,5 +1,5 @@
 """
-FraudTrap — Load Testing with Locust
+RiskLens — Load Testing with Locust
 Run: locust -f tests/load/locustfile.py --host=http://localhost:8000
 """
 

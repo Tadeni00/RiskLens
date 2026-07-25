@@ -1,5 +1,5 @@
 """
-FraudTrap — Explainability Monitoring
+RiskLens — Explainability Monitoring
 Tracks latency, usage, explanation quality, and operational health.
 """
 

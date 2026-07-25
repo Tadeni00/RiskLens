@@ -1,5 +1,5 @@
 """
-FraudTrap Dashboard — Data Loader
+RiskLens Console — Data Loader
 Provides realistic synthetic data for all dashboard pages.
 In production, replace _load_*() methods with ClickHouse queries.
 """
@@ -220,7 +220,7 @@ def _fetch_recent(tenant_id: str = "all_tenants", limit: int = 1000) -> tuple[pd
         port = int(os.getenv("CLICKHOUSE_PORT", "9000"))
         client = Client(host=host, port=port)
 
-        query = "SELECT * FROM fraudtrap.transactions"
+        query = "SELECT * FROM risklens.transactions"
         params = {}
 
         if tenant_id != "all_tenants":

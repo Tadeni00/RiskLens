@@ -1,5 +1,5 @@
 """
-FraudTrap — Rules DSL Configuration
+RiskLens — Rules DSL Configuration
 Defines the YAML/JSON schema for declarative rule definitions.
 """
 

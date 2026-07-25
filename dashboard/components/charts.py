@@ -1,5 +1,5 @@
 """
-FraudTrap Dashboard — Chart Components
+RiskLens Console — Chart Components
 Enterprise-grade Plotly chart wrappers with consistent theming.
 """
 

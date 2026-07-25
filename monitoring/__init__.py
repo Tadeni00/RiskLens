@@ -1,5 +1,5 @@
 """
-FraudTrap — Monitoring Package
+RiskLens — Monitoring Package
 """
 
 from monitoring.drift import (

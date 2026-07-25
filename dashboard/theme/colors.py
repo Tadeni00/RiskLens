@@ -1,5 +1,5 @@
 """
-FraudTrap Design System — Color Palette
+RiskLens Design System — Color Palette
 Enterprise-grade dark theme inspired by Stripe, Datadog, and Bloomberg Terminal.
 """
 

@@ -1,5 +1,5 @@
 """
-FraudTrap Behavioral Intelligence Layer - Unit Tests
+RiskLens Behavioral Intelligence Layer - Unit Tests
 """
 
 import pytest
